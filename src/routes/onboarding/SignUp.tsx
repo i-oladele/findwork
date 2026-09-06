@@ -1,31 +1,70 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { Spinner } from '../../components/system/States'
 import { useAppStore } from '../../store/appStore'
+import { useAuth } from '../../lib/authContext'
+import { friendlyError } from '../../lib/supabase'
+import { toE164 } from '../../lib/phone'
 
 export function SignUp() {
-  const profile = useAppStore((s) => s.profile)
+  const navigate = useNavigate()
+  const { signUp, signInWithOAuth } = useAuth()
   const updateProfile = useAppStore((s) => s.updateProfile)
 
   const [method, setMethod] = useState<'phone' | 'email'>('phone')
-  const [phone, setPhone] = useState(profile.phone.replace('+234 ', ''))
-  const [email, setEmail] = useState(profile.email)
-  const [fullName, setFullName] = useState(profile.fullName)
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const passwordValid = password.length >= 8 && /\d/.test(password)
-  const canSubmit = fullName.trim().length > 0 && passwordValid && (method === 'phone' ? phone.trim().length > 0 : email.trim().length > 0)
+  const canSubmit =
+    fullName.trim().length > 0 &&
+    passwordValid &&
+    (method === 'phone' ? phone.trim().length > 0 : email.trim().length > 0)
 
-  function submit() {
-    updateProfile({
-      fullName,
-      phone: method === 'phone' ? `+234 ${phone}` : profile.phone,
-      email: method === 'email' ? email : profile.email,
-    })
+  async function submit() {
+    if (!canSubmit || busy) return
+    setBusy(true)
+    setError(null)
+
+    const e164 = toE164(phone)
+    const cleanEmail = email.trim()
+
+    try {
+      await signUp({
+        method,
+        phone: method === 'phone' ? e164 : undefined,
+        email: method === 'email' ? cleanEmail : undefined,
+        password,
+        fullName: fullName.trim(),
+      })
+
+      // Mirrored into the local store so screens not yet migrated off mock
+      // data still show the right name. Source of truth is public.profiles,
+      // written by the handle_new_user trigger.
+      updateProfile({
+        fullName: fullName.trim(),
+        phone: method === 'phone' ? e164 : '',
+        email: method === 'email' ? cleanEmail : '',
+      })
+
+      // Verify needs to know which identity to confirm the code against.
+      navigate('/verify', {
+        state: { method, phone: method === 'phone' ? e164 : undefined, email: method === 'email' ? cleanEmail : undefined },
+      })
+    } catch (err) {
+      setError(friendlyError(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -76,6 +115,7 @@ export function SignUp() {
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="803 412 9087"
                   inputMode="tel"
+                  autoComplete="tel"
                   className="flex-1 text-[16px] text-ink bg-transparent outline-none placeholder:text-muted-2"
                 />
               </div>
@@ -92,6 +132,7 @@ export function SignUp() {
                 onChange={(e) => setPassword(e.target.value)}
                 type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
+                autoComplete="new-password"
                 className="flex-1 text-[16px] tracking-[0.05em] text-ink bg-transparent outline-none placeholder:text-muted-2 placeholder:tracking-normal"
               />
               <button type="button" onClick={() => setShowPassword((v) => !v)}>
@@ -104,8 +145,18 @@ export function SignUp() {
           </div>
         </div>
 
-        <Button to="/verify" onClick={submit} disabled={!canSubmit} className="mt-[26px]">
-          Send my code
+        {error && (
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 mt-4 bg-brand/8 border border-brand/25 rounded-xl px-4 py-3"
+          >
+            <i className="ph-fill ph-warning-circle text-[18px] text-brand relative top-px" />
+            <span className="text-[14px] leading-[1.45] text-brand-deep">{error}</span>
+          </div>
+        )}
+
+        <Button onClick={submit} disabled={!canSubmit || busy} className="mt-[26px]">
+          {busy ? <Spinner className="w-5 h-5 border-white/40 border-t-white" /> : 'Send my code'}
         </Button>
 
         <div className="flex items-center gap-3.5 my-6">
@@ -115,15 +166,28 @@ export function SignUp() {
         </div>
 
         <div className="flex gap-3">
-          <span className="flex-1 flex items-center justify-center gap-2 h-[52px] bg-white border border-line rounded-xl text-[15px] font-semibold text-ink">
+          <button
+            onClick={() => signInWithOAuth('google').catch((e) => setError(friendlyError(e)))}
+            className="flex-1 flex items-center justify-center gap-2 h-[52px] bg-white border border-line rounded-xl text-[15px] font-semibold text-ink"
+          >
             <i className="ph-bold ph-google-logo text-lg" />
             Google
-          </span>
-          <span className="flex-1 flex items-center justify-center gap-2 h-[52px] bg-white border border-line rounded-xl text-[15px] font-semibold text-ink">
+          </button>
+          <button
+            onClick={() => signInWithOAuth('apple').catch((e) => setError(friendlyError(e)))}
+            className="flex-1 flex items-center justify-center gap-2 h-[52px] bg-white border border-line rounded-xl text-[15px] font-semibold text-ink"
+          >
             <i className="ph-fill ph-apple-logo text-lg" />
             Apple
-          </span>
+          </button>
         </div>
+
+        <p className="mt-6 mb-8 text-center text-[14.5px] text-muted">
+          Already have an account?{' '}
+          <Link to="/signin" className="text-brand-hover font-semibold">
+            Sign in
+          </Link>
+        </p>
       </div>
     </Screen>
   )

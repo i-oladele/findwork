@@ -20,7 +20,7 @@ export function Welcome() {
         </div>
         <div className="mt-auto">
           <Button to="/signup">Create an account</Button>
-          <Button to="/home" variant="secondary" className="mt-3 text-cream">
+          <Button to="/signin" variant="secondary" className="mt-3 text-cream">
             I already have one
           </Button>
           <p className="mt-5 text-center text-[13px] leading-[1.5] text-muted-4">
