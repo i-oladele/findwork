@@ -242,7 +242,22 @@ export type Database = {
         }
         Insert: never
         Update: never
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'order_items_order_id_fkey'
+            columns: ['order_id']
+            isOneToOne: false
+            referencedRelation: 'orders'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'order_items_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+        ]
       }
       wallet_transactions: {
         Row: {
@@ -271,7 +286,22 @@ export type Database = {
         Row: { thread_id: string; profile_id: string; last_read_at: string }
         Insert: never
         Update: never
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'thread_participants_profile_id_fkey'
+            columns: ['profile_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'thread_participants_thread_id_fkey'
+            columns: ['thread_id']
+            isOneToOne: false
+            referencedRelation: 'chat_threads'
+            referencedColumns: ['id']
+          },
+        ]
       }
       chat_messages: {
         Row: {
@@ -530,7 +560,29 @@ export type Database = {
           created_at?: string
         }
         Update: { rating?: number; body?: string }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'reviews_reviewer_id_fkey'
+            columns: ['reviewer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reviews_provider_id_fkey'
+            columns: ['provider_id']
+            isOneToOne: false
+            referencedRelation: 'provider_profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reviews_booking_id_fkey'
+            columns: ['booking_id']
+            isOneToOne: true
+            referencedRelation: 'bookings'
+            referencedColumns: ['id']
+          },
+        ]
       }
       notifications: {
         Row: {
