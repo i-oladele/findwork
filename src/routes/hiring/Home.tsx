@@ -25,10 +25,10 @@ export function Home() {
             </Link>
           </div>
           <div className="flex items-center gap-2.5">
-            <Link to="/messages" className="inline-flex items-center justify-center w-11 h-11 text-cream">
+            <Link to="/notifications" className="inline-flex items-center justify-center w-11 h-11 text-cream">
               <i className="ph ph-bell text-[22px]" />
             </Link>
-            <Link to="/get-verified" className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-ink-soft text-cream">
+            <Link to="/settings" className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-ink-soft text-cream">
               <i className="ph-fill ph-user text-lg" />
             </Link>
           </div>

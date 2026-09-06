@@ -67,6 +67,9 @@ const Disputes = lazyNamed(() => import('./routes/disputes/Disputes'), 'Disputes
 const DisputeDetail = lazyNamed(() => import('./routes/disputes/DisputeDetail'), 'DisputeDetail')
 const Plans = lazyNamed(() => import('./routes/billing/Plans'), 'Plans')
 const Billing = lazyNamed(() => import('./routes/billing/Billing'), 'Billing')
+const Settings = lazyNamed(() => import('./routes/settings/Settings'), 'Settings')
+const Notifications = lazyNamed(() => import('./routes/settings/Notifications'), 'Notifications')
+const Legal = lazyNamed(() => import('./routes/settings/Legal'), 'Legal')
 
 
 
@@ -93,6 +96,9 @@ export default function App() {
           <Route path="/signin" element={<SignIn />} />
           <Route path="/verify" element={<Verify />} />
         </Route>
+
+        {/* Reachable signed in or out — required for store review */}
+        <Route path="/legal/:doc" element={<Legal />} />
 
         {/* Everything below requires a session */}
         <Route element={<ProtectedLayout />}>
@@ -162,6 +168,10 @@ export default function App() {
           {/* K · Subscription billing */}
           <Route path="/plans" element={<Plans />} />
           <Route path="/billing" element={<Billing />} />
+
+          {/* L · Account */}
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/notifications" element={<Notifications />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />
