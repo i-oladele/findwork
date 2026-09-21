@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  # Applies every migration to a real Postgres and exercises the money rules
+  # as the users who would call them: escrow, refunds, disputes, commission,
+  # top-up idempotency, withdrawals, and the permission boundaries.
+  database:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: findwork
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create database
+        run: psql -d postgres -c 'create database findwork'
+
+      - name: Stand in for Supabase (roles, auth schema, auth.uid)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/checks/postgres_stub.sql
+
+      - name: Apply migrations
+        run: |
+          for file in supabase/migrations/*.sql; do
+            echo "-- $file"
+            psql -v ON_ERROR_STOP=1 -q -f "$file"
+          done
+
+      - name: Seed
+        run: psql -v ON_ERROR_STOP=1 -q -f supabase/seed.sql
+
+      - name: Business rules
+        run: psql -v ON_ERROR_STOP=1 -f supabase/checks/business_rules.sql
+
+  # Fails the build if a service-role key or a real .env is ever committed.
+  # The anon key is safe in the client; the service-role key bypasses RLS.
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for committed secrets
+        run: |
+          if git ls-files | grep -E '^\.env($|\.)' | grep -v '\.env\.example'; then
+            echo "::error::A .env file is committed. Remove it and rotate the keys."
+            exit 1
+          fi
+          if grep -rIl --exclude-dir=node_modules --exclude='*.yml' -E 'service_role.*ey[A-Za-z0-9]{20,}' . ; then
+            echo "::error::A service-role key appears to be committed. Rotate it immediately."
+            exit 1
+          fi
+          echo "No committed secrets found."

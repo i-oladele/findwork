@@ -1,15 +1,19 @@
 import { Link } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
+import { BackButton } from '../../components/chrome/PageHeader'
 import { EmptyState, ErrorState, ListSkeleton } from '../../components/system/States'
 import {
   useNotifications,
   useNotificationsRealtime,
   useMarkNotificationRead,
 } from '../../lib/api'
+import { timeAgo } from '../../lib/format'
 import type { NotificationKind } from '../../lib/database.types'
 
 const ICONS: Record<NotificationKind, string> = {
+  order: 'ph-package',
+  support: 'ph-lifebuoy',
   booking: 'ph-calendar-check',
   quote: 'ph-note-pencil',
   message: 'ph-chat-circle',
@@ -21,30 +25,42 @@ const ICONS: Record<NotificationKind, string> = {
 
 /** Where a notification takes you, derived from the ref it carries. */
 function targetFor(refType: string | null, refId: string | null): string {
-  if (!refType || !refId) return '/home'
+  if (!refType) return '/home'
   switch (refType) {
     case 'thread':
-      return `/chat/${refId}`
+      return refId ? `/chat/${refId}` : '/messages'
     case 'booking':
       return '/bookings'
+    case 'booking_reschedule':
+      return refId ? `/bookings/${refId}/reschedule` : '/bookings'
+    case 'booking_request':
+      return '/provider/requests'
     case 'order':
-      return `/order/${refId}`
+      return refId ? `/order/${refId}` : '/orders'
+    case 'job':
+      return refId ? `/jobs/${refId}` : '/quotes'
     case 'rfq':
-      return `/rfqs/${refId}`
+      return refId ? `/rfqs/${refId}` : '/rfqs'
     case 'dispute':
-      return '/disputes'
+      return refId ? `/disputes/${refId}` : '/disputes'
+    case 'provider':
+      return refId ? `/provider/${refId}` : '/provider'
+    case 'wallet':
+      return '/wallet'
+    case 'billing':
+      return '/billing'
+    case 'support':
+      return '/help'
+    // Operator notifications: everything is handled in one console.
+    case 'admin_dispute':
+    case 'admin_order':
+    case 'admin_report':
+    case 'admin_support':
+    case 'admin_withdrawal':
+      return '/admin'
     default:
       return '/home'
   }
-}
-
-function timeAgo(iso: string): string {
-  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (seconds < 60) return 'now'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`
-  return new Date(iso).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })
 }
 
 export function Notifications() {
@@ -57,9 +73,7 @@ export function Notifications() {
       <div className="bg-ink px-[22px] pb-6">
         <StatusBar tone="light" />
         <div className="flex items-center gap-1 mt-1.5">
-          <Link to="/home" className="inline-flex items-center justify-center w-10 h-11 -ml-2.5 text-cream">
-            <i className="ph-bold ph-arrow-left text-[22px]" />
-          </Link>
+          <BackButton fallback="/home" tone="light" />
           <div className="font-display font-bold text-[22px] text-cream">Notifications</div>
         </div>
       </div>

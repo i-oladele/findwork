@@ -5,7 +5,12 @@
 -- — that's created live by using the app, same as any real user's data
 -- would be. All demo accounts share the password below for local testing.
 
+-- Hosted Supabase installs pgcrypto into the "extensions" schema, which is
+-- not always on the search path of the connection running this file, so
+-- crypt()/gen_salt() below would not resolve. Locally the extension lands in
+-- public and the extra entry is simply ignored.
 create extension if not exists pgcrypto;
+set search_path = public, extensions;
 
 do $$
 declare
@@ -21,6 +26,7 @@ declare
   v_ngozi uuid := '00000000-0000-0000-0000-000000000007';
   v_herbert uuid := '00000000-0000-0000-0000-000000000008';
   v_femi uuid := '00000000-0000-0000-0000-000000000009';
+  v_admin uuid := '00000000-0000-0000-0000-000000000010';
 
   v_user record;
 begin
@@ -34,7 +40,8 @@ begin
       (v_tunde, 'tunde.a@example.ng', 'Tunde A.', ''),
       (v_ngozi, 'ngozi.e@example.ng', 'Ngozi E.', ''),
       (v_herbert, 'contact@herbertmacaulayproperties.ng', 'Herbert Macaulay Properties', ''),
-      (v_femi, 'femi.o@example.ng', 'Femi O.', '')
+      (v_femi, 'femi.o@example.ng', 'Femi O.', ''),
+      (v_admin, 'admin@findwork.africa', 'FindWork Support', '')
     ) as t(id, email, full_name, phone)
   loop
     insert into auth.users (
@@ -61,7 +68,12 @@ begin
 
   -- Location, used by the profiles trigger's defaults left blank — fill in
   -- for the demo customer to match the original mock profile.
-  update public.profiles set location = 'Yaba, Lagos' where id = v_customer;
+  update public.profiles
+  set location = 'Yaba, Lagos', address = '14 Herbert Macaulay Way, Yaba, Lagos'
+  where id = v_customer;
+
+  -- Resolves disputes, fulfils orders and processes withdrawals in /admin.
+  update public.profiles set is_admin = true where id = v_admin;
 
   insert into public.provider_profiles
     (id, business_name, category, location, bio, price, price_unit, verified, rating, reviews, jobs_done, trust_score)
@@ -78,7 +90,7 @@ begin
     (v_chidi, 'Full plumbing inspection', 15000, 'Up to 3 bathrooms · ~2 hours'),
     (v_bisi, 'Ready-to-wear, single piece', 14000, '2 weeks');
 
-  insert into public.provider_availability (provider_id) values (v_ada), (v_chidi), (v_bisi), (v_mama);
+  -- Availability rows are created by the provider_profiles insert trigger.
 
   insert into public.classifieds (seller_id, title, price, category, location, description) values
     (v_tunde, 'Self-contain apartment, Yaba', 450000, 'Rentals', 'Yaba', 'Newly renovated self-contain, prepaid meter, water included. Annual rent, one year minimum.'),
@@ -115,10 +127,12 @@ insert into public.course_lessons (course_id, title, minutes, position) values
   ('internship-fashion-house', 'Shadowing senior tailors', 0, 2),
   ('internship-logistics', 'Dispatch systems walkthrough', 25, 1);
 
-insert into public.subscription_plans (id, name, price, features) values
-  ('free', 'Free', 0, array['3 active listings', 'Standard search placement', '6% platform fee']),
-  ('pro', 'Pro', 4500, array['Unlimited listings', 'Priority search placement', '4% platform fee', 'Verified Pro badge']),
-  ('business', 'Business', 15000, array['Everything in Pro', 'Team accounts (up to 5)', '2% platform fee', 'Dedicated support line']);
+-- commission_rate is what complete_booking takes from the provider's payout;
+-- listing_limit caps live packages (null = unlimited); priority orders search.
+insert into public.subscription_plans (id, name, price, features, commission_rate, listing_limit, priority) values
+  ('free', 'Free', 0, array['3 active listings', 'Standard search placement', '6% platform fee'], 0.06, 3, 0),
+  ('pro', 'Pro', 4500, array['Unlimited listings', 'Priority search placement', '4% platform fee', 'Verified Pro badge'], 0.04, null, 1),
+  ('business', 'Business', 15000, array['Everything in Pro', '2% platform fee — our lowest', 'Top search placement', 'Priority support'], 0.02, null, 2);
 
 -- Give the demo customer their original starting balance, as a real ledger
 -- entry rather than a hardcoded column — this is also the seed's proof that

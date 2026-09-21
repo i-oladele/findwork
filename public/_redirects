@@ -1,0 +1,4 @@
+# Single-page app: every path is served by index.html and routed in the
+# browser. Without this, opening /wallet directly returns 404 on Netlify
+# and Cloudflare Pages.
+/*  /index.html  200

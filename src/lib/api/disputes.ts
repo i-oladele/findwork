@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { keys } from './keys'
-import type { Dispute, DisputeRefType } from '../database.types'
+import type { Dispute, DisputeOutcome, DisputeRefType } from '../database.types'
 
+/** Disputes the signed-in user raised or that were raised against them. */
 export function useDisputes() {
   const { user } = useAuth()
 
@@ -14,6 +15,7 @@ export function useDisputes() {
       const { data, error } = await supabase
         .from('disputes')
         .select('*')
+        .or(`raised_by.eq.${user!.id},against_id.eq.${user!.id}`)
         .order('opened_at', { ascending: false })
       if (error) throw error
       return data
@@ -21,31 +23,67 @@ export function useDisputes() {
   })
 }
 
+export function useDispute(id: string | undefined) {
+  return useQuery({
+    queryKey: keys.disputes.detail(id ?? ''),
+    enabled: Boolean(id),
+    queryFn: async (): Promise<Dispute | null> => {
+      const { data, error } = await supabase.from('disputes').select('*').eq('id', id!).maybeSingle()
+      if (error) throw error
+      return data
+    },
+  })
+}
+
 /**
- * TODO(ops): opening a dispute records it but has no effect on money — escrow
- * is not frozen and no refund path exists, and there is no admin surface for
- * a human to adjudicate. Both are required before real funds are at stake.
+ * Opens a dispute and freezes the money behind it: while it is open the
+ * escrow cannot be released or cancelled, and the order cannot be cancelled.
+ * The server checks the caller is a party to what they are disputing.
  */
 export function useOpenDispute() {
   const qc = useQueryClient()
-  const { user } = useAuth()
 
   return useMutation({
     mutationFn: async (input: {
-      ref_id: string
-      ref_type: DisputeRefType
+      refType: DisputeRefType
+      refId: string
       reason: string
+      evidencePaths?: string[]
     }): Promise<string> => {
-      const { data, error } = await supabase
-        .from('disputes')
-        .insert({ raised_by: user!.id, ...input })
-        .select('id')
-        .single()
+      const { data, error } = await supabase.rpc('open_dispute', {
+        p_ref_type: input.refType,
+        p_ref_id: input.refId,
+        p_reason: input.reason,
+        p_evidence_paths: input.evidencePaths ?? [],
+      })
       if (error) throw error
-      return data.id
+      return data
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.disputes.all })
+      qc.invalidateQueries({ queryKey: keys.admin.all })
+    },
+  })
+}
+
+/** Admin only: settle a dispute, moving the held money one way or the other. */
+export function useResolveDispute() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: { disputeId: string; outcome: DisputeOutcome; note: string }) => {
+      const { error } = await supabase.rpc('resolve_dispute', {
+        p_dispute_id: input.disputeId,
+        p_outcome: input.outcome,
+        p_note: input.note,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.disputes.all })
+      qc.invalidateQueries({ queryKey: keys.admin.all })
+      qc.invalidateQueries({ queryKey: keys.bookings.all })
+      qc.invalidateQueries({ queryKey: keys.commerce.orders() })
     },
   })
 }

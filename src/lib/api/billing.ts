@@ -34,6 +34,9 @@ export function useSubscription() {
 }
 
 /**
+ * Charges the first month from the wallet; private.renew_subscriptions
+ * charges each month after, or drops the account to Free if it cannot.
+ *
  * TODO(store-review): on iOS, selling a digital subscription outside Apple's
  * in-app purchase is the single most common cause of marketplace-app
  * rejection. This wallet-charge path is fine on web and Android; the iOS
@@ -50,6 +53,7 @@ export function useSubscribe() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.billing.subscription() })
       qc.invalidateQueries({ queryKey: keys.wallet.all })
+      qc.invalidateQueries({ queryKey: keys.providers.all })
     },
   })
 }

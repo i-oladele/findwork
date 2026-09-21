@@ -1,69 +1,118 @@
 import { Link } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
-import { StatusBar } from '../../components/chrome/StatusBar'
-import { Badge } from '../../components/ui/Badge'
+import { PageHeader } from '../../components/chrome/PageHeader'
+import { SectionLabel } from '../../components/ui/SectionLabel'
+import { useMyProviderProfile } from '../../lib/api'
 
-const items = [
-  { icon: 'identification-card', label: 'NIN verified', detail: 'Checked 4 March 2026', points: '+30', done: true },
-  { icon: 'user-focus', label: 'Face matched to ID', detail: 'Checked 4 March 2026', points: '+20', done: true },
-  { icon: 'briefcase', label: '486 jobs completed', detail: 'No cancellations in 90 days', points: '+25', done: true },
-  { icon: 'star', label: '4.9 from 212 reviews', detail: 'Two disputes, both resolved', points: '+17', done: true },
-  { icon: 'buildings', label: 'CAC business registration', detail: 'Not added — worth 8 points', done: false },
+const PROTECTIONS = [
+  {
+    icon: 'lock-simple',
+    title: 'Escrow on every booking',
+    body: 'Your money is held by FindWork until you confirm the job is done. Providers see it is there before they start.',
+  },
+  {
+    icon: 'arrow-counter-clockwise',
+    title: 'Full refund before the start time',
+    body: 'If a provider declines, or either of you cancels before the job starts, the money comes straight back to your wallet.',
+  },
+  {
+    icon: 'scales',
+    title: 'Disputes freeze the money',
+    body: 'Report a problem and the payment is held until a person on our team looks at both sides and decides.',
+  },
+  {
+    icon: 'star',
+    title: 'Reviews only from real customers',
+    body: 'Only someone who booked, paid and confirmed a job can review it — one review per booking.',
+  },
+  {
+    icon: 'flag',
+    title: 'Report anything that feels wrong',
+    body: 'Every profile, listing and message has a report button. Reports go to our moderators.',
+  },
 ]
 
+/**
+ * How FindWork keeps people safe, plus — for providers — the signals that
+ * customers see. These are the real stored facts; there is no composite
+ * "trust score" formula yet, so none is shown.
+ */
 export function Trust() {
+  const { data: provider } = useMyProviderProfile()
+
   return (
     <Screen>
-      <div className="bg-ink px-[22px] pb-[26px]">
-        <StatusBar tone="light" />
-        <Link to="/home" className="inline-flex items-center justify-center w-11 h-11 -ml-2.5 text-cream">
-          <i className="ph-bold ph-arrow-left text-[22px]" />
-        </Link>
-        <div className="flex items-center gap-[18px] mt-2.5">
-          <div className="flex-none w-[88px] h-[88px] rounded-full border-[6px] border-success flex items-center justify-center">
-            <span className="font-display font-bold text-[28px] text-cream">92</span>
-          </div>
-          <div>
-            <div className="font-display font-bold text-2xl tracking-[-0.02em] text-cream">Trust score</div>
-            <div className="mt-2">
-              <Badge tone="success" icon="shield-check">Fully verified</Badge>
+      <PageHeader title="Safety and trust" back="/settings" />
+      <div className="px-[22px] pb-8">
+        {provider && (
+          <>
+            <SectionLabel className="mt-5 mb-2.5">What customers see about you</SectionLabel>
+            <div className="bg-white border border-line rounded-2xl overflow-hidden">
+              <Signal
+                done={provider.verified}
+                icon="shield-check"
+                label={provider.verified ? 'Verified by FindWork' : 'Not yet verified'}
+                action={provider.verified ? undefined : { to: '/get-verified', label: 'Get verified' }}
+              />
+              <Signal done={provider.jobs_done > 0} icon="briefcase" label={`${provider.jobs_done} job${provider.jobs_done === 1 ? '' : 's'} completed`} />
+              <Signal
+                done={provider.reviews > 0}
+                icon="star"
+                label={
+                  provider.reviews > 0
+                    ? `${Number(provider.rating).toFixed(1)} from ${provider.reviews} review${provider.reviews === 1 ? '' : 's'}`
+                    : 'No reviews yet'
+                }
+                last
+              />
             </div>
-          </div>
-        </div>
-      </div>
+          </>
+        )}
 
-      <div className="px-[22px] pt-5">
-        <p className="text-[15px] leading-[1.6] text-text-soft">
-          Your score is built from verification, completed jobs, reviews and how you handle disputes. Customers
-          see the badge, never the underlying documents.
-        </p>
-
-        <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mt-5 mb-2.5">What counts</div>
-        <div className="bg-white border border-line rounded-2xl overflow-hidden">
-          {items.map((item, i) => (
-            <div key={item.label} className={`flex items-center gap-3.5 p-[15px] ${i < items.length - 1 ? 'border-b border-line-soft' : ''}`}>
-              <i className={`${item.done ? 'ph-fill' : 'ph'} ph-${item.icon} text-[22px] ${item.done ? 'text-success' : 'text-muted-4'}`} />
-              <div className="flex-1">
-                <div className="text-[15px] font-semibold text-ink">{item.label}</div>
-                <div className="text-[12.5px] text-muted-2 mt-0.5">{item.detail}</div>
+        <SectionLabel className="mt-6 mb-2.5">How you are protected</SectionLabel>
+        <div className="space-y-2.5">
+          {PROTECTIONS.map((p) => (
+            <div key={p.title} className="flex gap-3.5 bg-white border border-line rounded-2xl p-4">
+              <i className={`ph-fill ph-${p.icon} text-[22px] text-success`} />
+              <div>
+                <div className="text-[15px] font-semibold text-ink">{p.title}</div>
+                <p className="mt-1 text-[13.5px] leading-[1.5] text-text-soft">{p.body}</p>
               </div>
-              {item.done ? (
-                <span className="font-mono text-[11px] text-success-text">{item.points}</span>
-              ) : (
-                <i className="ph-bold ph-arrow-right text-[17px] text-brand" />
-              )}
             </div>
           ))}
         </div>
 
-        <div className="flex items-start gap-2.5 bg-white border border-line rounded-2xl p-4 mt-3.5">
-          <i className="ph-fill ph-lock-simple text-[19px] text-muted-2 relative top-0.5" />
-          <p className="m-0 text-[13.5px] leading-[1.5] text-text-soft">
-            Documents are encrypted and only reviewed by our verification team. You can ask for them to be
-            deleted at any time.
-          </p>
-        </div>
+        <Link to="/help" className="flex items-center justify-between bg-ink rounded-2xl px-5 py-4 mt-5">
+          <span className="font-display font-semibold text-[16px] text-cream">Need help now?</span>
+          <i className="ph-bold ph-arrow-right text-xl text-brand" />
+        </Link>
       </div>
     </Screen>
+  )
+}
+
+function Signal({
+  done,
+  icon,
+  label,
+  action,
+  last,
+}: {
+  done: boolean
+  icon: string
+  label: string
+  action?: { to: string; label: string }
+  last?: boolean
+}) {
+  return (
+    <div className={`flex items-center gap-3.5 p-[15px] ${last ? '' : 'border-b border-line-soft'}`}>
+      <i className={`${done ? 'ph-fill text-success' : 'ph text-muted-4'} ph-${icon} text-[22px]`} />
+      <span className="flex-1 text-[15px] font-semibold text-ink">{label}</span>
+      {action && (
+        <Link to={action.to} className="text-[14px] font-semibold text-brand-hover">
+          {action.label}
+        </Link>
+      )}
+    </div>
   )
 }

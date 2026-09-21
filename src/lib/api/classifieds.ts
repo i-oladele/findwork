@@ -4,15 +4,21 @@ import { useAuth } from '../authContext'
 import { keys } from './keys'
 import type { Classified, ClassifiedCategory } from '../database.types'
 
+export type ClassifiedWithSeller = Classified & {
+  seller: { id: string; full_name: string; avatar_url: string | null } | null
+}
+
+const SELECT = '*, seller:profiles!classifieds_seller_id_fkey(id, full_name, avatar_url)'
+
 export function useClassifieds(category?: ClassifiedCategory) {
   return useQuery({
     queryKey: keys.classifieds.list(category),
-    queryFn: async (): Promise<Classified[]> => {
-      let q = supabase.from('classifieds').select('*')
+    queryFn: async (): Promise<ClassifiedWithSeller[]> => {
+      let q = supabase.from('classifieds').select(SELECT)
       if (category) q = q.eq('category', category)
       const { data, error } = await q.order('created_at', { ascending: false }).limit(50)
       if (error) throw error
-      return data
+      return data as unknown as ClassifiedWithSeller[]
     },
   })
 }
@@ -21,10 +27,10 @@ export function useClassified(id: string | undefined) {
   return useQuery({
     queryKey: keys.classifieds.detail(id ?? ''),
     enabled: Boolean(id),
-    queryFn: async (): Promise<Classified> => {
-      const { data, error } = await supabase.from('classifieds').select('*').eq('id', id!).single()
+    queryFn: async (): Promise<ClassifiedWithSeller | null> => {
+      const { data, error } = await supabase.from('classifieds').select(SELECT).eq('id', id!).maybeSingle()
       if (error) throw error
-      return data
+      return data as unknown as ClassifiedWithSeller | null
     },
   })
 }
@@ -40,6 +46,7 @@ export function usePostClassified() {
       category: ClassifiedCategory
       location: string
       description: string
+      photo_urls: string[]
     }): Promise<string> => {
       const { data, error } = await supabase
         .from('classifieds')

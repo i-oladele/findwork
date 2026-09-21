@@ -5,17 +5,19 @@ import { StatusBar } from '../../components/chrome/StatusBar'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Spinner } from '../../components/system/States'
-import { useAppStore } from '../../store/appStore'
+import { SocialSignIn } from '../../components/ui/SocialSignIn'
 import { useAuth } from '../../lib/authContext'
 import { friendlyError } from '../../lib/supabase'
 import { toE164 } from '../../lib/phone'
 
 export function SignUp() {
   const navigate = useNavigate()
-  const { signUp, signInWithOAuth } = useAuth()
-  const updateProfile = useAppStore((s) => s.updateProfile)
+  const { signUp } = useAuth()
 
-  const [method, setMethod] = useState<'phone' | 'email'>('phone')
+  // Email by default: phone needs an SMS provider configured on the Supabase
+  // project (and costs per message). Switch back to 'phone' once it is set up —
+  // phone-first is the right default for Nigerian users.
+  const [method, setMethod] = useState<'phone' | 'email'>('email')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
@@ -39,7 +41,7 @@ export function SignUp() {
     const cleanEmail = email.trim()
 
     try {
-      await signUp({
+      const { needsVerification } = await signUp({
         method,
         phone: method === 'phone' ? e164 : undefined,
         email: method === 'email' ? cleanEmail : undefined,
@@ -47,14 +49,10 @@ export function SignUp() {
         fullName: fullName.trim(),
       })
 
-      // Mirrored into the local store so screens not yet migrated off mock
-      // data still show the right name. Source of truth is public.profiles,
-      // written by the handle_new_user trigger.
-      updateProfile({
-        fullName: fullName.trim(),
-        phone: method === 'phone' ? e164 : '',
-        email: method === 'email' ? cleanEmail : '',
-      })
+      if (!needsVerification) {
+        navigate('/role', { replace: true })
+        return
+      }
 
       // Verify needs to know which identity to confirm the code against.
       navigate('/verify', {
@@ -159,28 +157,7 @@ export function SignUp() {
           {busy ? <Spinner className="w-5 h-5 border-white/40 border-t-white" /> : 'Send my code'}
         </Button>
 
-        <div className="flex items-center gap-3.5 my-6">
-          <span className="flex-1 h-px bg-line" />
-          <span className="font-mono text-[11px] tracking-[0.14em] uppercase text-muted">or</span>
-          <span className="flex-1 h-px bg-line" />
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={() => signInWithOAuth('google').catch((e) => setError(friendlyError(e)))}
-            className="flex-1 flex items-center justify-center gap-2 h-[52px] bg-white border border-line rounded-xl text-[15px] font-semibold text-ink"
-          >
-            <i className="ph-bold ph-google-logo text-lg" />
-            Google
-          </button>
-          <button
-            onClick={() => signInWithOAuth('apple').catch((e) => setError(friendlyError(e)))}
-            className="flex-1 flex items-center justify-center gap-2 h-[52px] bg-white border border-line rounded-xl text-[15px] font-semibold text-ink"
-          >
-            <i className="ph-fill ph-apple-logo text-lg" />
-            Apple
-          </button>
-        </div>
+        <SocialSignIn />
 
         <p className="mt-6 mb-8 text-center text-[14.5px] text-muted">
           Already have an account?{' '}

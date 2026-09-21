@@ -8,7 +8,7 @@ import { useAuth } from '../../lib/authContext'
 import { friendlyError } from '../../lib/supabase'
 import { toLocal } from '../../lib/phone'
 
-type VerifyState = { method: 'phone' | 'email'; phone?: string; email?: string }
+type VerifyState = { method: 'phone' | 'email'; phone?: string; email?: string; next?: string }
 
 const RESEND_SECONDS = 45
 
@@ -64,7 +64,8 @@ export function Verify() {
     setError(null)
     try {
       await verifyOtp({ method: pending!.method, phone: pending!.phone, email: pending!.email, token: code })
-      navigate('/role', { replace: true })
+      // A password reset by phone continues to /reset-password; sign-up to /role.
+      navigate(pending!.next ?? '/role', { replace: true })
     } catch (err) {
       setError(friendlyError(err))
       setDigits(['', '', '', '', '', ''])

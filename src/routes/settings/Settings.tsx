@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
 import { Input } from '../../components/ui/Input'
+import { AreaPicker } from '../../components/ui/AreaPicker'
+import { AvatarUpload } from '../../components/ui/AvatarUpload'
 import { ErrorState, ListSkeleton, Spinner } from '../../components/system/States'
 import { useAuth } from '../../lib/authContext'
 import { useProfile, useUpdateProfile, useDeleteAccount, useWalletSummary } from '../../lib/api'
@@ -20,6 +22,8 @@ export function Settings() {
   const [editing, setEditing] = useState(false)
   const [fullName, setFullName] = useState('')
   const [location, setLocation] = useState('')
+  const [address, setAddress] = useState('')
+  const [area, setArea] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmText, setConfirmText] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -27,13 +31,20 @@ export function Settings() {
   function startEditing() {
     setFullName(profile?.full_name ?? '')
     setLocation(profile?.location ?? '')
+    setAddress(profile?.address ?? '')
+    setArea(profile?.area ?? null)
     setEditing(true)
   }
 
   async function save() {
     setError(null)
     try {
-      await updateProfile.mutateAsync({ full_name: fullName.trim(), location: location.trim() || null })
+      await updateProfile.mutateAsync({
+        full_name: fullName.trim(),
+        location: location.trim() || null,
+        address: address.trim() || null,
+        area,
+      })
       setEditing(false)
     } catch (err) {
       setError(friendlyError(err))
@@ -81,7 +92,13 @@ export function Settings() {
               {editing ? (
                 <div className="space-y-4">
                   <Input label="Full name" value={fullName} onChange={setFullName} placeholder="Full name" />
-                  <Input label="Location" value={location} onChange={setLocation} placeholder="Yaba, Lagos" />
+                  <AreaPicker
+                    value={area}
+                    onChange={setArea}
+                    hint="Used to show you providers nearby, and to sort by who is closest."
+                  />
+                  <Input label="Neighbourhood (optional)" value={location} onChange={setLocation} placeholder="Off Herbert Macaulay Way" />
+                  <Input label="Delivery address" value={address} onChange={setAddress} placeholder="14 Herbert Macaulay Way, Yaba" />
                   <div className="flex gap-2.5">
                     <button
                       onClick={save}
@@ -100,17 +117,18 @@ export function Settings() {
                 </div>
               ) : (
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <AvatarUpload className="mr-1" />
+                  <div className="min-w-0 flex-1">
                     <div className="font-display font-bold text-[19px] text-ink truncate">
                       {profile.full_name || 'Add your name'}
                     </div>
                     <div className="mt-1 text-[14.5px] text-muted truncate">
                       {profile.phone ? `+234 ${toLocal(profile.phone)}` : profile.email}
                     </div>
-                    {profile.location && (
+                    {(profile.area || profile.location) && (
                       <div className="mt-1 flex items-center gap-1.5 text-[14px] text-muted-2">
                         <i className="ph-fill ph-map-pin text-brand text-[14px]" />
-                        {profile.location}
+                        {[profile.area, profile.location].filter(Boolean).join(' · ')}
                       </div>
                     )}
                   </div>
@@ -127,10 +145,19 @@ export function Settings() {
             <div className="mt-5 bg-white border border-line rounded-2xl overflow-hidden">
               <SettingsLink to="/get-verified" icon="ph-seal-check" label="Verification" />
               <SettingsLink to="/notifications" icon="ph-bell" label="Notifications" />
+              <SettingsLink to="/orders" icon="ph-package" label="My orders" />
+              <SettingsLink to="/quotes" icon="ph-note-pencil" label="My posted jobs" />
               <SettingsLink to="/billing" icon="ph-credit-card" label="Plan and billing" />
               <SettingsLink to="/disputes" icon="ph-scales" label="Disputes" />
-              <SettingsLink to="/trust" icon="ph-shield-check" label="Safety and trust" last />
+              <SettingsLink to="/trust" icon="ph-shield-check" label="Safety and trust" />
+              <SettingsLink to="/help" icon="ph-lifebuoy" label="Help and support" last />
             </div>
+
+            {profile.is_admin && (
+              <div className="mt-5 bg-white border border-line rounded-2xl overflow-hidden">
+                <SettingsLink to="/admin" icon="ph-user-circle-gear" label="Operations console" last />
+              </div>
+            )}
 
             <div className="mt-5 bg-white border border-line rounded-2xl overflow-hidden">
               <SettingsLink to="/legal/terms" icon="ph-file-text" label="Terms of service" />

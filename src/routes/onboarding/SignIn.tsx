@@ -5,15 +5,19 @@ import { StatusBar } from '../../components/chrome/StatusBar'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Spinner } from '../../components/system/States'
+import { SocialSignIn } from '../../components/ui/SocialSignIn'
 import { useAuth } from '../../lib/authContext'
 import { friendlyError } from '../../lib/supabase'
 import { toE164 } from '../../lib/phone'
 
 export function SignIn() {
   const navigate = useNavigate()
-  const { signIn, signInWithOAuth } = useAuth()
+  const { signIn } = useAuth()
 
-  const [method, setMethod] = useState<'phone' | 'email'>('phone')
+  // Email by default: phone needs an SMS provider configured on the Supabase
+  // project (and costs per message). Switch back to 'phone' once it is set up —
+  // phone-first is the right default for Nigerian users.
+  const [method, setMethod] = useState<'phone' | 'email'>('email')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -117,6 +121,12 @@ export function SignIn() {
           </div>
         </div>
 
+        <div className="flex justify-end mt-3">
+          <Link to="/forgot-password" className="text-[14px] font-semibold text-brand-hover">
+            Forgot password?
+          </Link>
+        </div>
+
         {error && (
           <div
             role="alert"
@@ -131,28 +141,7 @@ export function SignIn() {
           {busy ? <Spinner className="w-5 h-5 border-white/40 border-t-white" /> : 'Sign in'}
         </Button>
 
-        <div className="flex items-center gap-3.5 my-6">
-          <span className="flex-1 h-px bg-line" />
-          <span className="font-mono text-[11px] tracking-[0.14em] uppercase text-muted">or</span>
-          <span className="flex-1 h-px bg-line" />
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={() => signInWithOAuth('google').catch((e) => setError(friendlyError(e)))}
-            className="flex-1 flex items-center justify-center gap-2 h-[52px] bg-white border border-line rounded-xl text-[15px] font-semibold text-ink"
-          >
-            <i className="ph-bold ph-google-logo text-lg" />
-            Google
-          </button>
-          <button
-            onClick={() => signInWithOAuth('apple').catch((e) => setError(friendlyError(e)))}
-            className="flex-1 flex items-center justify-center gap-2 h-[52px] bg-white border border-line rounded-xl text-[15px] font-semibold text-ink"
-          >
-            <i className="ph-fill ph-apple-logo text-lg" />
-            Apple
-          </button>
-        </div>
+        <SocialSignIn />
 
         <p className="mt-6 mb-8 text-center text-[14.5px] text-muted">
           New here?{' '}

@@ -16,8 +16,24 @@ export function useProviderReviews(providerId: string | undefined) {
         .select('*, reviewer:profiles!reviews_reviewer_id_fkey(full_name, avatar_url)')
         .eq('provider_id', providerId!)
         .order('created_at', { ascending: false })
+        .limit(20)
       if (error) throw error
-      return data
+      return data as unknown as ReviewWithAuthor[]
+    },
+  })
+}
+
+/** Booking ids the signed-in user has already reviewed. */
+export function useMyReviewedBookingIds() {
+  const { user } = useAuth()
+
+  return useQuery({
+    queryKey: keys.reviews.mine(),
+    enabled: Boolean(user),
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await supabase.from('reviews').select('booking_id').eq('reviewer_id', user!.id)
+      if (error) throw error
+      return new Set(data.map((r) => r.booking_id))
     },
   })
 }
@@ -43,6 +59,7 @@ export function useLeaveReview() {
       if (error) throw error
     },
     onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: keys.reviews.mine() })
       qc.invalidateQueries({ queryKey: keys.providers.reviews(vars.providerId) })
       qc.invalidateQueries({ queryKey: keys.providers.detail(vars.providerId) })
     },

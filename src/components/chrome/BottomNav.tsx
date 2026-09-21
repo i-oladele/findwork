@@ -27,7 +27,7 @@ export function BottomNav({ mode }: { mode: 'customer' | 'provider' }) {
   const items = mode === 'customer' ? customerItems : providerItems
 
   return (
-    <div className="sticky bottom-0 left-0 right-0 h-[78px] bg-white border-t border-line-soft flex px-1.5 pt-2.5">
+    <nav className="sticky bottom-0 left-0 right-0 min-h-[78px] pb-[max(12px,env(safe-area-inset-bottom))] bg-white border-t border-line-soft flex px-1.5 pt-2.5">
       {items.map((item) => {
         const active = pathname === item.path
         return (
@@ -47,6 +47,6 @@ export function BottomNav({ mode }: { mode: 'customer' | 'provider' }) {
           </Link>
         )
       })}
-    </div>
+    </nav>
   )
 }

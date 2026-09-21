@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { Spinner } from '../system/States'
 
 type Variant = 'primary' | 'secondary' | 'ghost'
 
@@ -12,10 +13,16 @@ type ButtonProps = {
   onClick?: () => void
   type?: 'button' | 'submit'
   disabled?: boolean
+  /** Shows a spinner in place of the label and blocks further taps. */
+  loading?: boolean
 }
 
+// w-full matters: a <button> sizes to its own text even when it is a flex
+// container, while the <Link> variant (an <a>) stretches. Without this the
+// same component rendered two different widths depending on whether it was
+// given `to` or `onClick`.
 const base =
-  'flex items-center justify-center gap-2 h-14 rounded-xl font-semibold text-[17px] font-sans transition-colors'
+  'w-full flex items-center justify-center gap-2 h-14 rounded-xl font-semibold text-[17px] font-sans transition-colors'
 
 const variants: Record<Variant, string> = {
   primary: 'bg-brand text-white hover:bg-brand-hover',
@@ -34,9 +41,13 @@ export function Button({
   onClick,
   type = 'button',
   disabled,
+  loading,
 }: ButtonProps) {
-  const classes = `${base} ${variants[variant]} ${disabled ? 'opacity-50 pointer-events-none' : ''} ${className}`
-  const content = (
+  const inactive = disabled || loading
+  const classes = `${base} ${variants[variant]} ${inactive ? 'opacity-50 pointer-events-none' : ''} ${className}`
+  const content = loading ? (
+    <Spinner className="w-5 h-5 border-current/30 border-t-current" />
+  ) : (
     <>
       {icon && <i className={`ph-bold ph-${icon} text-[17px]`} />}
       {children}
@@ -52,7 +63,7 @@ export function Button({
   }
 
   return (
-    <button type={type} onClick={onClick} disabled={disabled} className={classes}>
+    <button type={type} onClick={onClick} disabled={inactive} className={classes}>
       {content}
     </button>
   )

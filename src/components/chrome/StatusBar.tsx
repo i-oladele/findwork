@@ -1,24 +1,15 @@
 type StatusBarProps = {
+  /** Kept for call-site compatibility with the design's light/dark headers. */
   tone?: 'light' | 'dark'
   className?: string
-  transparent?: boolean
 }
 
-/** The 9:41 / signal-wifi-battery row every screen in the source opens with. */
-export function StatusBar({ tone = 'dark', className = '', transparent = false }: StatusBarProps) {
-  const color = tone === 'light' ? 'text-cream' : 'text-ink'
-  return (
-    <div
-      className={`h-11 flex items-center justify-between px-[22px] font-mono text-xs ${color} ${
-        transparent ? 'bg-gradient-to-b from-cream/90 to-cream/0' : ''
-      } ${className}`}
-    >
-      <span>9:41</span>
-      <span className="flex items-center gap-1.5">
-        <i className="ph-fill ph-cell-signal-full text-[13px]" />
-        <i className="ph-fill ph-wifi-high text-[13px]" />
-        <i className="ph-fill ph-battery-full text-sm" />
-      </span>
-    </div>
-  )
+/**
+ * Top spacer that clears the phone's own status bar and notch. The design
+ * mocked a "9:41" bar here; on a real phone that sat underneath the real
+ * one. With viewport-fit=cover (index.html) env() reports the notch height
+ * when installed to the home screen, and 0 in a normal browser tab.
+ */
+export function StatusBar({ className = '' }: StatusBarProps) {
+  return <div aria-hidden className={`h-[max(12px,env(safe-area-inset-top))] ${className}`} />
 }

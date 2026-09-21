@@ -2,6 +2,17 @@
 -- (provider_id) combined with a range overlap check (the booking slot).
 create extension if not exists btree_gist;
 
+-- A generated column must be immutable, and timestamptz + interval is only
+-- stable (a '1 day' interval depends on the session timezone). Adding whole
+-- minutes never does, so this wrapper is honestly immutable.
+create function public.booking_slot(p_start timestamptz, p_minutes integer)
+returns tstzrange
+language sql
+immutable
+as $$
+  select tstzrange(p_start, p_start + p_minutes * interval '1 minute', '[)')
+$$;
+
 create table public.bookings (
   id uuid primary key default gen_random_uuid(),
   provider_id uuid not null references public.provider_profiles (id),
@@ -15,9 +26,7 @@ create table public.bookings (
   fee integer not null default 0,
   start_at timestamptz not null,
   duration_minutes integer not null default 60,
-  slot_range tstzrange generated always as (
-    tstzrange(start_at, start_at + make_interval(mins => duration_minutes), '[)')
-  ) stored,
+  slot_range tstzrange generated always as (public.booking_slot(start_at, duration_minutes)) stored,
   status text not null default 'pending' check (status in ('pending', 'active', 'done', 'cancelled')),
   escrow_held integer not null default 0,
   created_at timestamptz not null default now(),

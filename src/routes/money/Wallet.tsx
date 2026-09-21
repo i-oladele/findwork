@@ -1,27 +1,43 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
-import { formatNaira } from '../../data/mock'
-import { useAppStore } from '../../store/appStore'
-
-const iconFor: Record<string, { icon: string; bg: string; color: string }> = {
-  escrow: { icon: 'lock-simple', bg: 'bg-[#FBE2DC]', color: 'text-[#A8311F]' },
-  release: { icon: 'arrow-down-left', bg: 'bg-success-bg', color: 'text-success-text' },
-  order: { icon: 'shopping-cart', bg: 'bg-cream', color: 'text-ink' },
-  topup: { icon: 'bank', bg: 'bg-success-bg', color: 'text-success-text' },
-  fee: { icon: 'receipt', bg: 'bg-warning-bg', color: 'text-warning-text' },
-}
+import { TransactionRow } from '../../components/ui/TransactionRow'
+import { QueryState } from '../../components/system/QueryState'
+import { Skeleton } from '../../components/system/States'
+import { useDisputes, useMyBookings, useTransactions, useWalletSummary } from '../../lib/api'
+import { formatNaira } from '../../lib/format'
 
 export function Wallet() {
-  const wallet = useAppStore((s) => s.wallet)
-  const transactions = useAppStore((s) => s.transactions)
-  const bookings = useAppStore((s) => s.bookings)
-  const disputes = useAppStore((s) => s.disputes)
-  const recent = transactions.slice(0, 3)
-  const activeJobs = bookings.filter((b) => b.status === 'active').length
-  const openDisputeCount = disputes.filter((d) => d.status === 'open').length
-  const inTotal = transactions.filter((t) => t.amount > 0).reduce((sum, t) => sum + t.amount, 0)
-  const outTotal = transactions.filter((t) => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0)
+  const { data: wallet, isLoading } = useWalletSummary()
+  const transactions = useTransactions()
+  const { data: bookings } = useMyBookings()
+  const { data: disputes } = useDisputes()
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem('findwork-hide-balance') === '1'
+    } catch {
+      return false
+    }
+  })
+
+  const heldJobs = (bookings ?? []).filter((b) => (b.status === 'pending' || b.status === 'active') && b.escrow_held > 0).length
+  const openDisputes = (disputes ?? []).filter((d) => d.status === 'open').length
+  const ledger = transactions.data ?? []
+  const inTotal = ledger.filter((t) => t.balance_delta > 0).reduce((s, t) => s + t.balance_delta, 0)
+  const outTotal = ledger.filter((t) => t.balance_delta < 0).reduce((s, t) => s - t.balance_delta, 0)
+
+  function toggleHidden() {
+    const next = !hidden
+    setHidden(next)
+    try {
+      localStorage.setItem('findwork-hide-balance', next ? '1' : '0')
+    } catch {
+      // Private browsing: the toggle still works for this visit.
+    }
+  }
+
+  const money = (n: number) => (hidden ? '₦ ••••' : formatNaira(n))
 
   return (
     <Screen bottomNav="customer">
@@ -29,22 +45,28 @@ export function Wallet() {
         <StatusBar tone="light" />
         <div className="flex items-center justify-between mt-1.5">
           <span className="font-display font-bold text-[22px] text-cream">Wallet</span>
-          <Link to="/transactions" className="inline-flex items-center justify-center w-11 h-11 text-cream">
+          <Link to="/transactions" aria-label="All transactions" className="inline-flex items-center justify-center w-11 h-11 text-cream">
             <i className="ph ph-clock-counter-clockwise text-[22px]" />
           </Link>
         </div>
-        <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mt-3.5">
-          Available balance
-        </div>
+        <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mt-3.5">Available balance</div>
         <div className="flex items-baseline gap-2 mt-1.5">
-          <span className="font-display font-bold text-[44px] tracking-[-0.03em] text-cream">{formatNaira(wallet.balance)}</span>
-          <i className="ph ph-eye-slash text-[19px] text-muted-2" />
+          {isLoading ? (
+            <Skeleton className="h-11 w-48 bg-ink-soft" />
+          ) : (
+            <span className="font-display font-bold text-[44px] tracking-[-0.03em] text-cream">{money(wallet?.balance ?? 0)}</span>
+          )}
+          <button onClick={toggleHidden} aria-label={hidden ? 'Show balance' : 'Hide balance'}>
+            <i className={`ph ${hidden ? 'ph-eye' : 'ph-eye-slash'} text-[19px] text-muted-2`} />
+          </button>
         </div>
         <Link to="/escrow" className="flex items-center gap-2.5 bg-ink-soft border border-ink-line rounded-xl p-3.5 mt-[18px]">
           <i className="ph-fill ph-lock-simple text-xl text-brand" />
           <div className="flex-1">
-            <div className="text-[14.5px] font-semibold text-cream">{formatNaira(wallet.escrowHeld)} held in escrow</div>
-            <div className="text-[12.5px] text-muted-2 mt-0.5">Across {activeJobs} active job{activeJobs === 1 ? '' : 's'}</div>
+            <div className="text-[14.5px] font-semibold text-cream">{money(wallet?.escrow_held ?? 0)} held in escrow</div>
+            <div className="text-[12.5px] text-muted-2 mt-0.5">
+              Across {heldJobs} booking{heldJobs === 1 ? '' : 's'}
+            </div>
           </div>
           <i className="ph-bold ph-caret-right text-base text-muted-2" />
         </Link>
@@ -52,9 +74,7 @@ export function Wallet() {
           <i className="ph-fill ph-scales text-xl text-warning" />
           <div className="flex-1">
             <div className="text-[14.5px] font-semibold text-cream">My disputes</div>
-            {openDisputeCount > 0 && (
-              <div className="text-[12.5px] text-muted-2 mt-0.5">{openDisputeCount} under review</div>
-            )}
+            {openDisputes > 0 && <div className="text-[12.5px] text-muted-2 mt-0.5">{openDisputes} under review</div>}
           </div>
           <i className="ph-bold ph-caret-right text-base text-muted-2" />
         </Link>
@@ -63,53 +83,48 @@ export function Wallet() {
             <i className="ph-bold ph-plus text-[17px]" />
             Add money
           </Link>
-          <Link to="/wallet/add" className="flex-1 flex items-center justify-center gap-2 h-[50px] border-[1.5px] border-ink-line rounded-xl text-[15.5px] font-semibold text-cream">
+          <Link to="/wallet/withdraw" className="flex-1 flex items-center justify-center gap-2 h-[50px] border-[1.5px] border-ink-line rounded-xl text-[15.5px] font-semibold text-cream">
             <i className="ph-bold ph-arrow-up-right text-[17px]" />
             Withdraw
           </Link>
         </div>
       </div>
 
-      <div className="px-[22px] pt-5">
+      <div className="px-[22px] pt-5 pb-6">
         <div className="flex gap-3">
           <span className="flex-1 bg-white border border-line rounded-2xl p-3.5">
             <i className="ph-fill ph-arrow-down-left text-xl text-success" />
-            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2 mt-2.5">Total in</div>
-            <div className="font-display font-bold text-lg text-ink mt-1">{formatNaira(inTotal)}</div>
+            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2 mt-2.5">Money in</div>
+            <div className="font-display font-bold text-lg text-ink mt-1">{money(inTotal)}</div>
           </span>
           <span className="flex-1 bg-white border border-line rounded-2xl p-3.5">
             <i className="ph-fill ph-arrow-up-right text-xl text-brand-deep" />
-            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2 mt-2.5">Total out</div>
-            <div className="font-display font-bold text-lg text-ink mt-1">{formatNaira(outTotal)}</div>
+            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2 mt-2.5">Money out</div>
+            <div className="font-display font-bold text-lg text-ink mt-1">{money(outTotal)}</div>
           </span>
         </div>
 
         <div className="flex items-center justify-between mt-[22px]">
           <div className="font-display font-bold text-[18px] text-ink">Recent</div>
-          <Link to="/transactions" className="text-sm font-semibold text-brand-hover">See all</Link>
+          <Link to="/transactions" className="text-sm font-semibold text-brand-hover">
+            See all
+          </Link>
         </div>
 
-        <div className="bg-white border border-line rounded-2xl overflow-hidden mt-3">
-          {recent.length === 0 && (
-            <div className="p-4 text-sm text-muted text-center">No transactions yet</div>
-          )}
-          {recent.map((t, i) => {
-            const meta = iconFor[t.kind]
-            return (
-              <div key={t.id} className={`flex items-center gap-3.5 p-3.5 ${i < recent.length - 1 ? 'border-b border-line-soft' : ''}`}>
-                <span className={`flex-none inline-flex items-center justify-center w-10 h-10 rounded-[10px] ${meta.bg} ${meta.color}`}>
-                  <i className={`ph-fill ph-${meta.icon} text-lg`} />
-                </span>
-                <div className="flex-1">
-                  <div className="text-[15px] font-semibold text-ink">{t.label}</div>
-                  <div className="text-[12.5px] text-muted-2 mt-0.5">{t.time}</div>
-                </div>
-                <span className={`font-display font-bold text-[15px] ${t.amount > 0 ? 'text-success-text' : 'text-ink'}`}>
-                  {formatNaira(t.amount)}
-                </span>
+        <div className="mt-3">
+          <QueryState
+            query={{ ...transactions, data: transactions.data?.slice(0, 4) }}
+            errorMessage="We could not load your transactions."
+            empty={{ icon: 'ph-receipt', title: 'No transactions yet', body: 'Add money to book, shop and learn.' }}
+          >
+            {(recent) => (
+              <div className="bg-white border border-line rounded-2xl overflow-hidden">
+                {recent.map((t, i) => (
+                  <TransactionRow key={t.id} t={t} isLast={i === recent.length - 1} />
+                ))}
               </div>
-            )
-          })}
+            )}
+          </QueryState>
         </div>
       </div>
     </Screen>

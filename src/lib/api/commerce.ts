@@ -24,8 +24,8 @@ export function useProduct(id: string | undefined) {
   return useQuery({
     queryKey: keys.commerce.product(id ?? ''),
     enabled: Boolean(id),
-    queryFn: async (): Promise<Product> => {
-      const { data, error } = await supabase.from('products').select('*').eq('id', id!).single()
+    queryFn: async (): Promise<Product | null> => {
+      const { data, error } = await supabase.from('products').select('*').eq('id', id!).maybeSingle()
       if (error) throw error
       return data
     },
@@ -42,6 +42,7 @@ export function useOrders() {
       const { data, error } = await supabase
         .from('orders')
         .select('*, order_items(*)')
+        .eq('customer_id', user!.id)
         .order('placed_at', { ascending: false })
       if (error) throw error
       return data
@@ -53,12 +54,12 @@ export function useOrder(id: string | undefined) {
   return useQuery({
     queryKey: keys.commerce.order(id ?? ''),
     enabled: Boolean(id),
-    queryFn: async (): Promise<OrderWithItems> => {
+    queryFn: async (): Promise<OrderWithItems | null> => {
       const { data, error } = await supabase
         .from('orders')
         .select('*, order_items(*)')
         .eq('id', id!)
-        .single()
+        .maybeSingle()
       if (error) throw error
       return data
     },
@@ -77,16 +78,38 @@ export function usePlaceOrder() {
     mutationFn: async (input: {
       items: { product_id: string; qty: number }[]
       deliverySpeed: DeliverySpeed
-    }): Promise<string> => {
+      address: string
+      phone: string
+      // One order per seller in the cart: they ship and get paid separately.
+    }): Promise<string[]> => {
       const { data, error } = await supabase.rpc('place_order', {
         p_items: input.items,
         p_delivery_speed: input.deliverySpeed,
+        p_address: input.address,
+        p_phone: input.phone,
       })
       if (error) throw error
-      return data
+      return (data ?? []) as string[]
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.commerce.orders() })
+      qc.invalidateQueries({ queryKey: keys.wallet.all })
+    },
+  })
+}
+
+/** Full refund, allowed until the order is dispatched. */
+export function useCancelOrder() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (orderId: string) => {
+      const { error } = await supabase.rpc('cancel_order', { p_order_id: orderId })
+      if (error) throw error
+    },
+    onSuccess: (_d, orderId) => {
+      qc.invalidateQueries({ queryKey: keys.commerce.orders() })
+      qc.invalidateQueries({ queryKey: keys.commerce.order(orderId) })
       qc.invalidateQueries({ queryKey: keys.wallet.all })
     },
   })

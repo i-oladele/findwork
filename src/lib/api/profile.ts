@@ -4,6 +4,11 @@ import { useAuth } from '../authContext'
 import { keys } from './keys'
 import type { Profile, TablesUpdate } from '../database.types'
 
+/**
+ * Your own full profile, including email, phone and address. Other users'
+ * rows expose only name, location and avatar, so this goes through
+ * get_my_profile rather than a table select.
+ */
 export function useProfile() {
   const { user } = useAuth()
 
@@ -11,13 +16,9 @@ export function useProfile() {
     queryKey: keys.profile.me(),
     enabled: Boolean(user),
     queryFn: async (): Promise<Profile> => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user!.id)
-        .single()
+      const { data, error } = await supabase.rpc('get_my_profile')
       if (error) throw error
-      return data
+      return data as Profile
     },
   })
 }
@@ -28,17 +29,11 @@ export function useUpdateProfile() {
 
   return useMutation({
     mutationFn: async (patch: TablesUpdate<'profiles'>) => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(patch)
-        .eq('id', user!.id)
-        .select()
-        .single()
+      const { error } = await supabase.from('profiles').update(patch).eq('id', user!.id)
       if (error) throw error
-      return data
     },
-    onSuccess: (data) => {
-      qc.setQueryData(keys.profile.me(), data)
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.profile.me() })
     },
   })
 }

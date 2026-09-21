@@ -15,17 +15,28 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 /* ---- Check-constraint unions -------------------------------------------- */
 
 export type BookingStatus = 'pending' | 'active' | 'done' | 'cancelled'
-export type OrderStatus = 'placed' | 'delivered' | 'returned'
+export type OrderStatus = 'placed' | 'dispatched' | 'delivered' | 'returned' | 'cancelled'
 export type DeliverySpeed = 'same-day' | 'standard'
-export type WalletKind = 'escrow' | 'release' | 'order' | 'topup' | 'fee' | 'subscription'
-export type MessageKind = 'text' | 'voice'
+export type WalletKind =
+  | 'escrow'
+  | 'release'
+  | 'order'
+  | 'topup'
+  | 'fee'
+  | 'subscription'
+  | 'refund'
+  | 'course'
+  | 'withdrawal'
+  | 'adjustment'
+export type MessageKind = 'text' | 'voice' | 'image' | 'video' | 'file'
 export type PackageStatus = 'live' | 'paused'
 export type JobStatus = 'open' | 'closed'
-export type RequestStatus = 'new' | 'accepted' | 'declined'
+export type QuoteStatus = 'sent' | 'accepted' | 'declined'
 export type RfqStatus = 'open' | 'quoted' | 'closed'
 export type ClassifiedCategory = 'Rentals' | 'Used goods'
 export type DisputeStatus = 'open' | 'resolved'
 export type DisputeRefType = 'order' | 'booking'
+export type DisputeOutcome = 'release' | 'refund' | 'dismissed'
 export type CourseKind = 'course' | 'internship'
 export type NotificationKind =
   | 'booking'
@@ -35,6 +46,21 @@ export type NotificationKind =
   | 'dispute'
   | 'review'
   | 'system'
+  | 'order'
+  | 'support'
+export type ReportTargetType = 'classified' | 'message' | 'profile' | 'job' | 'rfq'
+export type ReportStatus = 'open' | 'actioned' | 'dismissed'
+export type SupportTopic = 'payments' | 'bookings' | 'orders' | 'account' | 'bug' | 'other'
+export type PaymentIntentStatus = 'pending' | 'success' | 'failed'
+export type WithdrawalStatus = 'requested' | 'paid' | 'rejected'
+
+type Rel<Name extends string, Col extends string, Ref extends string, One extends boolean = false> = {
+  foreignKeyName: Name
+  columns: [Col]
+  isOneToOne: One
+  referencedRelation: Ref
+  referencedColumns: ['id']
+}
 
 export type Database = {
   public: {
@@ -46,29 +72,25 @@ export type Database = {
           phone: string
           email: string
           location: string | null
+          address: string | null
+          area: string | null
+          lat: number | null
+          lng: number | null
           avatar_url: string | null
           is_admin: boolean
           created_at: string
+          deleted_at: string | null
         }
-        Insert: {
-          id: string
-          full_name?: string
-          phone?: string
-          email: string
-          location?: string | null
-          avatar_url?: string | null
-          is_admin?: boolean
-          created_at?: string
-        }
+        /** Created by the handle_new_user trigger, never by the client. */
+        Insert: never
+        /** Column grants allow only these. */
         Update: {
-          id?: string
           full_name?: string
           phone?: string
-          email?: string
           location?: string | null
+          address?: string | null
+          area?: string | null
           avatar_url?: string | null
-          is_admin?: boolean
-          created_at?: string
         }
         Relationships: []
       }
@@ -87,8 +109,15 @@ export type Database = {
           jobs_done: number
           trust_score: number
           taking_bookings: boolean
+          plan: string
+          priority: number
+          area: string | null
+          lat: number | null
+          lng: number | null
+          photo_urls: string[]
           created_at: string
         }
+        /** verified, rating, plan etc. are not client-writable (column grants). */
         Insert: {
           id: string
           business_name: string
@@ -97,13 +126,8 @@ export type Database = {
           bio?: string | null
           price?: number
           price_unit?: string
-          verified?: boolean
-          rating?: number
-          reviews?: number
-          jobs_done?: number
-          trust_score?: number
           taking_bookings?: boolean
-          created_at?: string
+          area?: string | null
         }
         Update: {
           business_name?: string
@@ -112,14 +136,11 @@ export type Database = {
           bio?: string | null
           price?: number
           price_unit?: string
-          verified?: boolean
-          rating?: number
-          reviews?: number
-          jobs_done?: number
-          trust_score?: number
           taking_bookings?: boolean
+          area?: string | null
+          photo_urls?: string[]
         }
-        Relationships: []
+        Relationships: [Rel<'provider_profiles_id_fkey', 'id', 'profiles', true>]
       }
       provider_packages: {
         Row: {
@@ -129,6 +150,7 @@ export type Database = {
           price: number
           detail: string | null
           status: PackageStatus
+          duration_minutes: number
           created_at: string
         }
         Insert: {
@@ -138,6 +160,7 @@ export type Database = {
           price: number
           detail?: string | null
           status?: PackageStatus
+          duration_minutes?: number
           created_at?: string
         }
         Update: {
@@ -145,8 +168,9 @@ export type Database = {
           price?: number
           detail?: string | null
           status?: PackageStatus
+          duration_minutes?: number
         }
-        Relationships: []
+        Relationships: [Rel<'provider_packages_provider_id_fkey', 'provider_id', 'provider_profiles'>]
       }
       provider_availability: {
         Row: {
@@ -186,21 +210,44 @@ export type Database = {
           provider_id: string
           provider_name: string
           customer_id: string
+          package_id: string | null
           service: string
           price: number
           fee: number
+          commission: number
           start_at: string
           duration_minutes: number
           /** Generated column (tstzrange). Read-only. */
           slot_range: string
           status: BookingStatus
           escrow_held: number
+          cancelled_by: string | null
+          cancelled_at: string | null
           created_at: string
         }
-        /** No client insert/update policy — writes go through pay_booking / complete_booking. */
+        /** No client write policy — pay_booking, respond_to_booking, cancel_booking, complete_booking. */
         Insert: never
         Update: never
-        Relationships: []
+        Relationships: [
+          Rel<'bookings_customer_id_fkey', 'customer_id', 'profiles'>,
+          Rel<'bookings_provider_id_fkey', 'provider_id', 'provider_profiles'>,
+        ]
+      }
+      booking_reschedules: {
+        Row: {
+          id: string
+          booking_id: string
+          requested_by: string
+          previous_start_at: string
+          proposed_start_at: string
+          reason: string
+          status: 'pending' | 'accepted' | 'declined' | 'withdrawn' | 'expired'
+          created_at: string
+          responded_at: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'booking_reschedules_booking_id_fkey', 'booking_id', 'bookings'>]
       }
       products: {
         Row: {
@@ -223,13 +270,17 @@ export type Database = {
           customer_id: string
           total: number
           delivery_speed: DeliverySpeed
+          delivery_fee: number
+          delivery_address: string | null
+          contact_phone: string | null
           status: OrderStatus
           placed_at: string
+          updated_at: string
         }
-        /** No client insert policy — writes go through place_order. */
+        /** No client write policy — place_order, cancel_order, admin_set_order_status. */
         Insert: never
         Update: never
-        Relationships: []
+        Relationships: [Rel<'orders_customer_id_fkey', 'customer_id', 'profiles'>]
       }
       order_items: {
         Row: {
@@ -243,20 +294,8 @@ export type Database = {
         Insert: never
         Update: never
         Relationships: [
-          {
-            foreignKeyName: 'order_items_order_id_fkey'
-            columns: ['order_id']
-            isOneToOne: false
-            referencedRelation: 'orders'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'order_items_product_id_fkey'
-            columns: ['product_id']
-            isOneToOne: false
-            referencedRelation: 'products'
-            referencedColumns: ['id']
-          },
+          Rel<'order_items_order_id_fkey', 'order_id', 'orders'>,
+          Rel<'order_items_product_id_fkey', 'product_id', 'products'>,
         ]
       }
       wallet_transactions: {
@@ -269,6 +308,7 @@ export type Database = {
           escrow_delta: number
           booking_id: string | null
           order_id: string | null
+          withdrawal_id: string | null
           created_at: string
         }
         /** Append-only ledger — every row is written by a SECURITY DEFINER function. */
@@ -287,20 +327,8 @@ export type Database = {
         Insert: never
         Update: never
         Relationships: [
-          {
-            foreignKeyName: 'thread_participants_profile_id_fkey'
-            columns: ['profile_id']
-            isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'thread_participants_thread_id_fkey'
-            columns: ['thread_id']
-            isOneToOne: false
-            referencedRelation: 'chat_threads'
-            referencedColumns: ['id']
-          },
+          Rel<'thread_participants_profile_id_fkey', 'profile_id', 'profiles'>,
+          Rel<'thread_participants_thread_id_fkey', 'thread_id', 'chat_threads'>,
         ]
       }
       chat_messages: {
@@ -310,6 +338,10 @@ export type Database = {
           sender_id: string
           text: string
           kind: MessageKind
+          attachment_path: string | null
+          attachment_name: string | null
+          attachment_mime: string | null
+          attachment_bytes: number | null
           created_at: string
         }
         Insert: {
@@ -332,6 +364,7 @@ export type Database = {
           budget: number
           needed_by: string | null
           status: JobStatus
+          quote_count: number
           created_at: string
         }
         Insert: {
@@ -344,8 +377,14 @@ export type Database = {
           status?: JobStatus
           created_at?: string
         }
-        Update: { status?: JobStatus }
-        Relationships: []
+        Update: {
+          title?: string
+          description?: string
+          budget?: number
+          needed_by?: string | null
+          status?: JobStatus
+        }
+        Relationships: [Rel<'job_posts_customer_id_fkey', 'customer_id', 'profiles'>]
       }
       sent_quotes: {
         Row: {
@@ -356,37 +395,22 @@ export type Database = {
           days: number
           start_day: string | null
           message: string | null
+          status: QuoteStatus
           created_at: string
         }
         Insert: {
-          id?: string
           job_id: string
           provider_id: string
           price: number
           days: number
           start_day?: string | null
           message?: string | null
-          created_at?: string
         }
         Update: never
-        Relationships: []
-      }
-      provider_requests: {
-        Row: {
-          id: string
-          provider_id: string
-          customer_id: string
-          service: string
-          requested_at: string | null
-          price: number
-          status: RequestStatus
-          expires_at: string | null
-          created_at: string
-        }
-        /** No client insert policy — responded to via respond_to_request. */
-        Insert: never
-        Update: never
-        Relationships: []
+        Relationships: [
+          Rel<'sent_quotes_job_id_fkey', 'job_id', 'job_posts'>,
+          Rel<'sent_quotes_provider_id_fkey', 'provider_id', 'profiles'>,
+        ]
       }
       rfqs: {
         Row: {
@@ -411,8 +435,15 @@ export type Database = {
           status?: RfqStatus
           created_at?: string
         }
-        Update: never
-        Relationships: []
+        Update: {
+          title?: string
+          description?: string
+          quantity?: string | null
+          budget_max?: number | null
+          deadline?: string | null
+          status?: RfqStatus
+        }
+        Relationships: [Rel<'rfqs_buyer_id_fkey', 'buyer_id', 'profiles'>]
       }
       rfq_quotes: {
         Row: {
@@ -421,19 +452,22 @@ export type Database = {
           supplier_id: string
           price: number
           message: string | null
+          lead_time: string | null
           accepted: boolean
           created_at: string
         }
         Insert: {
-          id?: string
           rfq_id: string
           supplier_id: string
           price: number
           message?: string | null
-          created_at?: string
+          lead_time?: string | null
         }
         Update: never
-        Relationships: []
+        Relationships: [
+          Rel<'rfq_quotes_rfq_id_fkey', 'rfq_id', 'rfqs'>,
+          Rel<'rfq_quotes_supplier_id_fkey', 'supplier_id', 'profiles'>,
+        ]
       }
       classifieds: {
         Row: {
@@ -444,6 +478,7 @@ export type Database = {
           category: ClassifiedCategory
           location: string
           description: string
+          photo_urls: string[]
           created_at: string
         }
         Insert: {
@@ -454,6 +489,7 @@ export type Database = {
           category: ClassifiedCategory
           location: string
           description: string
+          photo_urls?: string[]
           created_at?: string
         }
         Update: {
@@ -462,30 +498,33 @@ export type Database = {
           category?: ClassifiedCategory
           location?: string
           description?: string
+          photo_urls?: string[]
         }
-        Relationships: []
+        Relationships: [Rel<'classifieds_seller_id_fkey', 'seller_id', 'profiles'>]
       }
       disputes: {
         Row: {
           id: string
           raised_by: string
+          against_id: string | null
           ref_id: string
           ref_type: DisputeRefType
           reason: string
+          evidence_paths: string[]
           status: DisputeStatus
+          outcome: DisputeOutcome | null
+          resolution_note: string | null
+          resolved_by: string | null
+          resolved_at: string | null
           opened_at: string
         }
-        Insert: {
-          id?: string
-          raised_by: string
-          ref_id: string
-          ref_type: DisputeRefType
-          reason: string
-          status?: DisputeStatus
-          opened_at?: string
-        }
+        /** Opened through open_dispute, settled through resolve_dispute. */
+        Insert: never
         Update: never
-        Relationships: []
+        Relationships: [
+          Rel<'disputes_raised_by_fkey', 'raised_by', 'profiles'>,
+          Rel<'disputes_against_id_fkey', 'against_id', 'profiles'>,
+        ]
       }
       courses: {
         Row: {
@@ -497,6 +536,7 @@ export type Database = {
           instructor: string
           rating: number
           description: string
+          image_url: string | null
           created_at: string
         }
         Insert: never
@@ -510,6 +550,7 @@ export type Database = {
           title: string
           minutes: number
           position: number
+          body: string | null
         }
         Insert: never
         Update: never
@@ -522,20 +563,34 @@ export type Database = {
           progress: number
           enrolled_at: string
         }
-        /** No client insert/update policy — enroll_in_course / advance_progress. */
+        /** No client write policy — enroll_in_course / complete_lesson. */
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      lesson_completions: {
+        Row: { profile_id: string; lesson_id: string; completed_at: string }
         Insert: never
         Update: never
         Relationships: []
       }
       subscription_plans: {
-        Row: { id: string; name: string; price: number; features: string[] }
+        Row: {
+          id: string
+          name: string
+          price: number
+          features: string[]
+          commission_rate: number
+          listing_limit: number | null
+          priority: number
+        }
         Insert: never
         Update: never
         Relationships: []
       }
       subscriptions: {
-        Row: { profile_id: string; plan: string; since: string }
-        /** No client insert/update policy — subscribe_plan. */
+        Row: { profile_id: string; plan: string; since: string; renews_at: string | null }
+        /** No client write policy — subscribe_plan. */
         Insert: never
         Update: never
         Relationships: []
@@ -561,27 +616,9 @@ export type Database = {
         }
         Update: { rating?: number; body?: string }
         Relationships: [
-          {
-            foreignKeyName: 'reviews_reviewer_id_fkey'
-            columns: ['reviewer_id']
-            isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'reviews_provider_id_fkey'
-            columns: ['provider_id']
-            isOneToOne: false
-            referencedRelation: 'provider_profiles'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'reviews_booking_id_fkey'
-            columns: ['booking_id']
-            isOneToOne: true
-            referencedRelation: 'bookings'
-            referencedColumns: ['id']
-          },
+          Rel<'reviews_reviewer_id_fkey', 'reviewer_id', 'profiles'>,
+          Rel<'reviews_provider_id_fkey', 'provider_id', 'provider_profiles'>,
+          Rel<'reviews_booking_id_fkey', 'booking_id', 'bookings', true>,
         ]
       }
       notifications: {
@@ -601,12 +638,128 @@ export type Database = {
         Update: { read_at?: string | null }
         Relationships: []
       }
+      reports: {
+        Row: {
+          id: string
+          reporter_id: string
+          target_type: ReportTargetType
+          target_id: string
+          reason: string
+          details: string | null
+          status: ReportStatus
+          resolved_by: string | null
+          resolved_at: string | null
+          created_at: string
+        }
+        Insert: {
+          reporter_id: string
+          target_type: ReportTargetType
+          target_id: string
+          reason: string
+          details?: string | null
+        }
+        Update: never
+        Relationships: [Rel<'reports_reporter_id_fkey', 'reporter_id', 'profiles'>]
+      }
+      support_requests: {
+        Row: {
+          id: string
+          profile_id: string
+          topic: SupportTopic
+          message: string
+          status: 'open' | 'closed'
+          reply: string | null
+          created_at: string
+          closed_at: string | null
+        }
+        Insert: { profile_id: string; topic: SupportTopic; message: string }
+        Update: never
+        Relationships: [Rel<'support_requests_profile_id_fkey', 'profile_id', 'profiles'>]
+      }
+      payment_intents: {
+        Row: {
+          id: string
+          profile_id: string
+          reference: string
+          amount: number
+          provider: string
+          status: PaymentIntentStatus
+          created_at: string
+          paid_at: string | null
+        }
+        /** Created by the paystack-initialize Edge Function. */
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      payout_accounts: {
+        Row: {
+          profile_id: string
+          bank_name: string
+          account_number: string
+          account_name: string
+          updated_at: string
+        }
+        Insert: {
+          profile_id: string
+          bank_name: string
+          account_number: string
+          account_name: string
+          updated_at?: string
+        }
+        Update: {
+          bank_name?: string
+          account_number?: string
+          account_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      service_areas: {
+        Row: { name: string; city: string; lat: number; lng: number }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      favourites: {
+        Row: { profile_id: string; provider_id: string; created_at: string }
+        Insert: { profile_id: string; provider_id: string }
+        Update: never
+        Relationships: [Rel<'favourites_provider_id_fkey', 'provider_id', 'provider_profiles'>]
+      }
+      withdrawals: {
+        Row: {
+          id: string
+          profile_id: string
+          amount: number
+          bank_name: string
+          account_number: string
+          account_name: string
+          status: WithdrawalStatus
+          note: string | null
+          processed_by: string | null
+          processed_at: string | null
+          created_at: string
+        }
+        /** request_withdrawal / admin_process_withdrawal. */
+        Insert: never
+        Update: never
+        Relationships: [Rel<'withdrawals_profile_id_fkey', 'profile_id', 'profiles'>]
+      }
     }
     Views: Record<never, never>
     Functions: {
       wallet_summary: {
         Args: { p_profile_id: string }
         Returns: { balance: number; escrow_held: number }[]
+      }
+      get_my_profile: {
+        Args: Record<never, never>
+        Returns: Database['public']['Tables']['profiles']['Row']
+      }
+      is_admin: {
+        Args: Record<never, never>
+        Returns: boolean
       }
       get_or_create_thread: {
         Args: { p_other_profile_id: string }
@@ -616,42 +769,69 @@ export type Database = {
         Args: { p_thread_id: string }
         Returns: undefined
       }
-      add_money: {
-        Args: { p_amount: number }
-        Returns: undefined
+      send_chat_attachment: {
+        Args: { p_message_id: string; p_thread_id: string; p_path: string; p_name: string; p_text: string }
+        Returns: string
       }
       pay_booking: {
-        Args: {
-          p_provider_id: string
-          p_service: string
-          p_price: number
-          p_start_at: string
-          p_duration_minutes?: number
-        }
+        Args: { p_provider_id: string; p_package_id: string | null; p_start_at: string }
         Returns: string
+      }
+      respond_to_booking: {
+        Args: { p_booking_id: string; p_accept: boolean }
+        Returns: undefined
+      }
+      cancel_booking: {
+        Args: { p_booking_id: string }
+        Returns: undefined
       }
       complete_booking: {
         Args: { p_booking_id: string }
         Returns: undefined
       }
-      place_order: {
-        Args: { p_items: Json; p_delivery_speed: DeliverySpeed }
+      provider_busy_slots: {
+        Args: { p_provider_id: string; p_from: string; p_to: string }
+        Returns: { start_at: string; end_at: string }[]
+      }
+      reschedule_busy_slots: {
+        Args: { p_booking_id: string; p_from: string; p_to: string }
+        Returns: { start_at: string; end_at: string }[]
+      }
+      request_booking_reschedule: {
+        Args: { p_booking_id: string; p_start_at: string; p_reason: string }
         Returns: string
+      }
+      respond_booking_reschedule: {
+        Args: { p_request_id: string; p_action: 'accept' | 'decline' | 'withdraw' }
+        Returns: undefined
+      }
+      accept_job_quote: {
+        Args: { p_quote_id: string; p_start_at: string }
+        Returns: string
+      }
+      place_order: {
+        Args: { p_items: Json; p_delivery_speed: DeliverySpeed; p_address: string; p_phone: string }
+        /** One order id per seller in the cart. */
+        Returns: string[]
+      }
+      cancel_order: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
+      admin_set_order_status: {
+        Args: { p_order_id: string; p_status: 'dispatched' | 'delivered' }
+        Returns: undefined
       }
       enroll_in_course: {
         Args: { p_course_id: string }
         Returns: undefined
       }
-      advance_progress: {
-        Args: { p_course_id: string; p_lesson_count: number }
-        Returns: undefined
+      complete_lesson: {
+        Args: { p_lesson_id: string }
+        Returns: number
       }
       subscribe_plan: {
         Args: { p_plan: string }
-        Returns: undefined
-      }
-      respond_to_request: {
-        Args: { p_request_id: string; p_accept: boolean }
         Returns: undefined
       }
       accept_rfq_quote: {
@@ -660,6 +840,47 @@ export type Database = {
       }
       mark_notification_read: {
         Args: { p_notification_id: string }
+        Returns: undefined
+      }
+      open_dispute: {
+        Args: {
+          p_ref_type: DisputeRefType
+          p_ref_id: string
+          p_reason: string
+          p_evidence_paths?: string[]
+        }
+        Returns: string
+      }
+      resolve_dispute: {
+        Args: { p_dispute_id: string; p_outcome: DisputeOutcome; p_note: string }
+        Returns: undefined
+      }
+      admin_resolve_report: {
+        Args: { p_report_id: string; p_action: 'remove' | 'dismiss' }
+        Returns: undefined
+      }
+      admin_reply_support: {
+        Args: { p_request_id: string; p_reply: string }
+        Returns: undefined
+      }
+      admin_set_provider_verified: {
+        Args: { p_provider_id: string; p_verified: boolean }
+        Returns: undefined
+      }
+      admin_adjust_balance: {
+        Args: { p_profile_id: string; p_amount: number; p_reason: string }
+        Returns: undefined
+      }
+      admin_find_profiles: {
+        Args: { p_query: string }
+        Returns: { id: string; full_name: string; email: string; phone: string; balance: number }[]
+      }
+      request_withdrawal: {
+        Args: { p_amount: number }
+        Returns: string
+      }
+      admin_process_withdrawal: {
+        Args: { p_withdrawal_id: string; p_paid: boolean; p_note: string }
         Returns: undefined
       }
     }
@@ -681,6 +902,7 @@ export type Profile = Tables<'profiles'>
 export type ProviderProfile = Tables<'provider_profiles'>
 export type ProviderPackage = Tables<'provider_packages'>
 export type Booking = Tables<'bookings'>
+export type BookingReschedule = Tables<'booking_reschedules'>
 export type Product = Tables<'products'>
 export type Order = Tables<'orders'>
 export type OrderItem = Tables<'order_items'>
@@ -688,7 +910,6 @@ export type WalletTransaction = Tables<'wallet_transactions'>
 export type ChatMessage = Tables<'chat_messages'>
 export type JobPost = Tables<'job_posts'>
 export type SentQuote = Tables<'sent_quotes'>
-export type ProviderRequest = Tables<'provider_requests'>
 export type Rfq = Tables<'rfqs'>
 export type RfqQuote = Tables<'rfq_quotes'>
 export type Classified = Tables<'classifieds'>
@@ -700,3 +921,10 @@ export type SubscriptionPlan = Tables<'subscription_plans'>
 export type Subscription = Tables<'subscriptions'>
 export type Review = Tables<'reviews'>
 export type NotificationRow = Tables<'notifications'>
+export type Report = Tables<'reports'>
+export type SupportRequest = Tables<'support_requests'>
+export type PaymentIntent = Tables<'payment_intents'>
+export type PayoutAccount = Tables<'payout_accounts'>
+export type Withdrawal = Tables<'withdrawals'>
+export type ServiceArea = Tables<'service_areas'>
+export type Favourite = Tables<'favourites'>
