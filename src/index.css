@@ -1,0 +1,109 @@
+/* Self-hosted so the app does not depend on Google Fonts and unpkg being
+   reachable at runtime. On a patchy mobile connection the CDN version showed
+   blank icons and fell back to a system font mid-session. */
+@import "@fontsource/space-grotesk/400.css";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/600.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/hanken-grotesk/300.css";
+@import "@fontsource/hanken-grotesk/400.css";
+@import "@fontsource/hanken-grotesk/500.css";
+@import "@fontsource/hanken-grotesk/600.css";
+@import "@fontsource/hanken-grotesk/700.css";
+@import "@fontsource/space-mono/400.css";
+@import "@fontsource/space-mono/700.css";
+@import "@phosphor-icons/web/regular";
+@import "@phosphor-icons/web/bold";
+@import "@phosphor-icons/web/fill";
+
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Space Grotesk", sans-serif;
+  --font-sans: "Hanken Grotesk", system-ui, sans-serif;
+  --font-mono: "Space Mono", monospace;
+
+  /* backgrounds */
+  --color-canvas: #211d18;
+  --color-ink: #17130e;
+  --color-ink-soft: #241f19;
+  --color-ink-line: #38312a;
+  --color-cream: #f4f0e8;
+
+  /* text on cream/white */
+  --color-text: #17130e;
+  --color-text-soft: #4a4338;
+  --color-muted: #6e6557;
+  --color-muted-2: #8a8175;
+  --color-muted-3: #9b9285;
+  --color-muted-4: #a99f8f;
+
+  /* lines / surfaces on cream */
+  --color-line: #dcd5c8;
+  --color-line-soft: #e7e2d8;
+  --color-line-soft-2: #ded8cb;
+
+  /* brand */
+  --color-brand: #f04e2a;
+  --color-brand-hover: #c2402a;
+  --color-brand-deep: #b23217;
+  --color-brand-deep-2: #a8311f;
+
+  /* success */
+  --color-success: #0f8a5f;
+  --color-success-text: #0a6647;
+  --color-success-bg: #e4f2ea;
+
+  /* warning */
+  --color-warning: #eba313;
+  --color-warning-text: #8a6a12;
+  --color-warning-bg: #fcefd3;
+
+  /* danger */
+  --color-danger: #b23217;
+  --color-danger-bg: #fdede9;
+}
+
+/*
+ * These base styles live in Tailwind's own `base` layer so that utility
+ * classes (which live in the `utilities` layer, ordered after `base`) can
+ * still override them — e.g. text-white on a <Link> beating the `a { color }`
+ * rule below. Unlayered CSS always wins over layered CSS regardless of
+ * specificity, so without this the `a` rule would beat every text-* utility
+ * on every link no matter how specific.
+ */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: var(--color-canvas);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--color-brand);
+    color: #fff;
+  }
+
+  a {
+    color: var(--color-brand-hover);
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: var(--color-brand);
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+}
