@@ -67,7 +67,8 @@ export function useStartTopUp() {
   })
 }
 
-export type TopUpStatus = { status: 'success' | 'failed' | 'pending'; amount: number }
+/** refund_due and refunded: the payment reached an account already deleted. */
+export type TopUpStatus = { status: 'success' | 'failed' | 'pending' | 'refund_due' | 'refunded'; amount: number }
 
 /** Asks the server to confirm a returning Paystack payment and credit it. */
 export function useVerifyTopUp() {

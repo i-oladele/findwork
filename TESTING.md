@@ -6,11 +6,13 @@ you hand a phone to.
 ## Before you start
 
 1. A Supabase project, set up as in the [README](README.md#setting-up-the-backend).
-2. Seeded (`supabase db push --include-seed`, or `supabase db reset` locally),
-   which creates the demo catalog and the accounts below.
-3. Paystack **test** keys set (`sk_test_…`), with the webhook URL pointing at
+2. Seeded (`supabase db push --include-seed`), which creates the demo catalog
+   and the accounts below.
+3. The auth settings from the README, above all a real email sender: testers
+   signing up with their own address get no code without one.
+4. Paystack **test** keys set (`sk_test_…`), with the webhook URL pointing at
    your deployed `paystack-webhook` function.
-4. The app running: `npm run dev`, or deployed somewhere your testers can open.
+5. The app running: `npm run dev`, or deployed somewhere your testers can open.
 
 Use a **staging project**, not one holding real data: the check suite and the
 seed both assume they can be reset.
@@ -76,28 +78,56 @@ already paid into escrow.
 
 ### 6. Shop
 Add to cart, check out with a delivery address, then cancel for a refund.
+With goods from two sellers in the cart, checkout shows two deliveries, and
+the total on the pay button is exactly what leaves the wallet.
 Place another, mark it dispatched in `/admin`, and confirm the customer can
 no longer cancel but can report a problem.
 
-### 7. Withdrawals
+### 7. Selling goods
+Sign in as `hello@adastailoring.ng`, go to Dashboard → My products and add
+one with a photo and a stock of 2. It appears in the Shop under the business
+name. From the customer's device, buy it. Ada sees it under Orders → To send
+with the address and phone; she marks it sent. The customer taps "I have
+received it" on the order: Ada's balance rises by the price less 6%. Buy it
+again and have Ada cancel instead: the customer is refunded and told why, and
+the stock goes back up.
+
+### 8. Withdrawals
 Provider adds a bank account and withdraws. The balance drops immediately.
 In `/admin` → Payouts, reject it once (money returns to their wallet) and
 mark another as sent.
 
-### 8. Plans
+### 9. Plans
 Provider upgrades to Pro from their wallet, then completes a job: commission
 should be 4%, not 6%. On Free, adding a fourth live service is refused.
+Tapping Upgrade twice in quick succession charges one month, not two.
 
-### 9. Chat and moderation
+### 10. Chat and moderation
 Message a provider from their profile, reply from the other device (messages
 arrive live), then report a message and remove it from `/admin` → Reports.
+Every conversation stays in the inbox, however busy another one gets.
 
-### 10. The boring but important ones
+### 11. Verification
+A brand-new account sees "Complete verification to access all services" on
+Home. Tap it, choose NIN, enter 11 digits, add a photo of an ID and a
+selfie, and send: Home now says the ID is being checked. In `/admin` →
+Verification, reject it with a reason, and check the account sees the
+reason and can send again. Approve the second one: the notice disappears,
+and a provider gets the Verified badge.
+
+### 12. Your location
+On Home, tap "Add your area". Tap "Use my current location" (on the laptop,
+or the https site; phones on the plain local address can only search), or
+search for a street or landmark and pick a suggestion. The pin lands there;
+drag it, or tap the map, to fine-tune. Save: Home shows the address, and
+checkout offers it as the delivery address.
+
+### 13. The boring but important ones
 - Password reset by email.
 - Sign out and back in on a shared phone: the previous person's wallet,
   bookings and cart must be gone.
-- Delete an account from Settings while money is in escrow — it should
-  refuse and say why.
+- Delete an account from Settings while money is in escrow, or as a
+  provider with an accepted job — it should refuse and say why.
 
 ## Things that are meant to look unfinished
 
@@ -117,7 +147,8 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/checks/business_rules.sql
 ```
 
 The SQL suite signs in as the seeded users and exercises every money rule —
-escrow, refunds, disputes, commission, top-up idempotency, withdrawals. It
+escrow, refunds, disputes, commission, top-up idempotency, withdrawals,
+seller orders and returns, and what blocks account deletion. It
 runs in a transaction and rolls back, so it leaves nothing behind, but point
 it at staging rather than production.
 

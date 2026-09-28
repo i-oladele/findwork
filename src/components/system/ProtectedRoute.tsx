@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from '../../lib/authContext'
+import { destination, forgetDestination, rememberDestination, storedDestination } from '../../lib/destination'
 import { FullScreenLoader } from './States'
 
 /**
@@ -10,9 +12,20 @@ import { FullScreenLoader } from './States'
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
   const location = useLocation()
+  const here = location.pathname + location.search
+
+  // Arrived where they were headed: nothing left to remember.
+  useEffect(() => {
+    if (session && storedDestination() === here) forgetDestination()
+  }, [session, here])
 
   if (loading) return <FullScreenLoader />
-  if (!session) return <Navigate to="/welcome" replace state={{ from: location.pathname }} />
+  if (!session) {
+    // A link opened from outside the app (its first page) is kept, so signing
+    // in or up brings them back to it. Pages left behind by signing out are not.
+    if (location.key === 'default') rememberDestination(here)
+    return <Navigate to="/welcome" replace />
+  }
 
   return <>{children}</>
 }
@@ -22,7 +35,7 @@ export function PublicOnlyRoute({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
 
   if (loading) return <FullScreenLoader />
-  if (session) return <Navigate to="/home" replace />
+  if (session) return <Navigate to={destination()} replace />
 
   return <>{children}</>
 }

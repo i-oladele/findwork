@@ -1,0 +1,15 @@
+<!--
+  "Confirm signup" email. The app's code screen needs {{ .Token }}; the link
+  is for people who read the email on the phone they are signing up on.
+  On the hosted project, paste this into Authentication → Emails →
+  Confirm signup (subject: "Your FindWork code: {{ .Token }}").
+-->
+<div style="font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #17130e;">
+  <p style="font-size: 16px; line-height: 1.5; margin: 0 0 20px;">Welcome to FindWork. Enter this code in the app to confirm your email:</p>
+  <p style="font-size: 34px; font-weight: 700; letter-spacing: 8px; margin: 0 0 24px;">{{ .Token }}</p>
+  <p style="font-size: 16px; line-height: 1.5; margin: 0 0 24px;">Or, on the phone you are signing up on, tap the button:</p>
+  <p style="margin: 0 0 28px;">
+    <a href="{{ .ConfirmationURL }}" style="display: inline-block; background: #f04e2a; color: #ffffff; font-weight: 600; font-size: 16px; text-decoration: none; padding: 14px 24px; border-radius: 10px;">Confirm my email</a>
+  </p>
+  <p style="font-size: 13px; line-height: 1.5; color: #6e6557; margin: 0;">The code expires in an hour. If you did not sign up for FindWork, you can ignore this email.</p>
+</div>

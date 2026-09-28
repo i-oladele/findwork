@@ -6,7 +6,8 @@ export type DeleteAccountError = { error: string; message?: string }
 /**
  * Calls the delete-account Edge Function, which anonymises the profile and
  * removes the auth user. It refuses while the wallet still holds a balance or
- * escrow, so those cases surface as a message rather than a generic failure.
+ * escrow, or while bookings, orders, disputes or a withdrawal are still open,
+ * and each refusal arrives with a message saying which.
  */
 export function useDeleteAccount() {
   return useMutation({

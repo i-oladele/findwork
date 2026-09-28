@@ -15,8 +15,9 @@ export function Messages() {
   const [query, setQuery] = useState('')
 
   const q = query.trim().toLowerCase()
+  // Searches the conversations loaded so far; older ones load below.
   const filtered = threads.data?.filter(
-    (t) => !q || t.other?.full_name.toLowerCase().includes(q) || t.last_message?.text.toLowerCase().includes(q),
+    (t) => !q || t.other?.full_name.toLowerCase().includes(q) || t.last_message.text.toLowerCase().includes(q),
   )
 
   return (
@@ -45,18 +46,18 @@ export function Messages() {
         >
           {(list) =>
             list.map((t) => {
-              const mine = t.last_message?.sender_id === user?.id
+              const mine = t.last_message.sender_id === user?.id
               return (
                 <Link key={t.thread_id} to={`/chat/${t.thread_id}`} className="flex gap-3.5 bg-white border border-line rounded-2xl p-3.5 mt-3.5">
                   <PlaceholderImage shape="circle" src={t.other?.avatar_url ?? undefined} className="w-[52px] h-[52px] flex-none" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="font-display font-semibold text-base text-ink truncate">{t.other?.full_name || 'FindWork user'}</span>
-                      {t.last_message && <span className="font-mono text-[11px] text-muted-2">{timeAgo(t.last_message.created_at)}</span>}
+                      <span className="font-mono text-[11px] text-muted-2">{timeAgo(t.last_message_at)}</span>
                     </div>
                     <p className={`mt-1 text-sm leading-[1.4] truncate ${t.unread > 0 ? 'text-ink font-semibold' : 'text-text-soft'}`}>
                       {mine ? 'You: ' : ''}
-                      {t.last_message && messagePreview(t.last_message)}
+                      {messagePreview(t.last_message)}
                     </p>
                   </div>
                   {t.unread > 0 && (
@@ -69,6 +70,15 @@ export function Messages() {
             })
           }
         </QueryState>
+        {threads.hasNextPage && (
+          <button
+            onClick={() => void threads.fetchNextPage()}
+            disabled={threads.isFetchingNextPage}
+            className="w-full h-12 mt-3.5 text-[15px] font-semibold text-brand-hover disabled:opacity-50"
+          >
+            {threads.isFetchingNextPage ? 'Loading…' : 'Show older conversations'}
+          </button>
+        )}
       </div>
     </Screen>
   )

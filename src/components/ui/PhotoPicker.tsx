@@ -14,12 +14,15 @@ export function PhotoPicker({
   onChange,
   onError,
   max = 4,
+  capture,
 }: {
   bucket: UploadBucket
   value: string[]
   onChange: (next: string[]) => void
   onError: (message: string | null) => void
   max?: number
+  /** Opens the camera straight away on phones: "user" for a selfie. */
+  capture?: 'user' | 'environment'
 }) {
   const input = useRef<HTMLInputElement>(null)
   // Private uploads have no public URL to show, so keep a local preview of
@@ -75,7 +78,8 @@ export function PhotoPicker({
         ref={input}
         type="file"
         accept="image/*"
-        multiple
+        multiple={max > 1}
+        capture={capture}
         hidden
         onChange={(e) => pick(e.target.files)}
       />

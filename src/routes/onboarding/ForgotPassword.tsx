@@ -5,9 +5,11 @@ import { PageHeader } from '../../components/chrome/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Alert } from '../../components/ui/Alert'
-import { useAuth } from '../../lib/authContext'
+import { MethodTabs } from '../../components/ui/MethodTabs'
+import { PhoneInput } from '../../components/ui/PhoneInput'
+import { phoneUnavailable, useAuth, type AuthMethod } from '../../lib/authContext'
 import { friendlyError } from '../../lib/supabase'
-import { toE164 } from '../../lib/phone'
+import { emptyPhone, isPhoneNumber, toE164, type PhoneValue } from '../../lib/phone'
 
 /**
  * Email accounts get a reset link. Phone accounts get a one-time code, which
@@ -17,16 +19,17 @@ import { toE164 } from '../../lib/phone'
 export function ForgotPassword() {
   const navigate = useNavigate()
   const { requestPasswordReset } = useAuth()
-  const [method, setMethod] = useState<'phone' | 'email'>('email')
-  const [phone, setPhone] = useState('')
+  const [method, setMethod] = useState<AuthMethod>('phone')
+  const [phone, setPhone] = useState<PhoneValue>(emptyPhone)
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const canSubmit = method === 'phone' ? phone.trim().length >= 10 : email.includes('@')
+  const canSubmit = method === 'phone' ? isPhoneNumber(phone) : email.includes('@')
 
-  async function submit() {
+  async function submit(e?: React.FormEvent) {
+    e?.preventDefault()
     if (!canSubmit || busy) return
     setBusy(true)
     setError(null)
@@ -40,6 +43,7 @@ export function ForgotPassword() {
         setSent(true)
       }
     } catch (err) {
+      if (method === 'phone' && phoneUnavailable(err)) setMethod('email')
       setError(friendlyError(err))
     } finally {
       setBusy(false)
@@ -56,35 +60,31 @@ export function ForgotPassword() {
             new password.
           </Alert>
         ) : (
-          <>
+          <form onSubmit={submit} noValidate>
             <p className="text-[15.5px] leading-[1.55] text-muted">
               Tell us how you signed up and we will help you back in.
             </p>
-            <div className="flex gap-1.5 bg-line-soft rounded-lg p-1 mt-5">
-              {(['email', 'phone'] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMethod(m)}
-                  className={`flex-1 h-10 rounded-md text-[14.5px] ${
-                    method === m ? 'bg-white font-semibold text-ink' : 'font-medium text-muted'
-                  }`}
-                >
-                  {m === 'email' ? 'Email' : 'Phone'}
-                </button>
-              ))}
-            </div>
+            <MethodTabs value={method} onChange={setMethod} className="mt-5" />
             <div className="mt-5">
               {method === 'email' ? (
-                <Input label="Email address" value={email} onChange={setEmail} type="email" placeholder="you@example.com" />
+                <Input
+                  label="Email address"
+                  value={email}
+                  onChange={setEmail}
+                  type="email"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                />
               ) : (
-                <Input label="Phone number" value={phone} onChange={setPhone} placeholder="803 412 9087" icon="phone" />
+                <PhoneInput value={phone} onChange={setPhone} />
               )}
             </div>
             {error && <Alert className="mt-4">{error}</Alert>}
-            <Button onClick={submit} disabled={!canSubmit} loading={busy} className="mt-6 w-full">
+            <Button type="submit" disabled={!canSubmit} loading={busy} className="mt-6 w-full">
               {method === 'email' ? 'Send reset link' : 'Send code'}
             </Button>
-          </>
+          </form>
         )}
       </div>
     </Screen>

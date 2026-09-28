@@ -249,6 +249,11 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# Carries the 6-digit code the app's /verify screen asks for, and a link.
+[auth.email.template.confirmation]
+subject = "Your FindWork code: {{ .Token }}"
+content_path = "./supabase/templates/confirmation.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
@@ -415,4 +420,8 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 # Paystack calls this with its own signature, not a Supabase JWT.
 [functions.paystack-webhook]
+verify_jwt = false
+
+# Called by Supabase Auth with a webhook signature, not a user's JWT.
+[functions.send-sms]
 verify_jwt = false

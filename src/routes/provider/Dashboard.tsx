@@ -6,8 +6,10 @@ import { SectionLabel } from '../../components/ui/SectionLabel'
 import { RequireProvider } from '../../components/system/RequireProvider'
 import {
   useIncomingBookings,
+  useMyProducts,
   useOpenJobs,
   useProviderPackages,
+  useSellerOrders,
   useTransactions,
   useUnreadCount,
   useWalletSummary,
@@ -26,6 +28,8 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
   const { data: ledger } = useTransactions()
   const { data: packages } = useProviderPackages(provider.id)
   const { data: jobs } = useOpenJobs()
+  const { data: products } = useMyProducts()
+  const { data: sellerOrders } = useSellerOrders()
   const unread = useUnreadCount()
 
   const pending = (bookings ?? []).filter((b) => b.status === 'pending')
@@ -35,6 +39,8 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
     .filter((t) => (t.kind === 'release' || t.kind === 'fee') && new Date(t.created_at).getTime() >= weekAgo)
     .reduce((s, t) => s + t.balance_delta, 0)
   const liveCount = (packages ?? []).filter((p) => p.status === 'live').length
+  const productsLive = (products ?? []).filter((p) => p.status === 'live').length
+  const toSend = (sellerOrders ?? []).filter((o) => o.status === 'placed').length
 
   return (
     <Screen bottomNav="provider">
@@ -104,6 +110,16 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
           </Link>
         )}
 
+        {toSend > 0 && (
+          <Link to="/provider/orders" className="flex items-center gap-3 bg-white border-[1.5px] border-brand rounded-2xl p-4 mt-4">
+            <i className="ph-fill ph-package text-[22px] text-brand" />
+            <span className="flex-1 text-[14px] leading-[1.45] text-ink">
+              {toSend} order{toSend === 1 ? '' : 's'} paid and waiting to be sent.
+            </span>
+            <i className="ph-bold ph-caret-right text-brand" />
+          </Link>
+        )}
+
         <SectionLabel className="mt-[22px] mb-2.5">Needs you now</SectionLabel>
         {pending[0] ? (
           <RequestCard booking={pending[0]} highlighted />
@@ -140,6 +156,8 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
         <div className="grid grid-cols-2 gap-3">
           <Shortcut to="/provider/jobs" icon="magnifying-glass" color="text-brand" label="Find jobs" detail={jobs ? `${jobs.length} open` : ' '} />
           <Shortcut to="/provider/services" icon="list-checks" color="text-brand" label="My services" detail={`${liveCount} live`} />
+          <Shortcut to="/provider/products" icon="storefront" color="text-brand" label="My products" detail={`${productsLive} in the shop`} />
+          <Shortcut to="/provider/orders" icon="package" color="text-success" label="Orders" detail={toSend ? `${toSend} to send` : 'Nothing to send'} />
           <Shortcut to="/provider/availability" icon="calendar-dots" color="text-success" label="Availability" detail={provider.taking_bookings ? 'Taking bookings' : 'Paused'} />
           <Shortcut to="/provider/earnings" icon="wallet" color="text-success" label="Payouts" detail={`${formatNaira(wallet?.balance ?? 0)} available`} />
           <Shortcut to="/courses" icon="graduation-cap" color="text-success" label="Learn & certify" detail="Build your skills" />

@@ -48,3 +48,25 @@ export function describeDistance(km: number | null | undefined): string | null {
   if (km < 0.5) return 'in your area'
   return `about ${formatDistance(km)} away`
 }
+
+/**
+ * The listed area closest to a point, if one is within `withinKm`: the same
+ * rule set_my_location applies in the database, so the screen can say
+ * "near Yaba" before anything is saved.
+ */
+export function nearestArea<A extends { name: string; lat: number; lng: number }>(
+  areas: A[],
+  point: Point,
+  withinKm = 8,
+): A | null {
+  let best: A | null = null
+  let bestKm = withinKm
+  for (const area of areas) {
+    const km = distanceKm(point, { lat: Number(area.lat), lng: Number(area.lng) })
+    if (km <= bestKm) {
+      best = area
+      bestKm = km
+    }
+  }
+  return best
+}

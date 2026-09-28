@@ -46,6 +46,7 @@ export function Orders() {
                   </div>
                   <div className="text-[12.5px] text-muted-2 mt-1">
                     {count} item{count === 1 ? '' : 's'}
+                    {o.seller_name && ` · from ${o.seller_name}`}
                   </div>
                 </Card>
               )

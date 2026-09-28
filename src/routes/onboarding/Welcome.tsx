@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
 import { Button } from '../../components/ui/Button'
@@ -24,7 +25,15 @@ export function Welcome() {
             I already have one
           </Button>
           <p className="mt-5 text-center text-[13px] leading-[1.5] text-muted-4">
-            By continuing you agree to our Terms and Privacy Policy.
+            By continuing you agree to our{' '}
+            <Link to="/legal/terms" className="underline">
+              Terms
+            </Link>{' '}
+            and{' '}
+            <Link to="/legal/privacy" className="underline">
+              Privacy Policy
+            </Link>
+            .
           </p>
         </div>
       </div>

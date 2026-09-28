@@ -40,11 +40,11 @@ describe('friendlyError', () => {
   it('explains that phone sign-up is switched off, rather than "something went wrong"', () => {
     // What Supabase Auth returns when no SMS provider is configured.
     expect(friendlyError({ code: 'phone_provider_disabled', message: 'Phone signups are disabled' })).toBe(
-      'Phone sign-up is not switched on yet. Use your email address instead.',
+      'Phone sign-in is not available yet. Use your email address for now.',
     )
     // Older clients surface it as a message with no code.
     expect(friendlyError({ message: 'Phone signups are disabled' })).toBe(
-      'Phone sign-up is not switched on yet. Use your email address instead.',
+      'Phone sign-in is not available yet. Use your email address for now.',
     )
   })
 

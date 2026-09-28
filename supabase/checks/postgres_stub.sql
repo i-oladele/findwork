@@ -1,5 +1,5 @@
 -- Enough of Supabase to apply the migrations and run business_rules.sql
--- against a plain Postgres — in CI, or locally without Docker:
+-- against a plain Postgres, in CI or locally:
 --
 --   createdb findwork
 --   psql findwork -f supabase/checks/postgres_stub.sql

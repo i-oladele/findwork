@@ -9,7 +9,7 @@ import { ErrorState, ListSkeleton, Spinner } from '../../components/system/State
 import { useAuth } from '../../lib/authContext'
 import { useProfile, useUpdateProfile, useDeleteAccount, useWalletSummary } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
-import { toLocal } from '../../lib/phone'
+import { formatPhone } from '../../lib/phone'
 
 export function Settings() {
   const navigate = useNavigate()
@@ -20,7 +20,8 @@ export function Settings() {
   const deleteAccount = useDeleteAccount()
 
   const [editing, setEditing] = useState(false)
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [location, setLocation] = useState('')
   const [address, setAddress] = useState('')
   const [area, setArea] = useState<string | null>(null)
@@ -29,7 +30,8 @@ export function Settings() {
   const [error, setError] = useState<string | null>(null)
 
   function startEditing() {
-    setFullName(profile?.full_name ?? '')
+    setFirstName(profile?.first_name ?? '')
+    setLastName(profile?.last_name ?? '')
     setLocation(profile?.location ?? '')
     setAddress(profile?.address ?? '')
     setArea(profile?.area ?? null)
@@ -40,7 +42,9 @@ export function Settings() {
     setError(null)
     try {
       await updateProfile.mutateAsync({
-        full_name: fullName.trim(),
+        // The database rebuilds full_name, the name others see, from these.
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         location: location.trim() || null,
         address: address.trim() || null,
         area,
@@ -91,18 +95,25 @@ export function Settings() {
             <div className="bg-white border border-line rounded-2xl p-5">
               {editing ? (
                 <div className="space-y-4">
-                  <Input label="Full name" value={fullName} onChange={setFullName} placeholder="Full name" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input label="First name" value={firstName} onChange={setFirstName} autoComplete="given-name" autoCapitalize="words" />
+                    <Input label="Last name" value={lastName} onChange={setLastName} autoComplete="family-name" autoCapitalize="words" />
+                  </div>
                   <AreaPicker
                     value={area}
                     onChange={setArea}
                     hint="Used to show you providers nearby, and to sort by who is closest."
                   />
+                  <Link to="/location" className="inline-flex items-center gap-1.5 -mt-1 text-[14px] font-semibold text-brand-hover">
+                    <i className="ph-bold ph-map-pin" />
+                    Pin your exact location on a map instead
+                  </Link>
                   <Input label="Neighbourhood (optional)" value={location} onChange={setLocation} placeholder="Off Herbert Macaulay Way" />
                   <Input label="Delivery address" value={address} onChange={setAddress} placeholder="14 Herbert Macaulay Way, Yaba" />
                   <div className="flex gap-2.5">
                     <button
                       onClick={save}
-                      disabled={updateProfile.isPending}
+                      disabled={updateProfile.isPending || !firstName.trim()}
                       className="flex-1 h-12 bg-ink rounded-xl text-[15px] font-semibold text-cream flex items-center justify-center disabled:opacity-50"
                     >
                       {updateProfile.isPending ? <Spinner className="w-5 h-5 border-cream/40 border-t-cream" /> : 'Save'}
@@ -123,13 +134,15 @@ export function Settings() {
                       {profile.full_name || 'Add your name'}
                     </div>
                     <div className="mt-1 text-[14.5px] text-muted truncate">
-                      {profile.phone ? `+234 ${toLocal(profile.phone)}` : profile.email}
+                      {profile.phone ? formatPhone(profile.phone) : profile.email}
                     </div>
-                    {(profile.area || profile.location) && (
-                      <div className="mt-1 flex items-center gap-1.5 text-[14px] text-muted-2">
-                        <i className="ph-fill ph-map-pin text-brand text-[14px]" />
-                        {[profile.area, profile.location].filter(Boolean).join(' · ')}
-                      </div>
+                    {(profile.location_label || profile.area || profile.location) && (
+                      <Link to="/location" className="mt-1 flex items-center gap-1.5 text-[14px] text-muted-2 min-w-0">
+                        <i className="ph-fill ph-map-pin text-brand text-[14px] flex-none" />
+                        <span className="truncate">
+                          {profile.location_label ?? [profile.area, profile.location].filter(Boolean).join(' · ')}
+                        </span>
+                      </Link>
                     )}
                   </div>
                   <button

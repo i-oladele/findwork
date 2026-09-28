@@ -7,21 +7,23 @@ import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { SectionLabel } from '../../components/ui/SectionLabel'
-import { EvidenceGallery } from '../../components/ui/PrivateAttachment'
+import { EvidenceGallery, PrivatePhoto } from '../../components/ui/PrivateAttachment'
 import { FullScreenLoader } from '../../components/system/States'
 import {
   adminFindProfiles,
   useAdminAdjustBalance,
   useAdminDisputes,
+  useAdminMarkTopupRefunded,
   useAdminOrders,
+  useAdminRefundsDue,
   useAdminReplySupport,
   useAdminReports,
   useAdminProcessWithdrawal,
   useAdminResolveReport,
+  useAdminReviewVerification,
   useAdminSetOrderStatus,
-  useAdminSetVerified,
   useAdminSupport,
-  useAdminUnverifiedProviders,
+  useAdminVerifications,
   useAdminWithdrawals,
   useProfile,
   useResolveDispute,
@@ -29,9 +31,9 @@ import {
 } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatDateTime, formatNaira, parseNaira, shortId } from '../../lib/format'
-import type { DisputeOutcome } from '../../lib/database.types'
+import type { DisputeOutcome, PaymentIntent } from '../../lib/database.types'
 
-const TABS = ['Disputes', 'Orders', 'Payouts', 'Reports', 'Support', 'Providers', 'Wallets'] as const
+const TABS = ['Disputes', 'Orders', 'Payouts', 'Verification', 'Reports', 'Support', 'Wallets'] as const
 type Tab = (typeof TABS)[number]
 
 /**
@@ -47,9 +49,10 @@ export function Admin() {
   const disputes = useAdminDisputes()
   const orders = useAdminOrders()
   const withdrawals = useAdminWithdrawals()
+  const refunds = useAdminRefundsDue()
   const reports = useAdminReports()
   const support = useAdminSupport()
-  const providers = useAdminUnverifiedProviders()
+  const verifications = useAdminVerifications()
 
   if (isLoading) return <FullScreenLoader />
   if (!profile?.is_admin) return <Navigate to="/home" replace />
@@ -57,10 +60,10 @@ export function Admin() {
   const counts: Record<Tab, number> = {
     Disputes: disputes.data?.length ?? 0,
     Orders: orders.data?.length ?? 0,
-    Payouts: withdrawals.data?.length ?? 0,
+    Payouts: (withdrawals.data?.length ?? 0) + (refunds.data?.length ?? 0),
     Reports: reports.data?.length ?? 0,
     Support: support.data?.length ?? 0,
-    Providers: providers.data?.length ?? 0,
+    Verification: verifications.data?.length ?? 0,
     Wallets: 0,
   }
 
@@ -98,7 +101,7 @@ export function Admin() {
           {tab === 'Payouts' && <PayoutsTab onError={setError} />}
           {tab === 'Reports' && <ReportsTab onError={setError} />}
           {tab === 'Support' && <SupportTab onError={setError} />}
-          {tab === 'Providers' && <ProvidersTab onError={setError} />}
+          {tab === 'Verification' && <VerificationTab onError={setError} />}
           {tab === 'Wallets' && <WalletsTab onError={setError} />}
         </div>
       </div>
@@ -230,13 +233,18 @@ function OrdersTab({ onError }: TabProps) {
 
 function PayoutsTab({ onError }: TabProps) {
   const { data } = useAdminWithdrawals()
+  const { data: refunds } = useAdminRefundsDue()
   const process = useAdminProcessWithdrawal()
   const [note, setNote] = useState<Record<string, string>>({})
-  if (!data?.length) return <Empty text="No withdrawals waiting." />
+  if (!data?.length && !refunds?.length) return <Empty text="No withdrawals or refunds waiting." />
 
   return (
     <>
-      {data.map((w) => (
+      {refunds && refunds.length > 0 && <RefundsDue refunds={refunds} onError={onError} />}
+      {refunds && refunds.length > 0 && data && data.length > 0 && (
+        <SectionLabel className="mt-5 mb-2.5">Withdrawals</SectionLabel>
+      )}
+      {data?.map((w) => (
         <Panel key={w.id}>
           <div className="flex items-center justify-between">
             <span className="font-display font-bold text-[17px] text-ink">{formatNaira(w.amount)}</span>
@@ -274,6 +282,46 @@ function PayoutsTab({ onError }: TabProps) {
               Reject
             </button>
           </div>
+        </Panel>
+      ))}
+    </>
+  )
+}
+
+/** Paid into an account after it was deleted, so never credited. */
+function RefundsDue({ refunds, onError }: TabProps & { refunds: PaymentIntent[] }) {
+  const mark = useAdminMarkTopupRefunded()
+  const [note, setNote] = useState<Record<string, string>>({})
+
+  return (
+    <>
+      <SectionLabel className="mb-2.5">Top-ups to refund</SectionLabel>
+      {refunds.map((p) => (
+        <Panel key={p.id}>
+          <div className="flex items-center justify-between">
+            <span className="font-display font-bold text-[17px] text-ink">{formatNaira(p.amount)}</span>
+            {p.paid_at && <span className="text-[12px] text-muted-2">{formatDateTime(p.paid_at)}</span>}
+          </div>
+          <div className="text-[13.5px] text-text-soft mt-1.5">
+            Paid after the account was deleted. Refund it from the Paystack dashboard, then record it here.
+          </div>
+          <div className="font-mono text-[12px] text-ink mt-2 break-all">{p.reference}</div>
+          <input
+            value={note[p.id] ?? ''}
+            onChange={(e) => setNote((n) => ({ ...n, [p.id]: e.target.value }))}
+            placeholder="Paystack refund reference"
+            className="w-full h-11 mt-3 bg-cream rounded-lg px-3 text-[14px] text-ink outline-none placeholder:text-muted-2"
+          />
+          <button
+            onClick={() => {
+              onError(null)
+              mark.mutate({ id: p.id, note: note[p.id] ?? '' }, { onError: (e) => onError(friendlyError(e)) })
+            }}
+            disabled={!note[p.id]?.trim() || mark.isPending}
+            className="w-full h-11 mt-3 bg-success text-white rounded-lg text-[14px] font-semibold disabled:opacity-50"
+          >
+            Mark refunded
+          </button>
         </Panel>
       ))}
     </>
@@ -374,37 +422,76 @@ function SupportTab({ onError }: TabProps) {
   )
 }
 
-function ProvidersTab({ onError }: TabProps) {
-  const { data } = useAdminUnverifiedProviders()
-  const setVerified = useAdminSetVerified()
-  if (!data?.length) return <Empty text="Every provider is verified." />
+const ID_TYPE_LABELS: Record<string, string> = {
+  nin: 'NIN',
+  bvn: 'BVN',
+  passport: 'International passport',
+  drivers_licence: "Driver's licence",
+  voters_card: "Voter's card",
+}
+
+/** IDs sent for checking: compare the photo, the selfie and the name. */
+function VerificationTab({ onError }: TabProps) {
+  const { data } = useAdminVerifications()
+  const review = useAdminReviewVerification()
+  const [note, setNote] = useState<Record<string, string>>({})
+  if (!data?.length) return <Empty text="No IDs waiting to be checked." />
+
+  function decide(id: string, name: string, approve: boolean) {
+    const reason = note[id] ?? ''
+    if (approve && !window.confirm(`Verify ${name}? They get access to every service.`)) return
+    onError(null)
+    review.mutate({ id, approve, note: reason }, { onError: (e) => onError(friendlyError(e)) })
+  }
 
   return (
     <>
-      {data.map((p) => (
-        <Panel key={p.id}>
-          <div className="flex items-center justify-between gap-2">
-            <Link to={`/provider/${p.id}`} className="font-display font-semibold text-[16px] text-ink truncate">
-              {p.business_name}
-            </Link>
-            <span className="text-[12px] text-muted-2">{p.jobs_done} jobs</span>
-          </div>
-          <div className="text-[13px] text-muted-2 mt-1">
-            {p.category} · {p.location}
-          </div>
-          {p.bio && <p className="mt-2 text-[13.5px] leading-[1.45] text-text-soft line-clamp-3">{p.bio}</p>}
-          <button
-            onClick={() => {
-              if (!window.confirm(`Mark ${p.business_name} as verified?`)) return
-              onError(null)
-              setVerified.mutate({ providerId: p.id, verified: true }, { onError: (e) => onError(friendlyError(e)) })
-            }}
-            className="w-full h-11 mt-3 bg-success text-white rounded-lg text-[14px] font-semibold"
-          >
-            Mark verified
-          </button>
-        </Panel>
-      ))}
+      {data.map((v) => {
+        const name = v.profile?.full_name || 'Unnamed account'
+        return (
+          <Panel key={v.id}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-display font-semibold text-[16px] text-ink truncate">{name}</span>
+              <span className="text-[12px] text-muted-2">{formatDateTime(v.created_at)}</span>
+            </div>
+            <div className="text-[14px] text-ink mt-1.5">
+              {ID_TYPE_LABELS[v.id_type] ?? v.id_type} · <span className="font-mono">{v.id_number}</span>
+            </div>
+            <div className="flex gap-3 mt-3">
+              <div>
+                <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted-2 mb-1">ID</div>
+                <PrivatePhoto bucket="verification-documents" path={v.document_path} label="ID photo" className="w-32 h-24" />
+              </div>
+              <div>
+                <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted-2 mb-1">Selfie</div>
+                <PrivatePhoto bucket="verification-documents" path={v.selfie_path} label="Selfie" className="w-24 h-24" />
+              </div>
+            </div>
+            <input
+              value={note[v.id] ?? ''}
+              onChange={(e) => setNote((n) => ({ ...n, [v.id]: e.target.value }))}
+              placeholder="Reason, if rejecting (they will see it)"
+              className="w-full h-11 mt-3 bg-cream rounded-lg px-3 text-[14px] text-ink outline-none placeholder:text-muted-2"
+            />
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => decide(v.id, name, true)}
+                disabled={review.isPending}
+                className="flex-1 h-11 bg-success text-white rounded-lg text-[14px] font-semibold disabled:opacity-50"
+              >
+                Approve
+              </button>
+              <button
+                onClick={() => decide(v.id, name, false)}
+                disabled={review.isPending || !(note[v.id] ?? '').trim()}
+                className="flex-1 h-11 border border-line rounded-lg text-[14px] font-semibold text-muted disabled:opacity-50"
+              >
+                Reject
+              </button>
+            </div>
+          </Panel>
+        )
+      })}
     </>
   )
 }

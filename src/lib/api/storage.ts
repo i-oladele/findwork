@@ -5,12 +5,22 @@ import { useAuth } from '../authContext'
 /** Largest photo accepted. Phone cameras produce 3-5 MB; this leaves room. */
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 
-export type UploadBucket = 'classifieds-photos' | 'provider-portfolios' | 'dispute-evidence' | 'avatars'
+export type UploadBucket =
+  | 'classifieds-photos'
+  | 'provider-portfolios'
+  | 'product-images'
+  | 'dispute-evidence'
+  | 'verification-documents'
+  | 'avatars'
+
+/** Readable only by the uploader and admins, through short-lived links. */
+export type PrivateBucket = 'chat-attachments' | 'dispute-evidence' | 'verification-documents'
+const PRIVATE: string[] = ['dispute-evidence', 'verification-documents']
 
 /**
  * Uploads a file under the caller's own folder ("<uid>/<random>.<ext>"),
  * which is what the storage policies check. Public buckets return a public
- * URL; the private evidence bucket returns the object path, which only the
+ * URL; the private buckets (evidence, ID documents) return the object path, which only the
  * uploader and admins can turn into a signed URL.
  */
 export function useUpload(bucket: UploadBucket) {
@@ -29,7 +39,7 @@ export function useUpload(bucket: UploadBucket) {
       })
       if (error) throw error
 
-      if (bucket === 'dispute-evidence') return path
+      if (PRIVATE.includes(bucket)) return path
       return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
     },
   })
@@ -42,7 +52,7 @@ export async function evidenceUrl(path: string): Promise<string | null> {
 }
 
 /** Private links are short lived and scoped to the current signed-in user. */
-export function usePrivateMedia(bucket: 'chat-attachments' | 'dispute-evidence', path: string | null) {
+export function usePrivateMedia(bucket: PrivateBucket, path: string | null) {
   const { user } = useAuth()
   return useQuery({
     queryKey: ['private-media', user?.id, bucket, path],

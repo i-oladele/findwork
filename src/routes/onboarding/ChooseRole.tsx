@@ -1,9 +1,15 @@
+import { useSearchParams } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
 import { ProgressDots } from '../../components/ui/ProgressDots'
 import { Card } from '../../components/ui/Card'
+import { isAppPath } from '../../lib/destination'
 
 export function ChooseRole() {
+  // The link a new account arrived through, if any: hiring picks up there.
+  const [params] = useSearchParams()
+  const next = params.get('next')
+
   return (
     <Screen>
       <StatusBar />
@@ -16,7 +22,7 @@ export function ChooseRole() {
           Pick one to start. You can add the other role any time from your profile.
         </p>
 
-        <Card to="/home" active className="mt-6 p-[22px]">
+        <Card to={isAppPath(next) ? next : '/home'} active className="mt-6 p-[22px]">
           <i className="ph-fill ph-shopping-bag text-[28px] text-brand" />
           <div className="font-display font-semibold text-[19px] text-ink mt-3.5">I want to hire or buy</div>
           <p className="mt-1 text-[14.5px] leading-[1.5] text-muted">

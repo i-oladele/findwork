@@ -64,6 +64,7 @@ export function TopUpReturn() {
   const done = result?.status === 'success'
   const failed = result?.status === 'failed'
   const stillPending = result?.status === 'pending'
+  const refunding = result?.status === 'refund_due' || result?.status === 'refunded'
 
   return (
     <Screen background="bg-ink">
@@ -77,6 +78,13 @@ export function TopUpReturn() {
           <Message icon="ph-check" tone="bg-success" title={`${formatNaira(result.amount)} added`} body="It is in your wallet now." />
         ) : failed ? (
           <Message icon="ph-x" tone="bg-brand" title="Payment did not go through" body="Nothing was taken. You can try again." />
+        ) : refunding ? (
+          <Message
+            icon="ph-arrow-u-up-left"
+            tone="bg-warning"
+            title="This payment is being refunded"
+            body="The account it was for was closed before the money arrived, so we are sending it back to where it came from."
+          />
         ) : stillPending ? (
           <Message
             icon="ph-hourglass"

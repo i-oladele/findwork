@@ -7,7 +7,7 @@ import { Alert } from '../../components/ui/Alert'
 import { PlaceholderImage } from '../../components/ui/PlaceholderImage'
 import { SectionLabel } from '../../components/ui/SectionLabel'
 import { EmptyState, FullScreenLoader } from '../../components/system/States'
-import { useCancelOrder, useDisputes, useOrder } from '../../lib/api'
+import { useCancelOrder, useConfirmOrderReceived, useDisputes, useOrder } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatDateTime, formatNaira, shortId } from '../../lib/format'
 import type { OrderStatus } from '../../lib/database.types'
@@ -39,6 +39,7 @@ export function OrderReturn() {
   const { data: order, isLoading } = useOrder(orderId)
   const { data: disputes } = useDisputes()
   const cancel = useCancelOrder()
+  const confirm = useConfirmOrderReceived()
   const [error, setError] = useState<string | null>(null)
 
   if (isLoading) return <FullScreenLoader />
@@ -54,12 +55,25 @@ export function OrderReturn() {
   const dispute = disputes?.find((d) => d.ref_type === 'order' && d.ref_id === order.id && d.status === 'open')
   const reached = STEPS.findIndex((s) => s.status === order.status)
   const closed = order.status === 'cancelled' || order.status === 'returned'
+  // A seller's order is paid out of escrow when the customer says it arrived.
+  const awaitingReceipt = order.seller_id !== null && (order.status === 'placed' || order.status === 'dispatched')
 
   async function doCancel() {
     if (!window.confirm(`Cancel this order? ${formatNaira(order!.total)} goes back to your wallet.`)) return
     setError(null)
     try {
       await cancel.mutateAsync(order!.id)
+    } catch (err) {
+      setError(friendlyError(err))
+    }
+  }
+
+  async function doConfirm() {
+    const seller = order!.seller_name ?? 'The seller'
+    if (!window.confirm(`Confirm it arrived as expected? ${seller} is paid and the order closes.`)) return
+    setError(null)
+    try {
+      await confirm.mutateAsync(order!.id)
     } catch (err) {
       setError(friendlyError(err))
     }
@@ -73,6 +87,7 @@ export function OrderReturn() {
           <div>
             <OrderStatusBadge status={order.status} />
             <div className="text-[13.5px] text-muted mt-2">Placed {formatDateTime(order.placed_at)}</div>
+            {order.seller_name && <div className="text-[13.5px] text-muted mt-0.5">From {order.seller_name}</div>}
           </div>
           <span className="font-display font-bold text-[18px] text-ink">{formatNaira(order.total)}</span>
         </div>
@@ -94,6 +109,12 @@ export function OrderReturn() {
           </div>
         )}
 
+        {awaitingReceipt && !dispute && (
+          <Alert tone="info" className="mt-4">
+            {formatNaira(order.total)} is held until you confirm the order arrived.
+            {order.status === 'dispatched' && ' If you do not, the seller is paid a week after dispatch.'}
+          </Alert>
+        )}
         {dispute && (
           <Alert tone="info" className="mt-4">
             You reported a problem with this order. Our team is looking at it.{' '}
@@ -135,6 +156,15 @@ export function OrderReturn() {
           </>
         )}
 
+        {awaitingReceipt && !dispute && (
+          <button
+            onClick={doConfirm}
+            disabled={confirm.isPending}
+            className="flex items-center justify-center w-full h-12 mt-5 bg-ink rounded-xl text-[15.5px] font-semibold text-cream disabled:opacity-50"
+          >
+            I have received it
+          </button>
+        )}
         {order.status === 'placed' && !dispute && (
           <button
             onClick={doCancel}

@@ -23,6 +23,32 @@ export function useProfile() {
   })
 }
 
+/**
+ * Saves where you are: an exact pin with the address it was found at. The
+ * database fills in the nearest listed area; the pin stays private to you.
+ * Returns that area, or null outside the areas listed so far.
+ */
+export function useSetMyLocation() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (place: { lat: number; lng: number; label: string }): Promise<string | null> => {
+      const { data, error } = await supabase.rpc('set_my_location', {
+        p_lat: place.lat,
+        p_lng: place.lng,
+        p_label: place.label,
+      })
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.profile.me() })
+      // Distances to providers are worked out from this point.
+      qc.invalidateQueries({ queryKey: keys.providers.all })
+    },
+  })
+}
+
 export function useUpdateProfile() {
   const { user } = useAuth()
   const qc = useQueryClient()

@@ -42,16 +42,18 @@ export function ChatThread() {
   const bottom = useRef<HTMLDivElement>(null)
   useThreadRealtime(threadId)
 
-  const count = messages.data?.length ?? 0
+  // Keyed on the newest message, not the count, so loading earlier messages
+  // neither scrolls to the bottom nor marks anything read again.
+  const newest = messages.data?.at(-1)?.id
 
   // Reading the thread marks it read; so does each new message arriving while open.
   useEffect(() => {
     if (threadId) markRead(threadId)
-  }, [threadId, count, markRead])
+  }, [threadId, newest, markRead])
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'end' })
-  }, [count])
+  }, [newest])
 
   const name = partnerAsProvider?.business_name ?? partner?.full_name ?? 'Conversation'
 
@@ -93,6 +95,15 @@ export function ChatThread() {
         {messages.isError && <ErrorState message="We could not load this conversation." onRetry={() => messages.refetch()} />}
         {messages.data?.length === 0 && (
           <p className="text-center text-[14px] text-muted py-8">Say hello — ask about availability, price or directions.</p>
+        )}
+        {messages.hasNextPage && (
+          <button
+            onClick={() => void messages.fetchNextPage()}
+            disabled={messages.isFetchingNextPage}
+            className="block mx-auto mb-2 text-[14px] font-semibold text-brand-hover disabled:opacity-50"
+          >
+            {messages.isFetchingNextPage ? 'Loading…' : 'Show earlier messages'}
+          </button>
         )}
 
         {byDay(messages.data ?? []).map((group) => (

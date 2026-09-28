@@ -3,7 +3,7 @@ import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
 import { ProviderCard } from '../../components/ui/ProviderCard'
 import { QueryState } from '../../components/system/QueryState'
-import { useMyProviderProfile, useProfile, useProviders, useUnreadCount } from '../../lib/api'
+import { useMyProviderProfile, useMyVerification, useProfile, useProviders, useUnreadCount } from '../../lib/api'
 import { useIsAdmin } from '../../lib/api/admin'
 import { firstName } from '../../lib/format'
 import { distanceBetween } from '../../lib/distance'
@@ -31,9 +31,12 @@ export function Home() {
             <div className="text-[13.5px] text-muted-3">
               {greeting()}, {firstName(profile?.full_name)}
             </div>
-            <Link to="/settings" className="flex items-center gap-1.5 mt-1 font-display font-semibold text-[16px] text-cream">
+            <Link to="/location" className="flex items-center gap-1.5 mt-1 font-display font-semibold text-[16px] text-cream">
               <i className="ph-fill ph-map-pin text-brand text-[15px]" />
-              <span className="truncate">{profile?.area ?? profile?.location ?? 'Add your area'}</span>
+              <span className="truncate">
+                {profile?.location_label ?? profile?.area ?? profile?.location ?? 'Add your area'}
+              </span>
+              <i className="ph-bold ph-caret-down text-[12px] text-muted-3 flex-none" />
             </Link>
           </div>
           <div className="flex items-center gap-2.5">
@@ -76,6 +79,8 @@ export function Home() {
       </div>
 
       <div className="px-[22px] pt-5 pb-6">
+        {profile && !profile.verified_at && <VerifyNotice />}
+
         <div className="flex gap-3">
           <Link to="/categories" className="flex-1 bg-white border border-line rounded-2xl px-3.5 py-4">
             <i className="ph-fill ph-wrench text-2xl text-brand" />
@@ -140,5 +145,32 @@ export function Home() {
         </Link>
       </div>
     </Screen>
+  )
+}
+
+/**
+ * Shown until the account is verified: what to do next depends on whether
+ * they have sent their ID, and what the team said about it.
+ */
+function VerifyNotice() {
+  const { data: latest, isLoading } = useMyVerification()
+  if (isLoading) return null
+
+  const { icon, title, body } =
+    latest?.status === 'pending'
+      ? { icon: 'hourglass-medium', title: 'We are checking your ID', body: 'We will let you know as soon as it is done.' }
+      : latest?.status === 'rejected'
+        ? { icon: 'warning-circle', title: 'Your verification needs another look', body: 'See what to fix and send it again.' }
+        : { icon: 'seal-check', title: 'Complete verification to access all services', body: 'It takes a few minutes: an ID and a selfie.' }
+
+  return (
+    <Link to="/get-verified" className="flex items-center gap-3 bg-warning-bg rounded-2xl p-4 mb-4">
+      <i className={`ph-fill ph-${icon} text-[24px] text-warning-text flex-none`} />
+      <span className="flex-1 min-w-0">
+        <span className="block text-[14.5px] font-semibold leading-[1.35] text-warning-text">{title}</span>
+        <span className="block text-[13px] leading-[1.4] text-warning-text/80 mt-0.5">{body}</span>
+      </span>
+      <i className="ph-bold ph-caret-right text-warning-text flex-none" />
+    </Link>
   )
 }

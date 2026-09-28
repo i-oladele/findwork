@@ -23,6 +23,9 @@ export const supabase = createClient<Database>(url ?? 'http://localhost:54321', 
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    // Fingerprint and face sign-in (passkeys), which Supabase still marks
+    // experimental. Also switched on per project: Authentication → Passkeys.
+    experimental: { passkey: true },
   },
 })
 
@@ -65,6 +68,24 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   'order is closed': 'This order is already closed.',
   'address required': 'Add a delivery address first.',
   'product not found': 'Something in your cart is no longer sold. Remove it and try again.',
+  checkout_total_changed: 'Your cart total changed. Review the updated total before paying.',
+  seller_refund_insufficient_balance: 'The seller wallet cannot cover this return yet. The dispute remains open; recover the funds before retrying.',
+  'not enough stock': 'There is not enough stock for this cart. Update the quantities and try again.',
+  'cannot buy your own goods': 'That is one of your own products. Remove it from your cart to check out.',
+  'order not found': 'We could not find that order.',
+  'not your order': 'You do not have permission to change this order.',
+  products_name_length: 'Give the product a name of 2 to 120 characters.',
+  products_price_positive: 'Set a price above ₦0.',
+  products_stock_check: 'Stock cannot be less than zero.',
+  products_description_length: 'Keep the description under 2,000 characters.',
+  products_photo_limit: 'A product can have up to 6 photos.',
+  'payment is not awaiting a refund': 'That payment has already been dealt with.',
+  already_verified: 'Your account is already verified.',
+  verification_pending: 'We are already checking your ID. We will let you know when it is done.',
+  'invalid id number': 'Check the ID number: a NIN or BVN is 11 digits.',
+  'invalid id type': 'Choose the type of ID you are sending.',
+  'verification photos missing': 'Add a photo of your ID and a selfie, then send again.',
+  'verification already reviewed': 'Someone on the team has already checked this one.',
   'invalid quantity': 'Quantities must be between 1 and 99.',
   'cart is empty': 'Your cart is empty.',
   'not your job': 'You do not have permission to change this job.',
@@ -85,11 +106,19 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   // Supabase Auth error codes. Phone sign-in needs an SMS provider
   // (Twilio and friends) configured on the project, and costs money per
   // message, so it is off until someone switches it on.
-  phone_provider_disabled: 'Phone sign-up is not switched on yet. Use your email address instead.',
+  phone_provider_disabled: 'Phone sign-in is not available yet. Use your email address for now.',
+  sms_send_failed: 'We could not text that number. Check it and try again, or use your email address.',
+  // From the send-sms hook: codes are only texted to countries the business serves.
+  sms_country_not_supported: 'We can only text codes to Nigerian numbers for now. Use your email address instead.',
   email_provider_disabled: 'Email sign-up is not switched on yet.',
   signup_disabled: 'New accounts are closed at the moment.',
   over_sms_send_rate_limit: 'Too many codes sent. Wait a few minutes and try again.',
   over_email_send_rate_limit: 'Too many emails sent. Wait a few minutes and try again.',
+  over_request_rate_limit: 'Too many attempts. Wait a minute and try again.',
+  // Supabase's built-in mailer only writes to the project's own team. Real
+  // sign-ups need a custom SMTP sender set up in the dashboard.
+  email_address_not_authorized: 'We cannot send email to that address yet. Please try again later.',
+  'Database error saving new user': 'We could not finish creating your account. Please try again.',
   otp_expired: 'That code has expired. Ask for a new one.',
   invalid_credentials: 'That email, phone or password is not right.',
   user_already_exists: 'An account with those details already exists. Sign in instead.',
@@ -100,7 +129,8 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   validation_failed: 'Check the details you entered and try again.',
   'Unsupported provider': 'That sign-in option is not available yet. Use your email address.',
   same_password: 'That is your current password. Choose a different one.',
-  'Phone signups are disabled': 'Phone sign-up is not switched on yet. Use your email address instead.',
+  'Phone signups are disabled': 'Phone sign-in is not available yet. Use your email address for now.',
+  'Unsupported phone provider': 'Phone sign-in is not available yet. Use your email address for now.',
   'Signups not allowed': 'New accounts are closed at the moment.',
 }
 

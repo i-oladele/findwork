@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { keys } from './keys'
@@ -12,68 +12,49 @@ export type ThreadSummary = {
   thread_id: string
   last_read_at: string
   other: Participant | null
-  last_message: ChatMessage | null
+  last_message: ChatMessage
+  last_message_at: string
   unread: number
 }
 
+const INBOX_PAGE = 30
+const MESSAGE_PAGE = 100
+
+/**
+ * The inbox, newest conversation first, a page at a time. Each row carries
+ * its own latest message and unread count from the server (chat_inbox), so
+ * one busy conversation cannot push the others out.
+ */
 export function useThreads() {
   const { user } = useAuth()
 
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: keys.chat.threads(),
     enabled: Boolean(user),
-    queryFn: async (): Promise<ThreadSummary[]> => {
-      const { data: memberships, error } = await supabase
-        .from('thread_participants')
-        .select('thread_id, last_read_at')
-        .eq('profile_id', user!.id)
+    initialPageParam: null as { at: string; thread: string } | null,
+    queryFn: async ({ pageParam }): Promise<ThreadSummary[]> => {
+      const { data, error } = await supabase.rpc('chat_inbox', {
+        p_limit: INBOX_PAGE,
+        ...(pageParam && { p_before_at: pageParam.at, p_before_thread: pageParam.thread }),
+      })
       if (error) throw error
-      if (!memberships?.length) return []
-
-      const threadIds = memberships.map((m) => m.thread_id)
-
-      // The other participant in each thread, and the messages, in two more
-      // round trips rather than N+1 per thread.
-      const [others, messages] = await Promise.all([
-        supabase
-          .from('thread_participants')
-          .select('thread_id, profiles(id, full_name, avatar_url)')
-          .in('thread_id', threadIds)
-          .neq('profile_id', user!.id),
-        supabase
-          .from('chat_messages')
-          .select('*')
-          .in('thread_id', threadIds)
-          .order('created_at', { ascending: false })
-          .limit(500),
-      ])
-      if (others.error) throw others.error
-      if (messages.error) throw messages.error
-
-      return memberships
-        .map((m) => {
-          const threadMessages = messages.data.filter((msg) => msg.thread_id === m.thread_id)
-          const other = others.data.find((o) => o.thread_id === m.thread_id)
-          return {
-            thread_id: m.thread_id,
-            last_read_at: m.last_read_at,
-            other: (other?.profiles as unknown as Participant | null) ?? null,
-            last_message: threadMessages[0] ?? null,
-            unread: threadMessages.filter(
-              (msg) => msg.sender_id !== user!.id && msg.created_at > m.last_read_at,
-            ).length,
-          }
-        })
-        // Threads opened but never written in are clutter in the inbox.
-        .filter((t) => t.last_message)
-        .sort((a, b) => (b.last_message?.created_at ?? '').localeCompare(a.last_message?.created_at ?? ''))
+      return data.map((row) => ({
+        thread_id: row.thread_id,
+        last_read_at: row.last_read_at,
+        other: row.other_id
+          ? { id: row.other_id, full_name: row.other_name ?? '', avatar_url: row.other_avatar_url }
+          : null,
+        last_message: row.last_message,
+        last_message_at: row.last_message_at,
+        unread: row.unread,
+      }))
     },
+    getNextPageParam: (page) => {
+      const last = page.at(-1)
+      return page.length < INBOX_PAGE || !last ? undefined : { at: last.last_message_at, thread: last.thread_id }
+    },
+    select: (data) => data.pages.flat(),
   })
-}
-
-export function useUnreadMessageCount() {
-  const { data } = useThreads()
-  return data?.reduce((sum, t) => sum + t.unread, 0) ?? 0
 }
 
 /** Who the signed-in user is talking to in a thread. */
@@ -96,19 +77,39 @@ export function useThreadPartner(threadId: string | undefined) {
   })
 }
 
+/**
+ * A conversation, oldest first on screen, loaded newest first a page at a
+ * time. Loading it all in one request would stop at the API's row limit and
+ * leave out the newest messages of a long conversation, the ones that matter.
+ */
 export function useMessages(threadId: string | undefined) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: keys.chat.messages(threadId ?? ''),
     enabled: Boolean(threadId),
-    queryFn: async (): Promise<ChatMessage[]> => {
-      const { data, error } = await supabase
+    initialPageParam: null as { at: string; id: string } | null,
+    queryFn: async ({ pageParam }): Promise<ChatMessage[]> => {
+      let query = supabase
         .from('chat_messages')
         .select('*')
         .eq('thread_id', threadId!)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(MESSAGE_PAGE)
+      if (pageParam) {
+        // Everything before the oldest message already shown, ties broken by id.
+        query = query.or(
+          `created_at.lt."${pageParam.at}",and(created_at.eq."${pageParam.at}",id.lt.${pageParam.id})`,
+        )
+      }
+      const { data, error } = await query
       if (error) throw error
       return data
     },
+    getNextPageParam: (page) => {
+      const oldest = page.at(-1)
+      return page.length < MESSAGE_PAGE || !oldest ? undefined : { at: oldest.created_at, id: oldest.id }
+    },
+    select: (data) => data.pages.flat().reverse(),
   })
 }
 

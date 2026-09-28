@@ -1,5 +1,5 @@
-import { Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense, lazy, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigationType } from 'react-router-dom'
 
 import { ProtectedLayout, PublicOnlyLayout } from './components/system/RouteLayouts'
 import { NotFound } from './components/system/NotFound'
@@ -64,6 +64,9 @@ const Availability = lazyNamed(() => import('./routes/provider/Availability'), '
 const Services = lazyNamed(() => import('./routes/provider/Services'), 'Services')
 const ServiceEditor = lazyNamed(() => import('./routes/provider/ServiceEditor'), 'ServiceEditor')
 const Earnings = lazyNamed(() => import('./routes/provider/Earnings'), 'Earnings')
+const Products = lazyNamed(() => import('./routes/provider/Products'), 'Products')
+const ProductEditor = lazyNamed(() => import('./routes/provider/ProductEditor'), 'ProductEditor')
+const SellerOrders = lazyNamed(() => import('./routes/provider/SellerOrders'), 'SellerOrders')
 const RFQs = lazyNamed(() => import('./routes/wholesale/RFQs'), 'RFQs')
 const NewRFQ = lazyNamed(() => import('./routes/wholesale/NewRFQ'), 'NewRFQ')
 const RFQDetail = lazyNamed(() => import('./routes/wholesale/RFQDetail'), 'RFQDetail')
@@ -80,13 +83,29 @@ const Plans = lazyNamed(() => import('./routes/billing/Plans'), 'Plans')
 const Billing = lazyNamed(() => import('./routes/billing/Billing'), 'Billing')
 const Settings = lazyNamed(() => import('./routes/settings/Settings'), 'Settings')
 const Notifications = lazyNamed(() => import('./routes/settings/Notifications'), 'Notifications')
+const Location = lazyNamed(() => import('./routes/settings/Location'), 'Location')
 const Help = lazyNamed(() => import('./routes/settings/Help'), 'Help')
 const Legal = lazyNamed(() => import('./routes/settings/Legal'), 'Legal')
 const Admin = lazyNamed(() => import('./routes/admin/Admin'), 'Admin')
 
+/**
+ * A new page starts at its top: the whole window scrolls, so without this a
+ * page opened from halfway down a long one opens halfway down too. Going
+ * back keeps the browser's own restoring of where you were.
+ */
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  const navigation = useNavigationType()
+  useEffect(() => {
+    if (navigation !== 'POP') window.scrollTo(0, 0)
+  }, [pathname, navigation])
+  return null
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Suspense fallback={<FullScreenLoader />}>
         <Routes>
           <Route path="/" element={<Navigate to="/welcome" replace />} />
@@ -164,6 +183,10 @@ export default function App() {
             <Route path="/provider/services/new" element={<ServiceEditor />} />
             <Route path="/provider/services/:id/edit" element={<ServiceEditor />} />
             <Route path="/provider/earnings" element={<Earnings />} />
+            <Route path="/provider/products" element={<Products />} />
+            <Route path="/provider/products/new" element={<ProductEditor />} />
+            <Route path="/provider/products/:id/edit" element={<ProductEditor />} />
+            <Route path="/provider/orders" element={<SellerOrders />} />
 
             {/* G · B2B wholesale */}
             <Route path="/rfqs" element={<RFQs />} />
@@ -192,6 +215,7 @@ export default function App() {
             {/* L · Account */}
             <Route path="/settings" element={<Settings />} />
             <Route path="/notifications" element={<Notifications />} />
+            <Route path="/location" element={<Location />} />
             <Route path="/help" element={<Help />} />
 
             {/* M · Operations (admins only; the screen re-checks) */}

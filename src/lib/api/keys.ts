@@ -45,8 +45,21 @@ export const keys = {
   commerce: {
     products: () => ['products'] as const,
     product: (id: string) => ['products', id] as const,
+    // Under products, so anything that refreshes prices refreshes the quote.
+    quote: (items: { product_id: string; qty: number }[], speed: string) => ['products', 'quote', items, speed] as const,
     orders: () => ['orders'] as const,
     order: (id: string) => ['orders', id] as const,
+  },
+  verification: {
+    mine: () => ['verification', 'mine'] as const,
+  },
+  passkeys: {
+    available: () => ['passkeys', 'available'] as const,
+  },
+  seller: {
+    all: ['seller'] as const,
+    products: () => ['seller', 'products'] as const,
+    orders: () => ['seller', 'orders'] as const,
   },
   chat: {
     all: ['chat'] as const,
@@ -103,6 +116,8 @@ export const keys = {
     disputes: () => ['admin', 'disputes'] as const,
     orders: () => ['admin', 'orders'] as const,
     withdrawals: () => ['admin', 'withdrawals'] as const,
+    refunds: () => ['admin', 'refunds'] as const,
+    verifications: () => ['admin', 'verifications'] as const,
     reports: () => ['admin', 'reports'] as const,
     support: () => ['admin', 'support'] as const,
     providers: () => ['admin', 'providers'] as const,

@@ -4,7 +4,7 @@ import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
 import { PlaceholderImage } from '../../components/ui/PlaceholderImage'
 import { QueryState } from '../../components/system/QueryState'
-import { useProducts } from '../../lib/api'
+import { productImage, useProducts } from '../../lib/api'
 import { useCartCount } from '../../store/cart'
 import { formatNaira } from '../../lib/format'
 
@@ -70,11 +70,14 @@ export function Shop() {
               <div className="grid grid-cols-2 gap-2.5 mt-2">
                 {list.map((p) => (
                   <Link key={p.id} to={`/product/${p.id}`} className="bg-white border border-line rounded-2xl overflow-hidden">
-                    <PlaceholderImage src={p.image_url ?? undefined} className="h-[96px] w-full rounded-none" />
+                    <PlaceholderImage src={productImage(p)} className="h-[96px] w-full rounded-none" />
                     <div className="px-3 py-2.5">
                       <div className="text-[14.5px] font-semibold text-ink leading-[1.3]">{p.name}</div>
                       <div className="font-display font-bold text-base text-ink mt-2">{formatNaira(p.price)}</div>
-                      <div className="text-[11.5px] text-muted mt-1.5 truncate">{p.vendor}</div>
+                      <div className="text-[11.5px] text-muted mt-1.5 truncate">
+                        {p.stock === 0 ? 'Sold out · ' : ''}
+                        {p.vendor}
+                      </div>
                     </div>
                   </Link>
                 ))}

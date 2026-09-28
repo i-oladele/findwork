@@ -39,7 +39,7 @@ supabase login
 supabase link --project-ref <your-project-ref>
 supabase db push --include-seed         # migrations + demo catalog and accounts
 supabase functions deploy delete-account paystack-initialize paystack-verify
-supabase functions deploy paystack-webhook --no-verify-jwt
+supabase functions deploy paystack-webhook send-sms --no-verify-jwt
 supabase secrets set PAYSTACK_SECRET_KEY=sk_test_... APP_URL=https://your-app-url
 ```
 
@@ -55,10 +55,41 @@ supabase gen types typescript --linked > src/lib/database.types.ts
 `database.types.ts` is currently hand-written to match the migrations. Replace
 it with generated output as soon as a project is linked.
 
-Two auth settings matter. If you leave email confirmation **on**, add
-`{{ .Token }}` to the confirmation template so the 6-digit screen works;
-with it off, sign-up goes straight into the app. Phone sign-up needs an SMS
-provider (Twilio) configured, otherwise use email.
+For strangers to be able to sign up, four auth settings in the Supabase
+dashboard (Authentication) have to be right:
+
+1. **A real email sender** (Emails → SMTP settings): Resend, Postmark,
+   Amazon SES, Brevo or similar. Supabase's built-in mailer only writes to
+   the project's own team, a couple of times an hour, so with it nobody else
+   ever receives a sign-up code.
+2. **The confirmation email** (Emails → Confirm signup): paste
+   `supabase/templates/confirmation.html`, with the subject from its header.
+   It carries the 6-digit code the app's `/verify` screen asks for, and a
+   one-tap link. The default template has only the link.
+3. **Where links land** (URL Configuration): the Site URL is the app's
+   address, and Redirect URLs include it followed by `/**`. Otherwise the
+   confirmation link and password reset take people somewhere else.
+4. **Phone sign-up**, the app's default, texts codes through Termii, a
+   Nigerian provider whose DND route reaches every Nigerian number. Supabase
+   makes each code and hands it to the `send-sms` function to deliver:
+   - In Termii: an approved sender ID (FindWork) and the DND route switched
+     on for the account, with credit in the wallet.
+   - In Supabase, Authentication → Hooks: add a **Send SMS** hook of type
+     HTTPS, pointing at `https://<project-ref>.supabase.co/functions/v1/send-sms`,
+     and generate its secret.
+   - `supabase secrets set SEND_SMS_HOOK_SECRET='v1,whsec_…'
+     TERMII_API_KEY=… TERMII_BASE_URL=https://… TERMII_SENDER_ID=FindWork`
+   - Sign In / Providers → Phone: switch it on, with SMS OTP expiry at
+     600 seconds. The text says the code lasts 10 minutes, and it must match
+     the template registered with Termii word for word (see `smsText` in
+     `supabase/functions/send-sms/deliverCode.ts`).
+
+   Codes go only to Nigerian numbers; set `SMS_COUNTRIES` (calling codes,
+   comma separated) to add countries Termii can reach. Anyone else, and
+   everyone while Phone is off, is told why and moved to the email form.
+
+With email confirmation switched off, sign-up goes straight into the app and
+no code is sent.
 
 [TESTING.md](TESTING.md) covers test accounts, Paystack test cards, and what
 to walk through.
@@ -155,11 +186,23 @@ an admin checks them and switches on the badge. Wiring up a KYC vendor
 
 **Payouts.** Withdrawals leave the provider's balance immediately and queue in
 `/admin` for the team to send by bank transfer. Automating them through
-Paystack Transfers is the next step, and needs a live Paystack account.
+Paystack Transfers is the next step, and needs a live Paystack account. A
+top-up that Paystack confirms after its account was deleted is never
+credited; it waits in the same queue to be refunded from the Paystack
+dashboard.
 
-**Fulfilment.** Shop orders are a first-party catalog with no vendor accounts:
-an admin marks each order dispatched and delivered. There is no rider
-tracking, so the order screen shows status rather than a map.
+**Fulfilment.** The shop sells FindWork's own catalog, which an admin marks
+dispatched and delivered in `/admin`, and goods listed by providers, who send
+their own orders from the provider dashboard. A provider's money is held in
+escrow until the customer confirms the order arrived, or for a week after
+dispatch. There is no rider tracking, so the order screen shows status rather
+than a map.
+
+**Maps.** Address search and the map on "Add your area" use free
+OpenStreetMap services (Photon for search, openstreetmap.org for map tiles),
+which ask for fair use and have no uptime promise. Past early traffic, move to
+a paid provider: search lives in `src/lib/geocoding.ts`, tiles in
+`src/components/ui/LocationMap.tsx`.
 
 **Native.** There is no mobile app yet — this is a mobile-shaped web app that
 handles phone safe areas, so it behaves correctly in a phone browser. A store

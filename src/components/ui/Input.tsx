@@ -9,9 +9,23 @@ type InputProps = {
   type?: string
   hint?: string
   trailing?: ReactNode
+  /** Lets phones and password managers fill the field: "email", "name", … */
+  autoComplete?: string
+  autoCapitalize?: 'none' | 'words' | 'sentences'
 }
 
-export function Input({ label, value, onChange, placeholder, icon, type = 'text', hint, trailing }: InputProps) {
+export function Input({
+  label,
+  value,
+  onChange,
+  placeholder,
+  icon,
+  type = 'text',
+  hint,
+  trailing,
+  autoComplete,
+  autoCapitalize,
+}: InputProps) {
   return (
     <div>
       {label && (
@@ -24,7 +38,10 @@ export function Input({ label, value, onChange, placeholder, icon, type = 'text'
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
           placeholder={placeholder}
-          className="flex-1 text-[16px] text-ink bg-transparent outline-none placeholder:text-muted-2"
+          autoComplete={autoComplete}
+          autoCapitalize={autoCapitalize}
+          spellCheck={type === 'email' ? false : undefined}
+          className="flex-1 min-w-0 text-[16px] text-ink bg-transparent outline-none placeholder:text-muted-2"
         />
         {trailing}
       </div>

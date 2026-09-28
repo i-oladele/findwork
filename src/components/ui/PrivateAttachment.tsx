@@ -1,4 +1,4 @@
-import { usePrivateMedia } from '../../lib/api/storage'
+import { usePrivateMedia, type PrivateBucket } from '../../lib/api/storage'
 import type { ChatMessage } from '../../lib/database.types'
 
 export function ChatAttachment({ message }: { message: ChatMessage }) {
@@ -22,16 +22,24 @@ export function ChatAttachment({ message }: { message: ChatMessage }) {
 
 export function EvidenceGallery({ paths }: { paths: string[] }) {
   return <div className="flex flex-wrap gap-3 mt-3" aria-label="Evidence photos">
-    {paths.map((path, index) => <EvidencePhoto key={path} path={path} index={index} />)}
+    {paths.map((path, index) => (
+      <PrivatePhoto key={path} bucket="dispute-evidence" path={path} label={`Evidence photo ${index + 1}`} />
+    ))}
   </div>
 }
 
-function EvidencePhoto({ path, index }: { path: string; index: number }) {
-  const media = usePrivateMedia('dispute-evidence', path)
-  if (media.isLoading) return <p role="status" className="text-sm text-muted">Loading photo {index + 1}…</p>
-  if (media.isError) return <button type="button" className="text-sm text-brand-hover underline" onClick={() => media.refetch()}>Retry photo {index + 1}</button>
+/** A photo from a private bucket, through a short-lived link; opens full size. */
+export function PrivatePhoto({ bucket, path, label, className = 'w-24 h-24' }: {
+  bucket: PrivateBucket
+  path: string
+  label: string
+  className?: string
+}) {
+  const media = usePrivateMedia(bucket, path)
+  if (media.isLoading) return <p role="status" className="text-sm text-muted">Loading {label.toLowerCase()}…</p>
+  if (media.isError) return <button type="button" className="text-sm text-brand-hover underline" onClick={() => media.refetch()}>Retry {label.toLowerCase()}</button>
   if (!media.data) return null
-  return <a href={media.data} target="_blank" rel="noopener noreferrer" aria-label={`Open evidence photo ${index + 1}`}>
-    <img src={media.data} alt={`Evidence photo ${index + 1}`} loading="lazy" className="w-24 h-24 object-cover rounded-lg border border-line" />
+  return <a href={media.data} target="_blank" rel="noopener noreferrer" aria-label={`Open ${label.toLowerCase()}`}>
+    <img src={media.data} alt={label} loading="lazy" className={`${className} object-cover rounded-lg border border-line`} />
   </a>
 }

@@ -41,7 +41,9 @@ Deno.serve(async (req: Request) => {
   if (tx.status === 'success' && tx.currency === 'NGN') {
     const { error } = await admin.rpc('credit_topup', { p_reference: reference, p_amount_kobo: tx.amount })
     if (error) return json({ error: error.message }, 500)
-    return json({ status: 'success', amount: intent.amount })
+    // Usually success; refund_due if the account was deleted before it landed.
+    const { data: settled } = await admin.from('payment_intents').select('status').eq('reference', reference).single()
+    return json({ status: settled?.status ?? 'success', amount: intent.amount })
   }
 
   if (tx.status === 'failed' || tx.status === 'abandoned' || tx.status === 'reversed') {

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useProfile } from './profile'
 import { keys } from './keys'
-import type { Dispute, ProviderProfile, Report, SupportRequest, Withdrawal } from '../database.types'
+import type { Dispute, PaymentIntent, ProviderProfile, Report, SupportRequest, Verification, Withdrawal } from '../database.types'
 import type { OrderWithItems } from './commerce'
 
 /**
@@ -50,6 +50,9 @@ export function useAdminOrders() {
         .from('orders')
         .select('*, order_items(*), customer:profiles!orders_customer_id_fkey(full_name)')
         .in('status', ['placed', 'dispatched'])
+        // Sellers dispatch their own orders and the customer's confirmation
+        // pays them; the team fulfils FindWork's own catalog.
+        .is('seller_id', null)
         .order('placed_at')
       if (error) throw error
       return data as unknown as AdminOrder[]
@@ -72,6 +75,44 @@ export function useAdminWithdrawals() {
         .order('created_at')
       if (error) throw error
       return data as unknown as AdminWithdrawal[]
+    },
+  })
+}
+
+export type AdminVerification = Verification & { profile: Named }
+
+/** Submissions waiting for the team, oldest first. */
+export function useAdminVerifications() {
+  const isAdmin = useIsAdmin()
+  return useQuery({
+    queryKey: keys.admin.verifications(),
+    enabled: isAdmin,
+    queryFn: async (): Promise<AdminVerification[]> => {
+      const { data, error } = await supabase
+        .from('verifications')
+        .select('*, profile:profiles!verifications_profile_id_fkey(full_name)')
+        .eq('status', 'pending')
+        .order('created_at')
+      if (error) throw error
+      return data as unknown as AdminVerification[]
+    },
+  })
+}
+
+/** Top-ups that reached an account after it was deleted: send back by hand. */
+export function useAdminRefundsDue() {
+  const isAdmin = useIsAdmin()
+  return useQuery({
+    queryKey: keys.admin.refunds(),
+    enabled: isAdmin,
+    queryFn: async (): Promise<PaymentIntent[]> => {
+      const { data, error } = await supabase
+        .from('payment_intents')
+        .select('*')
+        .eq('status', 'refund_due')
+        .order('paid_at')
+      if (error) throw error
+      return data
     },
   })
 }
@@ -160,6 +201,24 @@ export function useAdminSetOrderStatus() {
 export function useAdminProcessWithdrawal() {
   return useAdminMutation(async ({ id, paid, note }: { id: string; paid: boolean; note: string }) => {
     const { error } = await supabase.rpc('admin_process_withdrawal', { p_withdrawal_id: id, p_paid: paid, p_note: note })
+    if (error) throw error
+  })
+}
+
+export function useAdminReviewVerification() {
+  return useAdminMutation(async ({ id, approve, note }: { id: string; approve: boolean; note: string }) => {
+    const { error } = await supabase.rpc('admin_review_verification', {
+      p_verification_id: id,
+      p_approve: approve,
+      p_note: note.trim() || null,
+    })
+    if (error) throw error
+  })
+}
+
+export function useAdminMarkTopupRefunded() {
+  return useAdminMutation(async ({ id, note }: { id: string; note: string }) => {
+    const { error } = await supabase.rpc('admin_mark_topup_refunded', { p_intent_id: id, p_note: note })
     if (error) throw error
   })
 }

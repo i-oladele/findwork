@@ -30,6 +30,18 @@ Deno.serve(async (req: Request) => {
   const reference = `fw_${crypto.randomUUID()}`
   const admin = adminClient()
 
+  // A deleted account whose sign-in removal failed can still hold a session.
+  // Money paid in could never be withdrawn, so take none.
+  const { data: profile, error: profileError } = await admin
+    .from('profiles')
+    .select('deleted_at')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (profileError) return json({ error: profileError.message }, 500)
+  if (!profile || profile.deleted_at) {
+    return json({ error: 'account_closed', message: 'This account has been deleted.' }, 403)
+  }
+
   const { error: insertError } = await admin
     .from('payment_intents')
     .insert({ profile_id: user.id, reference, amount })

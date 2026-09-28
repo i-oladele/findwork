@@ -37,6 +37,10 @@ function targetFor(refType: string | null, refId: string | null): string {
       return '/provider/requests'
     case 'order':
       return refId ? `/order/${refId}` : '/orders'
+    case 'seller_order':
+      return '/provider/orders'
+    case 'verification':
+      return '/get-verified'
     case 'job':
       return refId ? `/jobs/${refId}` : '/quotes'
     case 'rfq':
@@ -54,6 +58,8 @@ function targetFor(refType: string | null, refId: string | null): string {
     // Operator notifications: everything is handled in one console.
     case 'admin_dispute':
     case 'admin_order':
+    case 'admin_refund':
+    case 'admin_verification':
     case 'admin_report':
     case 'admin_support':
     case 'admin_withdrawal':

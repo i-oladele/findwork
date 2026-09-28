@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import { AuthContext } from './authContext'
+import { AuthContext, signUpOutcome } from './authContext'
 import { queryClient } from './queryClient'
+import { destination, forgetDestination, onboardingPath, rememberDestination, storedDestination } from './destination'
 import { useCart } from '../store/cart'
 import type { AuthContextValue } from './authContext'
 
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // shared phone the next person must not see them, even for a frame.
         queryClient.clear()
         useCart.getState().clear()
+        forgetDestination()
       }
       setSession(next)
       setLoading(false)
@@ -43,19 +45,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       loading,
 
-      async signUp({ method, phone, email, password, fullName }) {
-        // full_name rides along in metadata so the handle_new_user trigger
-        // (migration 1) can populate profiles in the same transaction.
+      async signUp({ method, phone, email, password, firstName, lastName }) {
+        // A new account picks a role first, then goes on to whatever link
+        // brought them. Set before signing up: with confirmation off, the
+        // session arrives mid-call and the sign-in guard redirects at once.
+        const before = storedDestination()
+        const next = onboardingPath(before)
+        rememberDestination(next)
+
+        // The names ride along in metadata so the handle_new_user trigger can
+        // populate profiles in the same transaction. full_name too, for any
+        // database that predates the separate name columns.
+        const names = { first_name: firstName, last_name: lastName, full_name: `${firstName} ${lastName}`.trim() }
         const credentials =
           method === 'phone'
-            ? { phone: phone!, password, options: { data: { full_name: fullName, phone: phone! } } }
-            : { email: email!, password, options: { data: { full_name: fullName } } }
+            ? { phone: phone!, password, options: { data: { ...names, phone: phone! } } }
+            : {
+                email: email!,
+                password,
+                // The confirmation email's link lands back in onboarding.
+                options: { data: names, emailRedirectTo: `${window.location.origin}${next}` },
+              }
 
-        const { data, error } = await supabase.auth.signUp(credentials)
-        if (error) throw error
-        // With confirmation switched off in the project, sign-up signs the
-        // user straight in and no code is ever sent.
-        return { needsVerification: !data.session }
+        try {
+          const { data, error } = await supabase.auth.signUp(credentials)
+          if (error) throw error
+          return signUpOutcome(data)
+        } catch (err) {
+          rememberDestination(before)
+          throw err
+        }
       },
 
       async signIn({ method, phone, email, password }) {
@@ -78,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.auth.resend(
           method === 'phone'
             ? { type: 'sms', phone: phone! }
-            : { type: 'signup', email: email! },
+            : { type: 'signup', email: email!, options: { emailRedirectTo: `${window.location.origin}${destination()}` } },
         )
         if (error) throw error
       },
@@ -86,8 +105,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async signInWithOAuth(provider) {
         const { error } = await supabase.auth.signInWithOAuth({
           provider,
-          options: { redirectTo: `${window.location.origin}/home` },
+          options: { redirectTo: `${window.location.origin}${destination()}` },
         })
+        if (error) throw error
+      },
+
+      async signInWithPasskey() {
+        // The phone offers the passkeys it holds for this site; no number or
+        // email is needed first.
+        const { error } = await supabase.auth.signInWithPasskey()
+        if (error) throw error
+      },
+
+      async registerPasskey() {
+        const { error } = await supabase.auth.registerPasskey()
         if (error) throw error
       },
 

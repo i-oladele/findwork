@@ -51,7 +51,10 @@ export type NotificationKind =
 export type ReportTargetType = 'classified' | 'message' | 'profile' | 'job' | 'rfq'
 export type ReportStatus = 'open' | 'actioned' | 'dismissed'
 export type SupportTopic = 'payments' | 'bookings' | 'orders' | 'account' | 'bug' | 'other'
-export type PaymentIntentStatus = 'pending' | 'success' | 'failed'
+export type VerificationIdType = 'nin' | 'bvn' | 'passport' | 'drivers_licence' | 'voters_card'
+export type VerificationStatus = 'pending' | 'approved' | 'rejected'
+/** refund_due / refunded: paid into an account deleted before it landed. */
+export type PaymentIntentStatus = 'pending' | 'success' | 'failed' | 'refund_due' | 'refunded'
 export type WithdrawalStatus = 'requested' | 'paid' | 'rejected'
 
 type Rel<Name extends string, Col extends string, Ref extends string, One extends boolean = false> = {
@@ -68,7 +71,11 @@ export type Database = {
       profiles: {
         Row: {
           id: string
+          /** Built from first_name and last_name; what other people see. */
           full_name: string
+          /** Only in your own row (get_my_profile); others see full_name. */
+          first_name: string
+          last_name: string
           phone: string
           email: string
           location: string | null
@@ -80,12 +87,18 @@ export type Database = {
           is_admin: boolean
           created_at: string
           deleted_at: string | null
+          /** Set by an admin approving a verification; null until then. */
+          verified_at: string | null
+          /** The address a pinned location was found at. Private, like lat/lng. */
+          location_label: string | null
         }
         /** Created by the handle_new_user trigger, never by the client. */
         Insert: never
         /** Column grants allow only these. */
         Update: {
           full_name?: string
+          first_name?: string
+          last_name?: string
           phone?: string
           location?: string | null
           address?: string | null
@@ -255,13 +268,40 @@ export type Database = {
           name: string
           price: number
           vendor: string
+          seller_id: string | null
+          stock: number | null
+          status: 'draft' | 'live' | 'hidden'
+          description: string | null
+          photo_urls: string[]
+          updated_at: string
           variant: string | null
           image_url: string | null
           created_at: string
         }
-        /** Catalog data — service-role writes only. */
-        Insert: never
-        Update: never
+        /**
+         * Sellers write their own goods (row policy: seller_id = auth.uid()).
+         * vendor is overwritten with the seller's business name by a trigger.
+         */
+        Insert: {
+          seller_id: string
+          name: string
+          price: number
+          vendor: string
+          variant?: string | null
+          description?: string | null
+          stock?: number | null
+          status?: 'draft' | 'live' | 'hidden'
+          photo_urls?: string[]
+        }
+        Update: {
+          name?: string
+          price?: number
+          variant?: string | null
+          description?: string | null
+          stock?: number | null
+          status?: 'draft' | 'live' | 'hidden'
+          photo_urls?: string[]
+        }
         Relationships: []
       }
       orders: {
@@ -276,8 +316,16 @@ export type Database = {
           status: OrderStatus
           placed_at: string
           updated_at: string
+          /** null for FindWork's own catalog; otherwise the provider selling. */
+          seller_id: string | null
+          seller_name: string | null
+          items_total: number
+          /** Held for the seller until delivery is confirmed; 0 once settled. */
+          escrow_held: number
+          commission: number
+          dispatched_at: string | null
         }
-        /** No client write policy — place_order, cancel_order, admin_set_order_status. */
+        /** No client write policy — place_order, cancel_order, dispatch_order, confirm_order_received. */
         Insert: never
         Update: never
         Relationships: [Rel<'orders_customer_id_fkey', 'customer_id', 'profiles'>]
@@ -686,6 +734,9 @@ export type Database = {
           status: PaymentIntentStatus
           created_at: string
           paid_at: string | null
+          refund_note: string | null
+          refunded_by: string | null
+          refunded_at: string | null
         }
         /** Created by the paystack-initialize Edge Function. */
         Insert: never
@@ -746,6 +797,27 @@ export type Database = {
         Update: never
         Relationships: [Rel<'withdrawals_profile_id_fkey', 'profile_id', 'profiles'>]
       }
+      verifications: {
+        Row: {
+          id: string
+          profile_id: string
+          id_type: VerificationIdType
+          id_number: string
+          /** In the private verification-documents bucket. */
+          document_path: string
+          selfie_path: string
+          status: VerificationStatus
+          /** Why it was rejected, shown to the person. */
+          note: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+        }
+        /** submit_verification / admin_review_verification. */
+        Insert: never
+        Update: never
+        Relationships: [Rel<'verifications_profile_id_fkey', 'profile_id', 'profiles'>]
+      }
     }
     Views: Record<never, never>
     Functions: {
@@ -768,6 +840,19 @@ export type Database = {
       mark_thread_read: {
         Args: { p_thread_id: string }
         Returns: undefined
+      }
+      chat_inbox: {
+        Args: { p_limit?: number; p_before_at?: string; p_before_thread?: string }
+        Returns: {
+          thread_id: string
+          last_read_at: string
+          other_id: string | null
+          other_name: string | null
+          other_avatar_url: string | null
+          last_message: Database['public']['Tables']['chat_messages']['Row']
+          last_message_at: string
+          unread: number
+        }[]
       }
       send_chat_attachment: {
         Args: { p_message_id: string; p_thread_id: string; p_path: string; p_name: string; p_text: string }
@@ -809,12 +894,24 @@ export type Database = {
         Args: { p_quote_id: string; p_start_at: string }
         Returns: string
       }
+      checkout_quote: {
+        Args: { p_items: Json; p_delivery_speed: DeliverySpeed }
+        Returns: Json
+      }
       place_order: {
-        Args: { p_items: Json; p_delivery_speed: DeliverySpeed; p_address: string; p_phone: string }
+        Args: { p_items: Json; p_delivery_speed: DeliverySpeed; p_address: string; p_phone: string; p_expected_total: number }
         /** One order id per seller in the cart. */
         Returns: string[]
       }
       cancel_order: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
+      dispatch_order: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
+      confirm_order_received: {
         Args: { p_order_id: string }
         Returns: undefined
       }
@@ -883,6 +980,23 @@ export type Database = {
         Args: { p_withdrawal_id: string; p_paid: boolean; p_note: string }
         Returns: undefined
       }
+      set_my_location: {
+        Args: { p_lat: number; p_lng: number; p_label: string }
+        /** The nearest listed area, or null when the pin is near none. */
+        Returns: string | null
+      }
+      submit_verification: {
+        Args: { p_id_type: VerificationIdType; p_id_number: string; p_document_path: string; p_selfie_path: string }
+        Returns: string
+      }
+      admin_review_verification: {
+        Args: { p_verification_id: string; p_approve: boolean; p_note: string | null }
+        Returns: undefined
+      }
+      admin_mark_topup_refunded: {
+        Args: { p_intent_id: string; p_note: string }
+        Returns: undefined
+      }
     }
     Enums: Record<never, never>
     CompositeTypes: Record<never, never>
@@ -926,5 +1040,6 @@ export type SupportRequest = Tables<'support_requests'>
 export type PaymentIntent = Tables<'payment_intents'>
 export type PayoutAccount = Tables<'payout_accounts'>
 export type Withdrawal = Tables<'withdrawals'>
+export type Verification = Tables<'verifications'>
 export type ServiceArea = Tables<'service_areas'>
 export type Favourite = Tables<'favourites'>

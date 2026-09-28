@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
 import { PlaceholderImage } from '../../components/ui/PlaceholderImage'
 import { EmptyState, ListSkeleton } from '../../components/system/States'
-import { useProducts } from '../../lib/api'
+import { productImage, useProducts } from '../../lib/api'
 import { useCart } from '../../store/cart'
 import { formatNaira } from '../../lib/format'
 
@@ -59,7 +59,7 @@ export function Cart() {
           <div className="bg-white border border-line rounded-2xl overflow-hidden mt-4">
             {items.map((it, i) => (
               <div key={it.id} className={`flex gap-3.5 p-3.5 ${i < items.length - 1 ? 'border-b border-line-soft' : ''}`}>
-                <PlaceholderImage src={it.image_url ?? undefined} className="w-[60px] h-[60px] flex-none" />
+                <PlaceholderImage src={productImage(it)} className="w-[60px] h-[60px] flex-none" />
                 <div className="flex-1 min-w-0">
                   <div className="text-[15px] font-semibold text-ink leading-[1.3]">{it.name}</div>
                   <div className="text-[12.5px] text-muted-2 mt-1">{it.vendor}</div>
