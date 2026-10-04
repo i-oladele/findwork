@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { keys } from './keys'
-import type { JobPost, ProviderProfile, SentQuote } from '../database.types'
+import type { JobPost, ProviderProfile, QuoteMilestone, SentQuote } from '../database.types'
 
 /** Open jobs posted by other people — what a provider can quote on. */
 export function useOpenJobs() {
@@ -66,6 +66,8 @@ export function usePostJob() {
       description: string
       budget: number
       needed_by?: string
+      category?: string | null
+      area?: string | null
     }): Promise<string> => {
       const { data, error } = await supabase
         .from('job_posts')
@@ -157,6 +159,7 @@ export function useSendQuote() {
       days: number
       start_day?: string
       message?: string
+      milestones?: QuoteMilestone[] | null
     }) => {
       const { error } = await supabase.from('sent_quotes').insert({ provider_id: user!.id, ...input })
       if (error) throw error
@@ -170,14 +173,54 @@ export function useSendQuote() {
 }
 
 /** Books the quoting provider at the quoted price and pays escrow; closes the job. */
+export function useQuoteHistory(quoteId: string) {
+  return useQuery({
+    queryKey: keys.marketplace.quoteHistory(quoteId),
+    queryFn: async () => {
+      const { data, error } = await supabase.from('quote_revisions').select('*').eq('quote_id', quoteId).order('revision', { ascending: false }).limit(50)
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export function useReviseQuote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; revision: number; price: number; days: number; start_day?: string; message?: string; milestones?: QuoteMilestone[] | null }) => {
+      const { error } = await supabase.rpc('revise_job_quote', {
+        p_quote_id: input.id, p_expected_revision: input.revision, p_price: input.price,
+        p_days: input.days, p_start_day: input.start_day ?? null, p_message: input.message ?? null,
+        p_milestones: input.milestones ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: keys.marketplace.quotes }); qc.invalidateQueries({ queryKey: keys.marketplace.jobs }) },
+    onError: () => { qc.invalidateQueries({ queryKey: keys.marketplace.quotes }); qc.invalidateQueries({ queryKey: keys.marketplace.jobs }) },
+  })
+}
+
+export function useWithdrawQuote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; revision: number }) => {
+      const { error } = await supabase.rpc('withdraw_job_quote', { p_quote_id: input.id, p_expected_revision: input.revision })
+      if (error) throw error
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: keys.marketplace.quotes }); qc.invalidateQueries({ queryKey: keys.marketplace.jobs }) },
+    onError: () => { qc.invalidateQueries({ queryKey: keys.marketplace.quotes }); qc.invalidateQueries({ queryKey: keys.marketplace.jobs }) },
+  })
+}
+
 export function useAcceptJobQuote() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async (input: { quoteId: string; startAt: string }): Promise<string> => {
+    mutationFn: async (input: { quoteId: string; startAt: string; revision: number }): Promise<string> => {
       const { data, error } = await supabase.rpc('accept_job_quote', {
         p_quote_id: input.quoteId,
         p_start_at: input.startAt,
+        p_expected_revision: input.revision,
       })
       if (error) throw error
       return data
@@ -187,6 +230,10 @@ export function useAcceptJobQuote() {
       qc.invalidateQueries({ queryKey: keys.marketplace.quotes })
       qc.invalidateQueries({ queryKey: keys.bookings.all })
       qc.invalidateQueries({ queryKey: keys.wallet.all })
+    },
+    onError: () => {
+      qc.invalidateQueries({ queryKey: keys.marketplace.quotes })
+      qc.invalidateQueries({ queryKey: keys.marketplace.jobs })
     },
   })
 }

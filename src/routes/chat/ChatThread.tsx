@@ -1,3 +1,5 @@
+import { usePreferences } from '../../lib/api'
+import { AssistantUnavailable, translateMessage } from '../../lib/api/assistant'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
@@ -16,6 +18,7 @@ import {
   useThreadPartner,
   useThreadRealtime,
 } from '../../lib/api'
+import { useThreadContext } from '../../lib/api/matching'
 import { formatDate, formatTime } from '../../lib/format'
 import type { ChatMessage } from '../../lib/database.types'
 
@@ -37,6 +40,7 @@ export function ChatThread() {
   const { data: partner } = useThreadPartner(threadId)
   const { data: partnerAsProvider } = useProvider(partner?.id)
   const messages = useMessages(threadId)
+  const { data: context } = useThreadContext(threadId)
   const { mutate: markRead } = useMarkThreadRead()
   const [reporting, setReporting] = useState<string | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
@@ -84,6 +88,30 @@ export function ChatThread() {
       </div>
 
       <div className="px-4 pt-4 pb-4 flex-1">
+        {context && (context.booking || context.order || context.purchase_order || context.dispute) && (
+          <div className="bg-white border border-line rounded-xl mb-3 overflow-hidden text-[13.5px]">
+            {context.dispute && (
+              <Link to={`/disputes/${context.dispute.id}`} className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-line-soft text-danger">
+                <i className="ph-fill ph-scales" /><span className="flex-1 truncate">Open dispute: {context.dispute.reason}</span><i className="ph ph-caret-right" />
+              </Link>
+            )}
+            {context.booking && (
+              <Link to={context.booking.mine ? '/bookings' : '/provider/requests'} className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-line-soft text-ink">
+                <i className="ph-fill ph-calendar-check text-brand" /><span className="flex-1 truncate">Booking: {context.booking.service} · {formatDate(context.booking.start_at)} · {context.booking.status}</span><i className="ph ph-caret-right text-muted-2" />
+              </Link>
+            )}
+            {context.order && (
+              <Link to={context.order.mine ? `/order/${context.order.id}` : '/provider/orders'} className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-line-soft text-ink">
+                <i className="ph-fill ph-package text-brand" /><span className="flex-1 truncate">Order #{context.order.id.slice(0, 8).toUpperCase()} · {context.order.status}</span><i className="ph ph-caret-right text-muted-2" />
+              </Link>
+            )}
+            {context.purchase_order && (
+              <Link to={`/purchase-orders/${context.purchase_order.id}`} className="flex items-center gap-2.5 px-3.5 py-2.5 text-ink">
+                <i className="ph-fill ph-file-text text-brand" /><span className="flex-1 truncate">Purchase order PO-{context.purchase_order.number} · {context.purchase_order.status.replace(/_/g, ' ')}</span><i className="ph ph-caret-right text-muted-2" />
+              </Link>
+            )}
+          </div>
+        )}
         <div className="flex items-center gap-2.5 bg-success-bg rounded-xl px-3.5 py-[11px] mb-4">
           <i className="ph-fill ph-shield-check text-lg text-success-text" />
           <p className="m-0 text-[12.5px] leading-[1.4] text-success-text">
@@ -127,6 +155,7 @@ export function ChatThread() {
                     <p className={`m-0 text-[15px] leading-[1.45] whitespace-pre-wrap break-words ${mine ? 'text-cream' : 'text-ink'}`}>
                       {m.text}
                     </p>
+                    {!mine && m.text.trim().length > 1 && <Translation text={m.text} />}
                     <div className={`flex items-center gap-2 font-mono text-[10px] mt-1.5 ${mine ? 'justify-end text-muted-2' : 'text-muted'}`}>
                       {formatTime(m.created_at)}
                       {!mine && (
@@ -147,5 +176,28 @@ export function ChatThread() {
 
       <ChatComposer key={threadId} threadId={threadId} />
     </Screen>
+  )
+}
+
+/** Shows a received message in the reader's own language, when they ask. */
+function Translation({ text }: { text: string }) {
+  const { data: prefs } = usePreferences()
+  const [state, setState] = useState<{ status: 'idle' | 'busy' | 'done' | 'error' | 'off'; text?: string }>({ status: 'idle' })
+  if (state.status === 'off') return null
+  if (state.status === 'done') return <p className="m-0 mt-1.5 pt-1.5 border-t border-line-soft text-[14px] leading-[1.45] text-text-soft whitespace-pre-wrap break-words">{state.text}</p>
+  return (
+    <button
+      disabled={state.status === 'busy'}
+      className="block mt-1 text-[12px] font-semibold text-brand-hover"
+      onClick={() => {
+        setState({ status: 'busy' })
+        translateMessage(text, prefs?.language ?? 'en').then(
+          (translated) => setState({ status: 'done', text: translated }),
+          (err) => setState({ status: err instanceof AssistantUnavailable ? 'off' : 'error' }),
+        )
+      }}
+    >
+      {state.status === 'busy' ? 'Translating…' : state.status === 'error' ? 'Could not translate. Try again' : 'Translate'}
+    </button>
   )
 }

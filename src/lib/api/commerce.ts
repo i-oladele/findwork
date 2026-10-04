@@ -2,30 +2,74 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { keys } from './keys'
-import type { DeliverySpeed, Order, OrderItem, Product } from '../database.types'
+import type { DeliverySpeed, Order, OrderItem, Product, ProductVariant } from '../database.types'
 
 /** Must match the case expression in place_order. */
 export const DELIVERY_FEE: Record<DeliverySpeed, number> = { 'same-day': 1800, standard: 1200 }
 
-export type CheckoutQuote = { items_total: number; delivery_fee: number; seller_count: number; total: number }
+export type CouponError = 'coupon_invalid' | 'coupon_used_up' | 'coupon_already_used' | 'coupon_not_for_cart' | 'coupon_min_spend'
+export type CheckoutQuote = {
+  items_total: number; discount: number; delivery_fee: number; seller_count: number; total: number
+  coupon: { code: string; error: CouponError | null; discount: number; issuer: string | null } | null
+}
+
+export const COUPON_ERRORS: Record<CouponError, string> = {
+  coupon_invalid: 'That code is not valid, or it has ended.',
+  coupon_used_up: 'That code has been used the maximum number of times.',
+  coupon_already_used: 'You have already used that code.',
+  coupon_not_for_cart: 'That code is for a different seller\'s goods.',
+  coupon_min_spend: 'Your cart is below the minimum spend for that code.',
+}
+
+export type CartItem = { product_id: string; variant_id?: string; qty: number }
 
 /**
  * What checkout will charge, priced by the server: delivery is one fee per
- * seller, and prices can change after the cart was filled. place_order
- * refuses to charge anything other than the total this returned.
+ * seller, prices can change after the cart was filled, and a coupon may or
+ * may not apply. place_order refuses to charge anything other than the total
+ * this returned.
  */
-export function useCheckoutQuote(items: { product_id: string; qty: number }[], deliverySpeed: DeliverySpeed) {
+export function useCheckoutQuote(items: CartItem[], deliverySpeed: DeliverySpeed, coupon = '') {
   return useQuery({
-    queryKey: keys.commerce.quote(items, deliverySpeed),
+    queryKey: keys.commerce.quote(items, deliverySpeed, coupon),
     enabled: items.length > 0,
     staleTime: 0,
     queryFn: async (): Promise<CheckoutQuote> => {
       const { data, error } = await supabase.rpc('checkout_quote', {
         p_items: items,
         p_delivery_speed: deliverySpeed,
+        p_coupon_code: coupon || null,
       })
       if (error) throw error
-      return data as CheckoutQuote
+      return data as unknown as CheckoutQuote
+    },
+  })
+}
+
+/** The options of the given products, for the product page and the cart. */
+export function useProductVariants(productIds: string[]) {
+  const ids = [...new Set(productIds)].sort()
+  return useQuery({
+    queryKey: keys.commerce.variants(ids),
+    enabled: ids.length > 0,
+    queryFn: async (): Promise<ProductVariant[]> => {
+      const { data, error } = await supabase.from('product_variants').select('*').in('product_id', ids).order('position')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+/** Everything one seller has on sale: their store. */
+export function useStoreProducts(sellerId: string | undefined) {
+  return useQuery({
+    queryKey: keys.commerce.store(sellerId ?? ''),
+    enabled: Boolean(sellerId),
+    queryFn: async (): Promise<Product[]> => {
+      const { data, error } = await supabase.from('products').select('*').eq('seller_id', sellerId!).eq('status', 'live')
+        .order('updated_at', { ascending: false })
+      if (error) throw error
+      return data
     },
   })
 }
@@ -67,6 +111,7 @@ export function useOrders() {
   return useQuery({
     queryKey: keys.commerce.orders(),
     enabled: Boolean(user),
+    refetchInterval: (query) => query.state.data?.some((o) => o.status === 'placed' || o.status === 'dispatched') ? 15_000 : false,
     queryFn: async (): Promise<OrderWithItems[]> => {
       const { data, error } = await supabase
         .from('orders')
@@ -83,6 +128,7 @@ export function useOrder(id: string | undefined) {
   return useQuery({
     queryKey: keys.commerce.order(id ?? ''),
     enabled: Boolean(id),
+    refetchInterval: (query) => ['placed', 'dispatched'].includes(query.state.data?.status ?? '') ? 15_000 : false,
     queryFn: async (): Promise<OrderWithItems | null> => {
       const { data, error } = await supabase
         .from('orders')
@@ -105,8 +151,9 @@ export function usePlaceOrder() {
 
   return useMutation({
     mutationFn: async (input: {
-      items: { product_id: string; qty: number }[]
+      items: CartItem[]
       deliverySpeed: DeliverySpeed
+      couponCode?: string
       address: string
       phone: string
       /** The quote the customer saw; the order is refused if it no longer matches. */
@@ -119,6 +166,7 @@ export function usePlaceOrder() {
         p_address: input.address,
         p_phone: input.phone,
         p_expected_total: input.expectedTotal,
+        p_coupon_code: input.couponCode || null,
       })
       if (error) throw error
       return (data ?? []) as string[]

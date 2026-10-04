@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { keys } from './keys'
-import type { Booking, BookingReschedule } from '../database.types'
+import type { Booking, BookingMilestone, BookingReschedule } from '../database.types'
 
 /** Customer service fee, matching round(price * 0.05) in private.create_booking. */
 export const PLATFORM_FEE_RATE = 0.05
@@ -177,6 +177,30 @@ export function useRespondReschedule() {
       const { error } = await supabase.rpc('respond_booking_reschedule', {
         p_request_id: input.requestId, p_action: input.action,
       })
+      if (error) throw error
+    },
+    onSuccess: invalidate,
+  })
+}
+
+/** The stages of a job paid in stages; empty for an ordinary booking. */
+export function useBookingMilestones(bookingId: string) {
+  return useQuery({
+    queryKey: keys.bookings.milestones(bookingId),
+    queryFn: async (): Promise<BookingMilestone[]> => {
+      const { data, error } = await supabase.from('booking_milestones').select('*').eq('booking_id', bookingId).order('position')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+/** The customer approves the next stage; its share of escrow goes to the provider. */
+export function useReleaseMilestone() {
+  const invalidate = useInvalidateBookings()
+  return useMutation({
+    mutationFn: async (milestoneId: string) => {
+      const { error } = await supabase.rpc('release_milestone', { p_milestone_id: milestoneId })
       if (error) throw error
     },
     onSuccess: invalidate,

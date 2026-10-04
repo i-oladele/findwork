@@ -14,7 +14,7 @@ export type UploadBucket =
   | 'avatars'
 
 /** Readable only by the uploader and admins, through short-lived links. */
-export type PrivateBucket = 'chat-attachments' | 'dispute-evidence' | 'verification-documents'
+export type PrivateBucket = 'chat-attachments' | 'dispute-evidence' | 'verification-documents' | 'provider-media' | 'course-media' | 'social-media'
 const PRIVATE: string[] = ['dispute-evidence', 'verification-documents']
 
 /**

@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useProfile } from './profile'
 import { keys } from './keys'
-import type { Dispute, PaymentIntent, ProviderProfile, Report, SupportRequest, Verification, Withdrawal } from '../database.types'
+import { staffCan, type StaffArea } from '../staff'
+import type { BusinessVerification, Dispute, PaymentIntent, ProviderProfile, Report, RiskAlert, StaffRole, SupportRequest, Verification, Withdrawal } from '../database.types'
 import type { OrderWithItems } from './commerce'
 
 /**
@@ -15,15 +16,27 @@ export function useIsAdmin() {
   return Boolean(data?.is_admin)
 }
 
+/** The signed-in person's staff role, and what it lets them open. */
+export function useStaff() {
+  const { data } = useProfile()
+  const role = data?.staff_role ?? null
+  return { role, can: (area: StaffArea) => staffCan(role, area) }
+}
+
+function useStaffCan(area: StaffArea) {
+  return useStaff().can(area)
+}
+
 type Named = { full_name: string } | null
 
 export type AdminDispute = Dispute & { raiser: Named; against: Named }
 
 export function useAdminDisputes() {
-  const isAdmin = useIsAdmin()
+  const isAdmin = useStaffCan('disputes')
   return useQuery({
     queryKey: keys.admin.disputes(),
     enabled: isAdmin,
+    refetchInterval: 15_000,
     queryFn: async (): Promise<AdminDispute[]> => {
       const { data, error } = await supabase
         .from('disputes')
@@ -41,7 +54,7 @@ export function useAdminDisputes() {
 export type AdminOrder = OrderWithItems & { customer: Named }
 
 export function useAdminOrders() {
-  const isAdmin = useIsAdmin()
+  const isAdmin = useStaffCan('orders')
   return useQuery({
     queryKey: keys.admin.orders(),
     enabled: isAdmin,
@@ -63,7 +76,7 @@ export function useAdminOrders() {
 export type AdminWithdrawal = Withdrawal & { profile: Named }
 
 export function useAdminWithdrawals() {
-  const isAdmin = useIsAdmin()
+  const isAdmin = useStaffCan('finance')
   return useQuery({
     queryKey: keys.admin.withdrawals(),
     enabled: isAdmin,
@@ -83,7 +96,7 @@ export type AdminVerification = Verification & { profile: Named }
 
 /** Submissions waiting for the team, oldest first. */
 export function useAdminVerifications() {
-  const isAdmin = useIsAdmin()
+  const isAdmin = useStaffCan('verification')
   return useQuery({
     queryKey: keys.admin.verifications(),
     enabled: isAdmin,
@@ -101,7 +114,7 @@ export function useAdminVerifications() {
 
 /** Top-ups that reached an account after it was deleted: send back by hand. */
 export function useAdminRefundsDue() {
-  const isAdmin = useIsAdmin()
+  const isAdmin = useStaffCan('finance')
   return useQuery({
     queryKey: keys.admin.refunds(),
     enabled: isAdmin,
@@ -120,7 +133,7 @@ export function useAdminRefundsDue() {
 export type AdminReport = Report & { reporter: Named }
 
 export function useAdminReports() {
-  const isAdmin = useIsAdmin()
+  const isAdmin = useStaffCan('moderation')
   return useQuery({
     queryKey: keys.admin.reports(),
     enabled: isAdmin,
@@ -139,7 +152,7 @@ export function useAdminReports() {
 export type AdminSupportRequest = SupportRequest & { profile: Named }
 
 export function useAdminSupport() {
-  const isAdmin = useIsAdmin()
+  const isAdmin = useStaffCan('support')
   return useQuery({
     queryKey: keys.admin.support(),
     enabled: isAdmin,
@@ -156,7 +169,7 @@ export function useAdminSupport() {
 }
 
 export function useAdminUnverifiedProviders() {
-  const isAdmin = useIsAdmin()
+  const isAdmin = useStaffCan('verification')
   return useQuery({
     queryKey: keys.admin.providers(),
     enabled: isAdmin,
@@ -247,6 +260,106 @@ export function useAdminSetVerified() {
 export function useAdminAdjustBalance() {
   return useAdminMutation(async ({ profileId, amount, reason }: { profileId: string; amount: number; reason: string }) => {
     const { error } = await supabase.rpc('admin_adjust_balance', { p_profile_id: profileId, p_amount: amount, p_reason: reason })
+    if (error) throw error
+  })
+}
+
+export type UserOverview = {
+  id: string; full_name: string; email: string; phone: string; created_at: string
+  deleted_at: string | null; verified_at: string | null
+  staff_role: StaffRole | null; suspended_at: string | null; suspended_reason: string | null
+  is_provider: boolean; balance: number | null; escrow_held: number | null
+  bookings: number; orders: number; disputes_raised: number; disputes_against: number; disputes_lost: number
+  reports_against: number; open_alerts: number
+  devices: { label: string; last_seen_at: string; last_ip: string | null }[]
+  events: { kind: string; created_at: string; detail: Record<string, unknown> }[]
+  actions: { action: string; created_at: string; detail: Record<string, unknown> }[]
+}
+
+export function useAdminUserOverview(profileId: string | null) {
+  const allowed = useStaffCan('lookup')
+  return useQuery({
+    queryKey: keys.admin.user(profileId ?? ''),
+    enabled: allowed && Boolean(profileId),
+    queryFn: async (): Promise<UserOverview> => {
+      const { data, error } = await supabase.rpc('admin_user_overview', { p_profile_id: profileId! })
+      if (error) throw error
+      return data as unknown as UserOverview
+    },
+  })
+}
+
+export function useAdminSuspendUser() {
+  return useAdminMutation(async ({ profileId, reason }: { profileId: string; reason: string }) => {
+    const { error } = await supabase.rpc('admin_suspend_user', { p_profile_id: profileId, p_reason: reason })
+    if (error) throw error
+  })
+}
+
+export function useAdminReinstateUser() {
+  return useAdminMutation(async ({ profileId, note }: { profileId: string; note: string }) => {
+    const { error } = await supabase.rpc('admin_reinstate_user', { p_profile_id: profileId, p_note: note })
+    if (error) throw error
+  })
+}
+
+export function useAdminSetStaffRole() {
+  return useAdminMutation(async ({ profileId, role }: { profileId: string; role: StaffRole | null }) => {
+    const { error } = await supabase.rpc('admin_set_staff_role', { p_profile_id: profileId, p_role: role })
+    if (error) throw error
+  })
+}
+
+export type AdminRiskAlert = RiskAlert & { profile: Named }
+
+export function useRiskAlerts() {
+  const allowed = useStaffCan('risk')
+  return useQuery({
+    queryKey: keys.admin.risk(),
+    enabled: allowed,
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<AdminRiskAlert[]> => {
+      const { data, error } = await supabase
+        .from('risk_alerts')
+        .select('*, profile:profiles!risk_alerts_profile_id_fkey(full_name)')
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (error) throw error
+      return data as unknown as AdminRiskAlert[]
+    },
+  })
+}
+
+export function useReviewRiskAlert() {
+  return useAdminMutation(async ({ id, status, note }: { id: string; status: 'reviewed' | 'dismissed'; note: string }) => {
+    const { error } = await supabase.rpc('admin_review_risk_alert', { p_alert_id: id, p_status: status, p_note: note })
+    if (error) throw error
+  })
+}
+
+export type AdminBusinessVerification = BusinessVerification & { profile: Named }
+
+export function useAdminBusinessVerifications() {
+  const allowed = useStaffCan('verification')
+  return useQuery({
+    queryKey: keys.admin.businessVerifications(),
+    enabled: allowed,
+    queryFn: async (): Promise<AdminBusinessVerification[]> => {
+      const { data, error } = await supabase
+        .from('business_verifications')
+        .select('*, profile:profiles!business_verifications_profile_id_fkey(full_name)')
+        .eq('status', 'pending')
+        .order('created_at')
+      if (error) throw error
+      return data as unknown as AdminBusinessVerification[]
+    },
+  })
+}
+
+export function useAdminReviewBusinessVerification() {
+  return useAdminMutation(async ({ id, approve, note }: { id: string; approve: boolean; note: string }) => {
+    const { error } = await supabase.rpc('admin_review_business_verification', { p_verification_id: id, p_approve: approve, p_note: note })
     if (error) throw error
   })
 }

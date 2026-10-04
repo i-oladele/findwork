@@ -5,10 +5,10 @@ import { keys } from './keys'
 import type { Classified, ClassifiedCategory } from '../database.types'
 
 export type ClassifiedWithSeller = Classified & {
-  seller: { id: string; full_name: string; avatar_url: string | null } | null
+  seller: { id: string; full_name: string; avatar_url: string | null; verification_tier: number; trust_score: number } | null
 }
 
-const SELECT = '*, seller:profiles!classifieds_seller_id_fkey(id, full_name, avatar_url)'
+const SELECT = '*, seller:profiles!classifieds_seller_id_fkey(id, full_name, avatar_url, verification_tier, trust_score)'
 
 export function useClassifieds(category?: ClassifiedCategory) {
   return useQuery({
@@ -47,6 +47,7 @@ export function usePostClassified() {
       location: string
       description: string
       photo_urls: string[]
+      area: string | null
     }): Promise<string> => {
       const { data, error } = await supabase
         .from('classifieds')
@@ -72,6 +73,27 @@ export function useDeleteClassified() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.classifieds.all })
+    },
+  })
+}
+
+export type NearbyClassified = {
+  id: string; seller_id: string; title: string; price: number; category: ClassifiedCategory; location: string
+  area: string | null; lat: number; lng: number; photo_urls: string[]; created_at: string; km: number
+  seller_tier: number; seller_trust: number
+}
+
+/** Listings within `radiusKm` of a point, nearest first. Only listings placed in a listed area can be found this way. */
+export function useNearbyClassifieds(point: { lat: number; lng: number } | null, radiusKm: number, category?: ClassifiedCategory) {
+  return useQuery({
+    queryKey: [...keys.classifieds.all, 'nearby', point?.lat ?? null, point?.lng ?? null, radiusKm, category ?? null],
+    enabled: Boolean(point),
+    queryFn: async (): Promise<NearbyClassified[]> => {
+      const { data, error } = await supabase.rpc('nearby_classifieds', {
+        p_lat: point!.lat, p_lng: point!.lng, p_radius_km: radiusKm, p_category: category ?? null,
+      })
+      if (error) throw error
+      return (data as unknown as NearbyClassified[]) ?? []
     },
   })
 }

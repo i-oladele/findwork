@@ -129,13 +129,49 @@ checkout offers it as the delivery address.
 - Delete an account from Settings while money is in escrow, or as a
   provider with an accepted job — it should refuse and say why.
 
+### 14. Built in October, not yet walked by anyone
+
+Everything below passed its database checks and unit tests, and has never been
+opened in a browser. Expect rough edges; these are the journeys to try first.
+
+- **Staff roles.** In `/admin` → Users, give a second account the moderator,
+  finance or support role. Each should see only its own tabs. Suspend an
+  account and confirm it is signed out of everything and told why.
+- **Second sign-in step.** Settings → Security: add an authenticator app, save
+  the recovery codes, sign out and back in. Then use a recovery code instead.
+- **Limits and trust.** A new unverified account should be refused a
+  withdrawal and a transfer, and told what to verify. Profiles show a trust
+  score with its reasons.
+- **Transfers.** Wallet → Send money, to another account's phone or email.
+- **Milestones.** As a provider, send a quote split into stages; as the
+  customer, accept it and release one stage at a time.
+- **Options and coupons.** Give a product sizes or colours with their own stock
+  and price; create a coupon in the provider dashboard; use it at checkout and
+  check the total matches what the wallet is charged.
+- **Riders.** Apply at `/rider`, approve in `/admin` → Deliveries, go online,
+  accept a delivery, and complete it with the customer's code. Watch
+  `/track/:orderId` as the customer on another device.
+- **Meetups and SOS.** From a classified, propose a meetup, share location,
+  and raise an SOS; it should reach `/admin` → Risk at once.
+- **Wholesale.** Post an RFQ with line items, accept a quote, fund the
+  purchase order, mark it delivered and confirm; open its invoice.
+- **Learning.** Write a lesson and a quiz in `/admin/courses`, pass it as a
+  learner, and open the certificate's public link while signed out.
+- **Internships, feed and live.** Post and apply to an internship; publish a
+  post to `/feed`; schedule a stream at `/live` and pin a product.
+- **Push.** With the keys set, switch push on in Preferences and trigger a
+  notification from another account with the app closed.
+
 ## Things that are meant to look unfinished
 
 Not bugs; they are listed in the README under "Before real money":
 
 - Identity verification is done by an admin, not an automated NIN check.
 - Withdrawals are sent by hand from `/admin`.
-- Orders have no rider tracking, only a status.
+- Delivery arrival times are estimates, not routed, until a maps key is set.
+- Live streams play from a link the seller supplies; FindWork carries no video.
+- The assistant answers only once its API key is set; before that, voice
+  understands a short list of English and Pidgin commands.
 - Course lessons have no written material yet.
 - Terms and privacy pages are placeholders.
 
@@ -148,7 +184,8 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/checks/business_rules.sql
 
 The SQL suite signs in as the seeded users and exercises every money rule —
 escrow, refunds, disputes, commission, top-up idempotency, withdrawals,
-seller orders and returns, and what blocks account deletion. It
+seller orders and returns, milestones, coupons, transfers, purchase orders,
+rider payouts, limits, and what blocks account deletion. It
 runs in a transaction and rolls back, so it leaves nothing behind, but point
 it at staging rather than production.
 

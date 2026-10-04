@@ -6,7 +6,7 @@ import { BackButton } from '../../components/chrome/PageHeader'
 import { PlaceholderImage } from '../../components/ui/PlaceholderImage'
 import { SectionLabel } from '../../components/ui/SectionLabel'
 import { EmptyState, FullScreenLoader } from '../../components/system/States'
-import { productImage, useProduct } from '../../lib/api'
+import { productImage, useProduct, useProductVariants, useRecommendedProducts } from '../../lib/api'
 import { useAuth } from '../../lib/authContext'
 import { useCart } from '../../store/cart'
 import { formatNaira } from '../../lib/format'
@@ -16,7 +16,12 @@ export function ProductDetail() {
   const { user } = useAuth()
   const { data: product, isLoading } = useProduct(id)
   const add = useCart((s) => s.add)
-  const inCart = useCart((s) => s.lines.find((l) => l.productId === id)?.qty ?? 0)
+  const { data: variants } = useProductVariants(id ? [id] : [])
+  const { data: suggestions } = useRecommendedProducts(id ?? null)
+  const [chosen, setChosen] = useState<string | null>(null)
+  const option = variants?.find((v) => v.id === chosen) ?? null
+  const inCart = useCart((s) => s.lines.find((l) => l.productId === id && (l.variantId ?? null) === (option?.id ?? null))?.qty ?? 0)
+  const inCartAll = useCart((s) => s.lines.filter((l) => l.productId === id).reduce((sum, l) => sum + l.qty, 0))
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
   const [photo, setPhoto] = useState(0)
@@ -36,9 +41,13 @@ export function ProductDetail() {
 
   const mine = Boolean(user && product.seller_id === user.id)
   const onSale = product.status === 'live'
+  const hasOptions = (variants?.length ?? 0) > 0
+  const needsChoice = hasOptions && !option
+  const price = option?.price ?? product.price
+  const stock = hasOptions ? (option ? option.stock : product.stock) : product.stock
   // Stock already in the cart counts: the server checks the cart as a whole.
-  const available = product.stock === null ? 99 : Math.max(0, Math.min(99, product.stock - inCart))
-  const soldOut = product.stock !== null && product.stock <= inCart
+  const available = needsChoice ? 0 : stock === null ? 99 : Math.max(0, Math.min(99, stock - inCart))
+  const soldOut = stock !== null && stock <= (hasOptions && !option ? 0 : inCart)
   const photos = product.photo_urls.length > 0 ? product.photo_urls : [productImage(product)]
 
   return (
@@ -56,7 +65,7 @@ export function ProductDetail() {
       <div className="px-[22px] pt-5 pb-6">
         <div className="flex items-start justify-between gap-3.5">
           <h2 className="font-display font-bold text-2xl leading-[1.15] tracking-[-0.02em] text-ink">{product.name}</h2>
-          <span className="font-display font-bold text-2xl text-ink whitespace-nowrap">{formatNaira(product.price)}</span>
+          <span className="font-display font-bold text-2xl text-ink whitespace-nowrap">{needsChoice ? 'From ' : ''}{formatNaira(price)}</span>
         </div>
         {product.variant && <div className="text-[14px] text-muted mt-1.5">{product.variant}</div>}
 
@@ -82,14 +91,14 @@ export function ProductDetail() {
 
         {product.seller_id ? (
           <Link
-            to={`/provider/${product.seller_id}`}
+            to={`/store/${product.seller_id}`}
             className="flex items-center gap-2.5 bg-white border border-line rounded-2xl p-3.5 mt-4"
           >
             <i className="ph-fill ph-storefront text-2xl text-brand" />
             <div className="flex-1">
               <div className="text-[15px] font-semibold text-ink">{product.vendor}</div>
               <div className="text-[12.5px] text-muted-2 mt-0.5">
-                Your money is held until you confirm it arrived
+                Visit the store · your money is held until you confirm it arrived
               </div>
             </div>
             <i className="ph ph-caret-right text-muted-2" />
@@ -104,8 +113,27 @@ export function ProductDetail() {
           </div>
         )}
 
-        {product.stock !== null && product.stock > 0 && product.stock <= 5 && (
-          <div className="text-[13.5px] font-semibold text-warning-text mt-3">Only {product.stock} left</div>
+        {hasOptions && (
+          <>
+            <SectionLabel className="mt-5 mb-2.5">Choose an option</SectionLabel>
+            <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Options">
+              {variants!.map((v) => {
+                const none = v.stock !== null && v.stock <= 0
+                return (
+                  <button key={v.id} type="button" role="radio" aria-checked={chosen === v.id} disabled={none}
+                    onClick={() => { setChosen(v.id); setQty(1); setAdded(false) }}
+                    className={`rounded-xl px-4 py-2.5 text-left border-[1.5px] disabled:opacity-40 ${chosen === v.id ? 'border-brand bg-white' : 'border-line bg-white'}`}>
+                    <div className="text-[14.5px] font-semibold text-ink">{v.name}</div>
+                    <div className="text-[12.5px] text-muted-2">{none ? 'Sold out' : formatNaira(v.price)}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {stock !== null && stock > 0 && stock <= 5 && !needsChoice && (
+          <div className="text-[13.5px] font-semibold text-warning-text mt-3">Only {stock} left</div>
         )}
 
         <SectionLabel className="mt-5 mb-2.5">Quantity</SectionLabel>
@@ -127,6 +155,24 @@ export function ProductDetail() {
           </button>
         </div>
 
+        {(suggestions?.length ?? 0) > 0 && (
+          <>
+            <SectionLabel className="mt-6 mb-2.5">You may also like</SectionLabel>
+            <div className="flex gap-3 overflow-x-auto -mx-[22px] px-[22px] pb-1">
+              {suggestions!.map((s) => (
+                <Link key={s.id} to={`/product/${s.id}`} className="flex-none w-[132px] bg-white border border-line rounded-2xl overflow-hidden">
+                  <PlaceholderImage src={productImage(s)} className="w-full h-[88px] rounded-none" />
+                  <div className="p-2.5">
+                    <div className="text-[13px] font-semibold text-ink leading-[1.3] line-clamp-2">{s.name}</div>
+                    <div className="font-display font-bold text-[13.5px] text-ink mt-1">{formatNaira(s.price)}</div>
+                    <div className="text-[11px] text-muted-2 mt-0.5">{s.reason}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+
         <div className="flex items-center gap-2.5 bg-white border border-line rounded-2xl p-3.5 mt-5">
           <i className="ph ph-truck text-xl text-success" />
           <div>
@@ -144,34 +190,36 @@ export function ProductDetail() {
           >
             {onSale ? 'Your product · Edit' : 'Hidden from the shop · Edit'}
           </Link>
-        ) : !onSale || (soldOut && inCart === 0) ? (
+        ) : !onSale || (soldOut && inCartAll === 0) ? (
           <div className="flex-1 flex items-center justify-center h-14 bg-line-soft rounded-xl text-muted font-semibold text-[17px]">
             {onSale ? 'Sold out' : 'No longer sold'}
           </div>
         ) : (
           <>
-            {added || inCart > 0 ? (
+            {added || inCartAll > 0 ? (
               <Link
                 to="/cart"
                 className="flex-none flex items-center justify-center px-5 h-14 border-[1.5px] border-ink rounded-xl text-ink font-semibold"
               >
-                Cart ({inCart})
+                Cart ({inCartAll})
               </Link>
             ) : null}
             <button
               onClick={() => {
-                add(product.id, Math.min(qty, available))
+                add(product.id, Math.min(qty, available), option?.id ?? null)
                 setAdded(true)
                 setQty(1)
               }}
               disabled={available === 0}
               className="flex-1 flex items-center justify-center h-14 bg-brand text-white rounded-xl font-semibold text-[17px] disabled:opacity-50"
             >
-              {available === 0
-                ? 'All in your cart'
-                : added
-                  ? 'Added ✓ — add more'
-                  : `Add to cart · ${formatNaira(product.price * Math.min(qty, available))}`}
+              {needsChoice
+                ? 'Choose an option'
+                : available === 0
+                  ? 'All in your cart'
+                  : added
+                    ? 'Added ✓ — add more'
+                    : `Add to cart · ${formatNaira(price * Math.min(qty, available))}`}
             </button>
           </>
         )}

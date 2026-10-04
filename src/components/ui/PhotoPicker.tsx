@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Spinner } from '../system/States'
 import { useUpload, type UploadBucket } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
@@ -15,6 +15,7 @@ export function PhotoPicker({
   onError,
   max = 4,
   capture,
+  onUploadingChange,
 }: {
   bucket: UploadBucket
   value: string[]
@@ -23,15 +24,20 @@ export function PhotoPicker({
   max?: number
   /** Opens the camera straight away on phones: "user" for a selfie. */
   capture?: 'user' | 'environment'
+  onUploadingChange?: (uploading: boolean) => void
 }) {
   const input = useRef<HTMLInputElement>(null)
   // Private uploads have no public URL to show, so keep a local preview of
   // each file picked in this session, keyed by what the upload returned.
   const previews = useRef<Record<string, string>>({})
   const upload = useUpload(bucket)
+  const [uploading, setUploading] = useState(false)
+  useEffect(() => () => { for (const url of Object.values(previews.current)) URL.revokeObjectURL(url) }, [])
 
   async function pick(files: FileList | null) {
-    if (!files?.length) return
+    if (!files?.length || uploading) return
+    setUploading(true)
+    onUploadingChange?.(true)
     onError(null)
     const next = [...value]
     for (const file of Array.from(files).slice(0, max - value.length)) {
@@ -45,6 +51,8 @@ export function PhotoPicker({
       }
     }
     onChange(next)
+    setUploading(false)
+    onUploadingChange?.(false)
     if (input.current) input.current.value = ''
   }
 
@@ -56,7 +64,11 @@ export function PhotoPicker({
           <button
             type="button"
             aria-label="Remove photo"
-            onClick={() => onChange(value.filter((x) => x !== v))}
+            disabled={uploading}
+            onClick={() => {
+              if (previews.current[v]) { URL.revokeObjectURL(previews.current[v]); delete previews.current[v] }
+              onChange(value.filter((x) => x !== v))
+            }}
             className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-ink text-white flex items-center justify-center"
           >
             <i className="ph-bold ph-x text-xs" />
@@ -67,11 +79,11 @@ export function PhotoPicker({
         <button
           type="button"
           onClick={() => input.current?.click()}
-          disabled={upload.isPending}
+          disabled={uploading}
           aria-label="Add photo"
           className="w-[74px] h-[74px] border-[1.5px] border-dashed border-muted-4 rounded-lg flex items-center justify-center text-muted-2"
         >
-          {upload.isPending ? <Spinner className="w-5 h-5" /> : <i className="ph ph-camera text-2xl" />}
+          {uploading ? <Spinner className="w-5 h-5" /> : <i className="ph ph-camera text-2xl" />}
         </button>
       )}
       <input

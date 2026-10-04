@@ -1,3 +1,4 @@
+import { BookingMilestones } from '../../components/ui/BookingMilestones'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
@@ -122,6 +123,7 @@ export function RequestCard({ booking: b, highlighted }: { booking: BookingWithC
           Paid {formatNaira(b.price - b.commission)} after {formatNaira(b.commission)} FindWork fee
         </div>
       )}
+      <BookingMilestones bookingId={b.id} canRelease={false} />
       {error && <Alert className="mt-3">{error}</Alert>}
 
       <Link to={`/bookings/${b.id}/reschedule`} className="inline-block mt-3 text-[14px] font-semibold text-brand-hover">

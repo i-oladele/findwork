@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DisputeConversation } from '../../components/ui/DisputeConversation'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { PageHeader } from '../../components/chrome/PageHeader'
@@ -160,6 +161,8 @@ export function DisputeDetail() {
             {dispute.evidence_paths.length} photo{dispute.evidence_paths.length === 1 ? '' : 's'} attached
           </div>
         )}
+
+        <DisputeConversation disputeId={dispute.id} open={dispute.status === 'open'} />
 
         {dispute.status === 'resolved' ? (
           <div className="bg-white border border-line rounded-2xl p-[18px] mt-4">

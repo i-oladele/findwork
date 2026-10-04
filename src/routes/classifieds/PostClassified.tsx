@@ -7,6 +7,7 @@ import { Chip } from '../../components/ui/Chip'
 import { Alert } from '../../components/ui/Alert'
 import { SectionLabel } from '../../components/ui/SectionLabel'
 import { PhotoPicker } from '../../components/ui/PhotoPicker'
+import { AreaPicker } from '../../components/ui/AreaPicker'
 import { usePostClassified, useProfile } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { parseNaira } from '../../lib/format'
@@ -21,6 +22,7 @@ export function PostClassified() {
   const [price, setPrice] = useState('')
   const [category, setCategory] = useState<ClassifiedCategory>('Used goods')
   const [location, setLocation] = useState(profile?.location ?? '')
+  const [area, setArea] = useState<string | null>(profile?.area ?? null)
   const [description, setDescription] = useState('')
   const [photos, setPhotos] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +39,7 @@ export function PostClassified() {
         location: location.trim(),
         description: description.trim(),
         photo_urls: photos,
+        area,
       })
       navigate(`/classifieds/${id}`, { replace: true })
     } catch (err) {
@@ -102,6 +105,10 @@ export function PostClassified() {
               className="w-full bg-white border-[1.5px] border-line rounded-lg h-[52px] px-3.5 text-[15.5px] text-ink outline-none placeholder:text-muted-2"
             />
           </div>
+        </div>
+
+        <div className="mt-4">
+          <AreaPicker value={area} onChange={setArea} label="Area, so people nearby can find it" hint="Your listing is shown at the centre of this area, never at your own address." />
         </div>
 
         {error && <Alert className="mt-4">{error}</Alert>}

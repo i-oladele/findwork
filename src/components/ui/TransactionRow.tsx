@@ -12,6 +12,8 @@ const META: Record<WalletKind, { icon: string; bg: string; color: string }> = {
   course: { icon: 'graduation-cap', bg: 'bg-cream', color: 'text-ink' },
   withdrawal: { icon: 'arrow-up-right', bg: 'bg-cream', color: 'text-ink' },
   adjustment: { icon: 'sliders-horizontal', bg: 'bg-cream', color: 'text-ink' },
+  transfer: { icon: 'arrows-left-right', bg: 'bg-cream', color: 'text-ink' },
+  delivery: { icon: 'moped', bg: 'bg-success-bg', color: 'text-success-text' },
 }
 
 /**

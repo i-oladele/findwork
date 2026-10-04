@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "prd:report": "node scripts/prd-checklist.mjs",
+    "prd:check": "node scripts/prd-checklist.mjs --check",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",

@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
 import { BackButton } from '../../components/chrome/PageHeader'
@@ -53,6 +54,34 @@ function targetFor(refType: string | null, refId: string | null): string {
       return '/wallet'
     case 'billing':
       return '/billing'
+    case 'security':
+      return '/security'
+    case 'rider':
+      return '/rider'
+    case 'open_job':
+      return refId ? `/provider/jobs/${refId}/quote` : '/provider/jobs'
+    case 'stream':
+      return refId ? `/live/${refId}` : '/live'
+    case 'certificate':
+      return '/learning'
+    case 'internship':
+      return refId ? `/internships/${refId}` : '/internships'
+    case 'purchase_order':
+      return refId ? `/purchase-orders/${refId}` : '/procurement'
+    case 'procurement':
+      return '/procurement'
+    case 'admin_purchase_order':
+      return '/admin'
+    case 'meetup':
+      return refId ? `/meetups/${refId}` : '/meetups'
+    case 'admin_sos':
+      return '/admin'
+    case 'track':
+      return refId ? `/track/${refId}` : '/orders'
+    case 'admin_rider':
+      return '/admin'
+    case 'risk':
+      return '/admin'
     case 'support':
       return '/help'
     // Operator notifications: everything is handled in one console.
@@ -74,13 +103,30 @@ export function Notifications() {
   const markRead = useMarkNotificationRead()
   useNotificationsRealtime()
 
+  // A tapped push lands here with the notification it was about; pass it on
+  // to the screen that notification points at.
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+  const open = params.get('open')
+  const opened = open ? data?.find((n) => n.id === open) : undefined
+  useEffect(() => {
+    if (!opened) return
+    if (!opened.read_at) markRead.mutate(opened.id)
+    navigate(targetFor(opened.ref_type, opened.ref_id), { replace: true })
+    // markRead is a new object each render; the notification is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened, navigate])
+
   return (
     <Screen bottomNav="customer">
       <div className="bg-ink px-[22px] pb-6">
         <StatusBar tone="light" />
         <div className="flex items-center gap-1 mt-1.5">
           <BackButton fallback="/home" tone="light" />
-          <div className="font-display font-bold text-[22px] text-cream">Notifications</div>
+          <div className="flex-1 font-display font-bold text-[22px] text-cream">Notifications</div>
+          <Link to="/preferences" aria-label="Notification settings" className="inline-flex items-center justify-center w-11 h-11 text-cream">
+            <i className="ph ph-gear text-[21px]" />
+          </Link>
         </div>
       </div>
 

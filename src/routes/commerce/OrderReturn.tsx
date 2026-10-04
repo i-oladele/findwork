@@ -123,6 +123,12 @@ export function OrderReturn() {
             </Link>
           </Alert>
         )}
+        {order.status === 'dispatched' && (
+          <Link to={`/track/${order.id}`} className="flex items-center justify-between bg-ink rounded-2xl px-5 py-4 mt-4">
+            <span className="font-display font-semibold text-[16px] text-cream">Track delivery and get your code</span>
+            <i className="ph-bold ph-arrow-right text-xl text-brand" />
+          </Link>
+        )}
         {error && <Alert className="mt-4">{error}</Alert>}
 
         <SectionLabel className="mt-5 mb-2.5">Items</SectionLabel>
@@ -135,11 +141,17 @@ export function OrderReturn() {
                   {it.name}
                 </Link>
                 <div className="text-[13px] text-muted-2 mt-0.5">
-                  {formatNaira(it.price)} · qty {it.qty}
+                  {it.variant_name ? `${it.variant_name} · ` : ''}{formatNaira(it.price)} · qty {it.qty}
                 </div>
               </div>
             </div>
           ))}
+          {order.discount > 0 && (
+            <div className="flex justify-between px-3.5 py-3 border-t border-line-soft text-[14px] text-success-text">
+              <span>Coupon {order.coupon_code}</span>
+              <span>−{formatNaira(order.discount)}</span>
+            </div>
+          )}
           <div className="flex justify-between px-3.5 py-3 border-t border-line-soft text-[14px] text-text-soft">
             <span>Delivery ({order.delivery_speed})</span>
             <span className="text-ink">{formatNaira(order.delivery_fee)}</span>
@@ -150,7 +162,7 @@ export function OrderReturn() {
           <>
             <SectionLabel className="mt-5 mb-2.5">Delivering to</SectionLabel>
             <div className="bg-white border border-line rounded-2xl p-4 text-[14.5px] leading-[1.5] text-text-soft">
-              {order.delivery_address}
+              <div className="whitespace-pre-line">{order.delivery_address}</div>
               {order.contact_phone && <div className="text-muted-2 mt-1">{order.contact_phone}</div>}
             </div>
           </>

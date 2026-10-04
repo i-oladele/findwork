@@ -156,8 +156,12 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
         <div className="grid grid-cols-2 gap-3">
           <Shortcut to="/provider/jobs" icon="magnifying-glass" color="text-brand" label="Find jobs" detail={jobs ? `${jobs.length} open` : ' '} />
           <Shortcut to="/provider/services" icon="list-checks" color="text-brand" label="My services" detail={`${liveCount} live`} />
+          <Shortcut to="/provider/portfolio" icon="images" color="text-brand" label="Portfolio" detail="Work & credentials" />
           <Shortcut to="/provider/products" icon="storefront" color="text-brand" label="My products" detail={`${productsLive} in the shop`} />
           <Shortcut to="/provider/orders" icon="package" color="text-success" label="Orders" detail={toSend ? `${toSend} to send` : 'Nothing to send'} />
+          <Shortcut to="/provider/coupons" icon="ticket" color="text-brand" label="Coupons" detail="Discount codes" />
+          <Shortcut to="/feed/new" icon="film-reel" color="text-brand" label="Stories & reels" detail="Show your work" />
+          <Shortcut to="/live/new" icon="broadcast" color="text-success" label="Go live" detail="Sell on a stream" />
           <Shortcut to="/provider/availability" icon="calendar-dots" color="text-success" label="Availability" detail={provider.taking_bookings ? 'Taking bookings' : 'Paused'} />
           <Shortcut to="/provider/earnings" icon="wallet" color="text-success" label="Payouts" detail={`${formatNaira(wallet?.balance ?? 0)} available`} />
           <Shortcut to="/courses" icon="graduation-cap" color="text-success" label="Learn & certify" detail="Build your skills" />

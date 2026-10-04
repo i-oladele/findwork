@@ -11,6 +11,8 @@
  */
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type SavedAddress = Database['public']['Tables']['saved_addresses']['Row']
+export type ProviderMedia = Database['public']['Tables']['provider_media']['Row']
 
 /* ---- Check-constraint unions -------------------------------------------- */
 
@@ -28,10 +30,12 @@ export type WalletKind =
   | 'course'
   | 'withdrawal'
   | 'adjustment'
+  | 'transfer'
+  | 'delivery'
 export type MessageKind = 'text' | 'voice' | 'image' | 'video' | 'file'
 export type PackageStatus = 'live' | 'paused'
 export type JobStatus = 'open' | 'closed'
-export type QuoteStatus = 'sent' | 'accepted' | 'declined'
+export type QuoteStatus = 'sent' | 'accepted' | 'declined' | 'withdrawn'
 export type RfqStatus = 'open' | 'quoted' | 'closed'
 export type ClassifiedCategory = 'Rentals' | 'Used goods'
 export type DisputeStatus = 'open' | 'resolved'
@@ -48,7 +52,7 @@ export type NotificationKind =
   | 'system'
   | 'order'
   | 'support'
-export type ReportTargetType = 'classified' | 'message' | 'profile' | 'job' | 'rfq'
+export type ReportTargetType = 'classified' | 'message' | 'profile' | 'job' | 'rfq' | 'post' | 'stream'
 export type ReportStatus = 'open' | 'actioned' | 'dismissed'
 export type SupportTopic = 'payments' | 'bookings' | 'orders' | 'account' | 'bug' | 'other'
 export type VerificationIdType = 'nin' | 'bvn' | 'passport' | 'drivers_licence' | 'voters_card'
@@ -56,6 +60,22 @@ export type VerificationStatus = 'pending' | 'approved' | 'rejected'
 /** refund_due / refunded: paid into an account deleted before it landed. */
 export type PaymentIntentStatus = 'pending' | 'success' | 'failed' | 'refund_due' | 'refunded'
 export type WithdrawalStatus = 'requested' | 'paid' | 'rejected'
+/** One stage of a job paid in stages; the amounts add up to the quote's price. */
+export type QuoteMilestone = { title: string; amount: number }
+export type MilestoneStatus = 'pending' | 'released' | 'refunded'
+export type RiderVehicle = 'bicycle' | 'motorcycle' | 'car' | 'van'
+export type RiderStatus = 'pending' | 'approved' | 'rejected'
+export type DeliveryStatus = 'awaiting_rider' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled'
+export type Language = 'en' | 'pcm' | 'yo' | 'ig' | 'ha'
+export type MeetupStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled'
+export type OrgRole = 'owner' | 'approver' | 'buyer'
+export type PurchaseOrderStatus = 'pending_approval' | 'rejected' | 'funded' | 'delivered' | 'on_hold' | 'completed' | 'cancelled' | 'refunded'
+export type InternshipApplicationStatus = 'submitted' | 'shortlisted' | 'accepted' | 'rejected' | 'withdrawn'
+export type StreamStatus = 'scheduled' | 'live' | 'ended'
+export type StaffRole = 'admin' | 'moderator' | 'finance' | 'support'
+export type SecurityEventKind = 'sign_in' | 'new_device' | 'mfa_enrolled' | 'mfa_removed' | 'mfa_recovered' | 'suspended' | 'reinstated' | 'role_changed' | 'sos'
+export type RiskSeverity = 'low' | 'medium' | 'high'
+export type RiskAlertStatus = 'open' | 'reviewed' | 'dismissed'
 
 type Rel<Name extends string, Col extends string, Ref extends string, One extends boolean = false> = {
   foreignKeyName: Name
@@ -68,6 +88,237 @@ type Rel<Name extends string, Col extends string, Ref extends string, One extend
 export type Database = {
   public: {
     Tables: {
+      social_posts: {
+        Row: { id: string; author_id: string; kind: 'story' | 'reel'; media_path: string; mime: string; caption: string; product_id: string | null; expires_at: string | null; views: number; likes: number; status: 'live' | 'removed'; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      post_likes: {
+        Row: { post_id: string; profile_id: string; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      live_streams: {
+        Row: { id: string; seller_id: string; title: string; playback_url: string; status: StreamStatus; scheduled_for: string | null; started_at: string | null; ended_at: string | null; pinned_product_id: string | null; peak_viewers: number; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'live_streams_seller_id_fkey', 'seller_id', 'provider_profiles'>]
+      }
+      stream_products: {
+        Row: { stream_id: string; product_id: string; position: number }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'stream_products_product_id_fkey', 'product_id', 'products'>]
+      }
+      stream_messages: {
+        Row: { id: string; stream_id: string; sender_id: string; body: string; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'stream_messages_sender_id_fkey', 'sender_id', 'profiles'>]
+      }
+      quiz_questions: {
+        /** The correct answer is not readable. */
+        Row: { id: string; course_id: string; position: number; prompt: string; options: string[] }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      quiz_attempts: {
+        Row: { id: string; profile_id: string; course_id: string; score: number; passed: boolean; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      certificates: {
+        Row: { id: string; profile_id: string; course_id: string; code: string; holder_name: string; course_title: string; score: number | null; issued_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      internships: {
+        Row: { id: string; employer_id: string; company: string; title: string; description: string; skills: string[]; area: string | null; location: string | null; duration: string | null; stipend: number | null; closes_on: string | null; status: 'open' | 'closed'; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      internship_applications: {
+        Row: { id: string; internship_id: string; applicant_id: string; cover_note: string; match_score: number; matched_skills: string[]; status: InternshipApplicationStatus; created_at: string; decided_at: string | null }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'internship_applications_applicant_id_fkey', 'applicant_id', 'profiles'>]
+      }
+      organizations: {
+        Row: { id: string; name: string; owner_id: string; approval_threshold: number; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      organization_members: {
+        Row: { organization_id: string; profile_id: string; role: OrgRole; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'organization_members_profile_id_fkey', 'profile_id', 'profiles'>, Rel<'organization_members_organization_id_fkey', 'organization_id', 'organizations'>]
+      }
+      organization_suppliers: {
+        Row: { organization_id: string; supplier_id: string; status: 'approved' | 'blocked'; note: string | null; added_by: string; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      rfq_items: {
+        Row: { rfq_id: string; position: number; description: string; quantity: number; unit: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      purchase_orders: {
+        Row: { id: string; number: number; rfq_id: string; quote_id: string; organization_id: string | null; buyer_id: string; payer_id: string; supplier_id: string; title: string; amount: number; commission: number; escrow_held: number; status: PurchaseOrderStatus; decided_by: string | null; decision_note: string | null; hold_reason: string | null; funded_at: string | null; delivered_at: string | null; closed_at: string | null; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'purchase_orders_supplier_id_fkey', 'supplier_id', 'profiles'>, Rel<'purchase_orders_buyer_id_fkey', 'buyer_id', 'profiles'>, Rel<'purchase_orders_organization_id_fkey', 'organization_id', 'organizations'>]
+      }
+      invoices: {
+        Row: { id: string; number: number; purchase_order_id: string; supplier_id: string; payer_id: string; organization_id: string | null; amount: number; status: 'issued' | 'paid' | 'void'; issued_at: string; paid_at: string | null }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      meetups: {
+        Row: { id: string; classified_id: string | null; title: string; buyer_id: string; seller_id: string; place: string; meet_at: string; status: MeetupStatus; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'meetups_buyer_id_fkey', 'buyer_id', 'profiles'>, Rel<'meetups_seller_id_fkey', 'seller_id', 'profiles'>]
+      }
+      trusted_contacts: {
+        Row: { id: string; profile_id: string; name: string; phone: string; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      sos_alerts: {
+        Row: { id: string; profile_id: string; meetup_id: string | null; lat: number | null; lng: number | null; note: string | null; status: 'open' | 'handled'; handled_by: string | null; handled_at: string | null; handled_note: string | null; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'sos_alerts_profile_id_fkey', 'profile_id', 'profiles'>]
+      }
+      user_preferences: {
+        Row: { profile_id: string; language: Language; muted_kinds: string[]; interests: string[]; skills: string[]; analytics: boolean; updated_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      push_subscriptions: {
+        /** The keys are readable only by the sender. */
+        Row: { id: string; profile_id: string; endpoint: string; label: string; created_at: string; last_sent_at: string | null }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      rider_profiles: {
+        Row: { id: string; vehicle: RiderVehicle; plate: string | null; area: string | null; status: RiderStatus; note: string | null; reviewed_by: string | null; reviewed_at: string | null; online: boolean; lat: number | null; lng: number | null; located_at: string | null; deliveries_done: number; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'rider_profiles_id_fkey', 'id', 'profiles', true>]
+      }
+      deliveries: {
+        /** The delivery code is not readable through the table; the customer gets it from delivery_tracking. */
+        Row: { id: string; order_id: string; rider_id: string | null; status: DeliveryStatus; pickup_address: string | null; pickup_lat: number | null; pickup_lng: number | null; dropoff_address: string; dropoff_lat: number | null; dropoff_lng: number | null; rider_fee: number; eta_minutes: number | null; eta_at: string | null; eta_source: 'estimate' | 'routed'; assigned_at: string | null; picked_up_at: string | null; delivered_at: string | null; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'deliveries_order_id_fkey', 'order_id', 'orders', true>, Rel<'deliveries_rider_id_fkey', 'rider_id', 'rider_profiles'>]
+      }
+      product_variants: {
+        Row: { id: string; product_id: string; name: string; price: number; stock: number | null; position: number; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      coupons: {
+        Row: { id: string; code: string; seller_id: string | null; kind: 'percent' | 'fixed'; value: number; min_spend: number; max_discount: number | null; starts_at: string; ends_at: string | null; usage_limit: number | null; per_customer_limit: number; used_count: number; active: boolean; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      coupon_redemptions: {
+        Row: { coupon_id: string; profile_id: string; order_id: string; amount: number; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      wallet_transfers: {
+        Row: { id: string; sender_id: string; recipient_id: string; amount: number; note: string | null; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      booking_milestones: {
+        Row: { id: string; booking_id: string; position: number; title: string; amount: number; status: MilestoneStatus; released_at: string | null }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'booking_milestones_booking_id_fkey', 'booking_id', 'bookings'>]
+      }
+      platform_limits: {
+        Row: { tier: number; label: string; daily_withdrawal: number; daily_transfer: number }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      business_verifications: {
+        Row: { id: string; profile_id: string; rc_number: string; business_name: string; document_path: string; status: VerificationStatus; note: string | null; reviewed_by: string | null; reviewed_at: string | null; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'business_verifications_profile_id_fkey', 'profile_id', 'profiles'>]
+      }
+      admin_actions: {
+        Row: { id: string; actor_id: string; action: string; target_id: string | null; detail: Json; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      devices: {
+        Row: { profile_id: string; device_id: string; label: string; last_ip: string | null; first_seen_at: string; last_seen_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      security_events: {
+        Row: { id: string; profile_id: string; kind: SecurityEventKind; device_id: string | null; ip: string | null; detail: Json; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      risk_alerts: {
+        Row: { id: string; profile_id: string; kind: string; severity: RiskSeverity; summary: string; detail: Json; ref_type: string | null; ref_id: string | null; status: RiskAlertStatus; reviewed_by: string | null; reviewed_at: string | null; review_note: string | null; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'risk_alerts_profile_id_fkey', 'profile_id', 'profiles'>]
+      }
+      dispute_responses: {
+        Row: { id: string; dispute_id: string; author_id: string; author_role: 'claimant' | 'respondent' | 'moderator'; body: string; evidence_paths: string[]; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      quote_revisions: {
+        Row: { quote_id: string; revision: number; price: number; days: number; start_day: string | null; message: string | null; status: QuoteStatus; milestones: QuoteMilestone[] | null; recorded_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      provider_media: {
+        Row: { id: string; provider_id: string; kind: 'image' | 'video' | 'certificate'; path: string; mime: string; title: string; description: string; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      saved_addresses: {
+        Row: { id: string; profile_id: string; label: string; recipient: string; phone: string; address: string; is_default: boolean; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       profiles: {
         Row: {
           id: string
@@ -85,10 +336,20 @@ export type Database = {
           lng: number | null
           avatar_url: string | null
           is_admin: boolean
+          /** The part of the operator console this person may use; null for everyone else. */
+          staff_role: StaffRole | null
+          suspended_at: string | null
+          /** Only in your own row. */
+          suspended_reason: string | null
           created_at: string
           deleted_at: string | null
           /** Set by an admin approving a verification; null until then. */
           verified_at: string | null
+          business_verified_at: string | null
+          /** 0 unconfirmed, 1 contact confirmed, 2 ID verified, 3 business verified. */
+          verification_tier: number
+          /** 0 to 100; see private.trust_breakdown. */
+          trust_score: number
           /** The address a pinned location was found at. Private, like lat/lng. */
           location_label: string | null
         }
@@ -233,7 +494,10 @@ export type Database = {
           /** Generated column (tstzrange). Read-only. */
           slot_range: string
           status: BookingStatus
+          /** What is still held: falls as stages are released. */
           escrow_held: number
+          released_amount: number
+          released_fee: number
           cancelled_by: string | null
           cancelled_at: string | null
           created_at: string
@@ -324,6 +588,9 @@ export type Database = {
           escrow_held: number
           commission: number
           dispatched_at: string | null
+          /** What a coupon took off the goods; items_total is already net of it. */
+          discount: number
+          coupon_code: string | null
         }
         /** No client write policy — place_order, cancel_order, dispatch_order, confirm_order_received. */
         Insert: never
@@ -338,6 +605,9 @@ export type Database = {
           name: string
           price: number
           qty: number
+          variant_id: string | null
+          /** The option bought, as it was named at the time. */
+          variant_name: string | null
         }
         Insert: never
         Update: never
@@ -411,6 +681,9 @@ export type Database = {
           description: string
           budget: number
           needed_by: string | null
+          /** The trade wanted and where; both feed matching. */
+          category: string | null
+          area: string | null
           status: JobStatus
           quote_count: number
           created_at: string
@@ -422,6 +695,8 @@ export type Database = {
           description: string
           budget: number
           needed_by?: string | null
+          category?: string | null
+          area?: string | null
           status?: JobStatus
           created_at?: string
         }
@@ -430,12 +705,15 @@ export type Database = {
           description?: string
           budget?: number
           needed_by?: string | null
+          category?: string | null
+          area?: string | null
           status?: JobStatus
         }
         Relationships: [Rel<'job_posts_customer_id_fkey', 'customer_id', 'profiles'>]
       }
       sent_quotes: {
         Row: {
+          revision: number
           id: string
           job_id: string
           provider_id: string
@@ -444,6 +722,8 @@ export type Database = {
           start_day: string | null
           message: string | null
           status: QuoteStatus
+          /** Null when the job is paid in one go. */
+          milestones: QuoteMilestone[] | null
           created_at: string
         }
         Insert: {
@@ -453,6 +733,7 @@ export type Database = {
           days: number
           start_day?: string | null
           message?: string | null
+          milestones?: QuoteMilestone[] | null
         }
         Update: never
         Relationships: [
@@ -470,6 +751,10 @@ export type Database = {
           budget_max: number | null
           deadline: string | null
           status: RfqStatus
+          /** Set when the request is an organisation's; its owner's wallet pays. */
+          organization_id: string | null
+          /** 0 anyone, 2 ID verified, 3 a verified business. */
+          min_supplier_tier: number
           created_at: string
         }
         Insert: {
@@ -527,6 +812,10 @@ export type Database = {
           location: string
           description: string
           photo_urls: string[]
+          /** A listed area; the listing sits at that area's centre, never the seller's own pin. */
+          area: string | null
+          lat: number | null
+          lng: number | null
           created_at: string
         }
         Insert: {
@@ -538,6 +827,7 @@ export type Database = {
           location: string
           description: string
           photo_urls?: string[]
+          area?: string | null
           created_at?: string
         }
         Update: {
@@ -585,6 +875,9 @@ export type Database = {
           rating: number
           description: string
           image_url: string | null
+          status: 'draft' | 'live'
+          /** The quiz score, out of 100, that earns the certificate. */
+          pass_mark: number
           created_at: string
         }
         Insert: never
@@ -592,13 +885,13 @@ export type Database = {
         Relationships: []
       }
       course_lessons: {
+        /** The material (body, video) is not readable from the table; it comes from course_content. */
         Row: {
           id: string
           course_id: string
           title: string
           minutes: number
           position: number
-          body: string | null
         }
         Insert: never
         Update: never
@@ -821,6 +1114,128 @@ export type Database = {
     }
     Views: Record<never, never>
     Functions: {
+      match_providers_for_job: { Args: { p_job_id: string }; Returns: Json }
+      invite_provider_to_job: { Args: { p_job_id: string; p_provider_id: string }; Returns: undefined }
+      recommended_jobs: { Args: Record<never, never>; Returns: Json }
+      recommended_providers: { Args: Record<never, never>; Returns: Json }
+      recommended_products: { Args: { p_product_id: string | null }; Returns: Json }
+      thread_context: { Args: { p_thread_id: string }; Returns: Json }
+      set_analytics_consent: { Args: { p_allowed: boolean }; Returns: undefined }
+      track_events: { Args: { p_session_id: string; p_events: Json }; Returns: undefined }
+      admin_engagement: { Args: { p_from: string; p_to: string }; Returns: Json }
+      admin_user_activity: { Args: { p_profile_id: string }; Returns: Json }
+      publish_post: { Args: { p_kind: 'story' | 'reel'; p_path: string; p_caption: string; p_product_id: string | null }; Returns: string }
+      remove_post: { Args: { p_post_id: string }; Returns: string }
+      record_post_view: { Args: { p_post_id: string }; Returns: undefined }
+      toggle_post_like: { Args: { p_post_id: string }; Returns: Json }
+      social_feed: { Args: { p_kind: 'story' | 'reel' | null; p_author_id: string | null }; Returns: Json }
+      schedule_stream: { Args: { p_title: string; p_playback_url: string; p_scheduled_for: string | null; p_product_ids: string[] }; Returns: string }
+      update_stream: { Args: { p_stream_id: string; p_action: 'start' | 'end' | 'pin'; p_product_id: string | null }; Returns: undefined }
+      send_stream_message: { Args: { p_stream_id: string; p_body: string }; Returns: string }
+      remove_stream_message: { Args: { p_message_id: string }; Returns: undefined }
+      stream_heartbeat: { Args: { p_stream_id: string }; Returns: number }
+      course_content: { Args: { p_course_id: string }; Returns: Json }
+      submit_quiz: { Args: { p_course_id: string; p_answers: number[] }; Returns: Json }
+      verify_certificate: { Args: { p_code: string }; Returns: Json }
+      admin_save_course: {
+        Args: { p_id: string | null; p_title: string; p_category: string; p_instructor: string; p_description: string; p_price: number; p_pass_mark: number; p_status: 'draft' | 'live'; p_lessons: Json; p_questions: Json }
+        Returns: string
+      }
+      admin_course_quiz: { Args: { p_course_id: string }; Returns: Json }
+      save_skills: { Args: { p_skills: string[] }; Returns: undefined }
+      post_internship: {
+        Args: { p_company: string; p_title: string; p_description: string; p_skills: string[]; p_area: string | null; p_location: string | null; p_duration: string | null; p_stipend: number | null; p_closes_on: string | null }
+        Returns: string
+      }
+      close_internship: { Args: { p_internship_id: string }; Returns: undefined }
+      apply_to_internship: { Args: { p_internship_id: string; p_cover_note: string }; Returns: string }
+      update_internship_application: { Args: { p_application_id: string; p_status: InternshipApplicationStatus }; Returns: undefined }
+      internship_matches: { Args: Record<never, never>; Returns: Json }
+      org_role: { Args: { p_organization_id: string }; Returns: OrgRole | null }
+      create_organization: { Args: { p_name: string; p_approval_threshold: number }; Returns: string }
+      update_organization: { Args: { p_organization_id: string; p_name: string; p_approval_threshold: number }; Returns: undefined }
+      set_organization_member: { Args: { p_organization_id: string; p_profile_id: string; p_role: 'approver' | 'buyer' | null }; Returns: undefined }
+      set_organization_supplier: { Args: { p_organization_id: string; p_supplier_id: string; p_status: 'approved' | 'blocked' | null; p_note: string | null }; Returns: undefined }
+      post_rfq: { Args: { p_organization_id: string | null; p_title: string; p_description: string; p_deadline: string | null; p_budget_max: number | null; p_min_supplier_tier: number; p_items: Json }; Returns: string }
+      review_purchase_order: { Args: { p_po_id: string; p_approve: boolean; p_note: string }; Returns: undefined }
+      mark_purchase_order_delivered: { Args: { p_po_id: string; p_stock: Json | null }; Returns: undefined }
+      confirm_purchase_order: { Args: { p_po_id: string }; Returns: undefined }
+      cancel_purchase_order: { Args: { p_po_id: string }; Returns: undefined }
+      hold_purchase_order: { Args: { p_po_id: string; p_reason: string }; Returns: undefined }
+      admin_resolve_purchase_order: { Args: { p_po_id: string; p_outcome: 'release' | 'refund'; p_note: string }; Returns: undefined }
+      procurement_summary: { Args: { p_organization_id: string | null }; Returns: Json }
+      nearby_classifieds: { Args: { p_lat: number; p_lng: number; p_radius_km: number; p_category: string | null }; Returns: Json }
+      propose_meetup: { Args: { p_classified_id: string; p_place: string; p_meet_at: string }; Returns: string }
+      update_meetup: { Args: { p_meetup_id: string; p_action: 'confirm' | 'complete' | 'cancel' }; Returns: undefined }
+      start_location_share: { Args: { p_meetup_id: string; p_minutes: number }; Returns: string }
+      update_location_share: { Args: { p_meetup_id: string; p_lat: number; p_lng: number }; Returns: undefined }
+      stop_location_share: { Args: { p_meetup_id: string }; Returns: undefined }
+      meetup_locations: { Args: { p_meetup_id: string }; Returns: Json }
+      save_trusted_contact: { Args: { p_name: string; p_phone: string }; Returns: string }
+      remove_trusted_contact: { Args: { p_contact_id: string }; Returns: undefined }
+      raise_sos: { Args: { p_meetup_id: string | null; p_lat: number | null; p_lng: number | null; p_note: string | null }; Returns: string }
+      admin_handle_sos: { Args: { p_alert_id: string; p_note: string }; Returns: undefined }
+      save_preferences: { Args: { p_language: Language; p_muted_kinds: string[]; p_interests: string[] }; Returns: undefined }
+      save_push_subscription: { Args: { p_endpoint: string; p_p256dh: string; p_auth: string; p_label: string }; Returns: undefined }
+      remove_push_subscription: { Args: { p_endpoint: string }; Returns: undefined }
+      apply_as_rider: { Args: { p_vehicle: RiderVehicle; p_plate: string; p_area: string | null }; Returns: undefined }
+      admin_review_rider: { Args: { p_rider_id: string; p_approve: boolean; p_note: string }; Returns: undefined }
+      set_rider_online: { Args: { p_online: boolean }; Returns: undefined }
+      update_rider_location: { Args: { p_lat: number; p_lng: number }; Returns: undefined }
+      rider_available_deliveries: { Args: Record<never, never>; Returns: Json }
+      accept_delivery: { Args: { p_delivery_id: string }; Returns: undefined }
+      admin_assign_delivery: { Args: { p_delivery_id: string; p_rider_id: string }; Returns: undefined }
+      release_delivery: { Args: { p_delivery_id: string }; Returns: undefined }
+      mark_delivery_picked_up: { Args: { p_delivery_id: string }; Returns: undefined }
+      complete_delivery: { Args: { p_delivery_id: string; p_code: string }; Returns: undefined }
+      delivery_outcome: { Args: { p_delivery_id: string }; Returns: Json }
+      set_delivery_dropoff: { Args: { p_order_id: string; p_lat: number; p_lng: number }; Returns: undefined }
+      delivery_tracking: { Args: { p_order_id: string }; Returns: Json }
+      save_product_variants: { Args: { p_product_id: string; p_variants: Json }; Returns: undefined }
+      save_coupon: {
+        Args: { p_id: string | null; p_code: string; p_kind: 'percent' | 'fixed'; p_value: number; p_min_spend: number; p_max_discount: number | null; p_ends_at: string | null; p_usage_limit: number | null; p_per_customer_limit: number; p_active: boolean; p_platform: boolean }
+        Returns: string
+      }
+      find_transfer_recipient: { Args: { p_contact: string }; Returns: Json }
+      transfer_funds: { Args: { p_id: string; p_recipient_id: string; p_amount: number; p_note: string | null }; Returns: string }
+      release_milestone: { Args: { p_milestone_id: string }; Returns: undefined }
+      trust_score: { Args: { p_profile_id: string }; Returns: Json }
+      my_limits: { Args: Record<never, never>; Returns: Json }
+      submit_business_verification: { Args: { p_rc_number: string; p_business_name: string; p_document_path: string }; Returns: string }
+      admin_review_business_verification: { Args: { p_verification_id: string; p_approve: boolean; p_note: string }; Returns: undefined }
+      staff_can: { Args: { p_area: string }; Returns: boolean }
+      create_mfa_recovery_codes: { Args: Record<never, never>; Returns: string[] }
+      record_mfa_removed: { Args: Record<never, never>; Returns: undefined }
+      record_sign_in: { Args: { p_device_id: string; p_label: string }; Returns: Json }
+      admin_suspend_user: { Args: { p_profile_id: string; p_reason: string }; Returns: undefined }
+      admin_reinstate_user: { Args: { p_profile_id: string; p_note: string }; Returns: undefined }
+      admin_set_staff_role: { Args: { p_profile_id: string; p_role: StaffRole | null }; Returns: undefined }
+      admin_review_risk_alert: { Args: { p_alert_id: string; p_status: 'reviewed' | 'dismissed'; p_note: string }; Returns: undefined }
+      admin_user_overview: { Args: { p_profile_id: string }; Returns: Json }
+      admin_analytics: {
+        Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
+      respond_to_dispute: {
+        Args: { p_id: string; p_dispute_id: string; p_body: string; p_evidence_paths: string[] }
+        Returns: string
+      }
+      save_provider_media: {
+        Args: { p_id: string | null; p_kind: 'image' | 'video' | 'certificate'; p_path: string; p_title: string; p_description: string }
+        Returns: string
+      }
+      remove_provider_media: {
+        Args: { p_id: string }
+        Returns: string
+      }
+      save_address: {
+        Args: { p_id: string | null; p_label: string; p_recipient: string; p_phone: string; p_address: string; p_default: boolean }
+        Returns: string
+      }
+      delete_address: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       wallet_summary: {
         Args: { p_profile_id: string }
         Returns: { balance: number; escrow_held: number }[]
@@ -891,15 +1306,23 @@ export type Database = {
         Returns: undefined
       }
       accept_job_quote: {
-        Args: { p_quote_id: string; p_start_at: string }
+        Args: { p_quote_id: string; p_start_at: string; p_expected_revision: number }
         Returns: string
       }
+      revise_job_quote: {
+        Args: { p_quote_id: string; p_expected_revision: number; p_price: number; p_days: number; p_start_day: string | null; p_message: string | null; p_milestones: QuoteMilestone[] | null }
+        Returns: undefined
+      }
+      withdraw_job_quote: {
+        Args: { p_quote_id: string; p_expected_revision: number }
+        Returns: undefined
+      }
       checkout_quote: {
-        Args: { p_items: Json; p_delivery_speed: DeliverySpeed }
+        Args: { p_items: Json; p_delivery_speed: DeliverySpeed; p_coupon_code?: string | null }
         Returns: Json
       }
       place_order: {
-        Args: { p_items: Json; p_delivery_speed: DeliverySpeed; p_address: string; p_phone: string; p_expected_total: number }
+        Args: { p_items: Json; p_delivery_speed: DeliverySpeed; p_address: string; p_phone: string; p_expected_total: number; p_coupon_code?: string | null }
         /** One order id per seller in the cart. */
         Returns: string[]
       }
@@ -933,7 +1356,8 @@ export type Database = {
       }
       accept_rfq_quote: {
         Args: { p_quote_id: string }
-        Returns: undefined
+        /** The purchase order it raised. */
+        Returns: string
       }
       mark_notification_read: {
         Args: { p_notification_id: string }
@@ -1043,3 +1467,25 @@ export type Withdrawal = Tables<'withdrawals'>
 export type Verification = Tables<'verifications'>
 export type ServiceArea = Tables<'service_areas'>
 export type Favourite = Tables<'favourites'>
+export type BusinessVerification = Tables<'business_verifications'>
+export type BookingMilestone = Tables<'booking_milestones'>
+export type ProductVariant = Tables<'product_variants'>
+export type Coupon = Tables<'coupons'>
+export type RiderProfile = Tables<'rider_profiles'>
+export type Delivery = Tables<'deliveries'>
+export type UserPreferences = Tables<'user_preferences'>
+export type Meetup = Tables<'meetups'>
+export type TrustedContact = Tables<'trusted_contacts'>
+export type SosAlert = Tables<'sos_alerts'>
+export type Organization = Tables<'organizations'>
+export type PurchaseOrder = Tables<'purchase_orders'>
+export type Invoice = Tables<'invoices'>
+export type RfqItem = Tables<'rfq_items'>
+export type Certificate = Tables<'certificates'>
+export type QuizQuestion = Tables<'quiz_questions'>
+export type Internship = Tables<'internships'>
+export type InternshipApplication = Tables<'internship_applications'>
+export type LiveStream = Tables<'live_streams'>
+export type Device = Tables<'devices'>
+export type SecurityEvent = Tables<'security_events'>
+export type RiskAlert = Tables<'risk_alerts'>

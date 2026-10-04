@@ -88,6 +88,10 @@ export function Wallet() {
             Withdraw
           </Link>
         </div>
+        <Link to="/wallet/transfer" className="flex items-center justify-center gap-2 h-11 mt-2.5 text-[14.5px] font-semibold text-cream">
+          <i className="ph-bold ph-arrows-left-right text-[16px]" />
+          Send to another FindWork account
+        </Link>
       </div>
 
       <div className="px-[22px] pt-5 pb-6">

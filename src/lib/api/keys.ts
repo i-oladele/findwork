@@ -4,6 +4,7 @@
  * can invalidate `keys.wallet.all` without knowing which screens are mounted.
  */
 export const keys = {
+  addresses: { all: ['addresses'] as const },
   profile: {
     me: () => ['profile', 'me'] as const,
     byId: (id: string) => ['profile', id] as const,
@@ -14,6 +15,7 @@ export const keys = {
     categories: () => ['providers', 'categories'] as const,
     detail: (id: string) => ['providers', id] as const,
     packages: (id: string) => ['providers', id, 'packages'] as const,
+    portfolio: (id: string) => ['providers', id, 'portfolio'] as const,
     availability: (id: string) => ['providers', id, 'availability'] as const,
     reviews: (id: string) => ['providers', id, 'reviews'] as const,
     busy: (id: string, from: string, to: string, bookingId?: string) => ['providers', id, 'busy', from, to, bookingId ?? null] as const,
@@ -23,6 +25,7 @@ export const keys = {
     mine: () => ['bookings', 'mine'] as const,
     detail: (id: string) => ['bookings', id] as const,
     reschedules: (id: string) => ['bookings', id, 'reschedules'] as const,
+    milestones: (id: string) => ['bookings', id, 'milestones'] as const,
   },
   reviews: {
     mine: () => ['reviews', 'mine'] as const,
@@ -46,12 +49,20 @@ export const keys = {
     products: () => ['products'] as const,
     product: (id: string) => ['products', id] as const,
     // Under products, so anything that refreshes prices refreshes the quote.
-    quote: (items: { product_id: string; qty: number }[], speed: string) => ['products', 'quote', items, speed] as const,
+    quote: (items: { product_id: string; qty: number }[], speed: string, coupon = '') => ['products', 'quote', items, speed, coupon] as const,
+    variants: (ids: string[]) => ['products', 'variants', ids] as const,
+    store: (sellerId: string) => ['products', 'store', sellerId] as const,
+    coupons: (platform: boolean) => ['coupons', platform] as const,
     orders: () => ['orders'] as const,
     order: (id: string) => ['orders', id] as const,
   },
   verification: {
     mine: () => ['verification', 'mine'] as const,
+    business: () => ['verification', 'business'] as const,
+  },
+  trust: {
+    score: (id: string) => ['trust', id] as const,
+    limits: () => ['trust', 'limits'] as const,
   },
   passkeys: {
     available: () => ['passkeys', 'available'] as const,
@@ -74,6 +85,7 @@ export const keys = {
     job: (id: string) => ['jobs', id] as const,
     quotes: ['quotes'] as const,
     sentQuotes: () => ['quotes', 'sent'] as const,
+    quoteHistory: (id: string) => ['quotes', id, 'history'] as const,
     quotesForJob: (jobId: string) => ['quotes', 'job', jobId] as const,
   },
   rfqs: {
@@ -81,6 +93,7 @@ export const keys = {
     list: (scope: string) => ['rfqs', 'list', scope] as const,
     detail: (id: string) => ['rfqs', id] as const,
     quotes: (rfqId: string) => ['rfqs', rfqId, 'quotes'] as const,
+    items: (rfqId: string) => ['rfqs', rfqId, 'items'] as const,
   },
   classifieds: {
     all: ['classifieds'] as const,
@@ -93,9 +106,16 @@ export const keys = {
     lessons: (id: string) => ['courses', id, 'lessons'] as const,
     enrollments: () => ['enrollments'] as const,
     completions: () => ['lesson-completions'] as const,
+    quiz: (id: string) => ['courses', id, 'quiz'] as const,
+    certificates: (profileId: string) => ['certificates', profileId] as const,
+    internships: () => ['internships'] as const,
+    internship: (id: string) => ['internships', id] as const,
+    applications: (id: string) => ['internships', id, 'applications'] as const,
+    myApplications: () => ['internships', 'applications', 'mine'] as const,
   },
   disputes: {
     all: ['disputes'] as const,
+    responses: (id: string) => ['disputes', id, 'responses'] as const,
     list: () => ['disputes', 'list'] as const,
     detail: (id: string) => ['disputes', id] as const,
   },
@@ -111,7 +131,56 @@ export const keys = {
     all: ['support'] as const,
     mine: () => ['support', 'mine'] as const,
   },
+  logistics: {
+    all: ['logistics'] as const,
+    rider: () => ['logistics', 'rider'] as const,
+    available: () => ['logistics', 'available'] as const,
+    mine: () => ['logistics', 'mine'] as const,
+    earnings: () => ['logistics', 'earnings'] as const,
+    tracking: (orderId: string) => ['logistics', 'tracking', orderId] as const,
+    adminRiders: () => ['logistics', 'admin', 'riders'] as const,
+    adminDeliveries: () => ['logistics', 'admin', 'deliveries'] as const,
+  },
+  preferences: {
+    mine: () => ['preferences', 'mine'] as const,
+    push: () => ['preferences', 'push'] as const,
+  },
+  safety: {
+    all: ['safety'] as const,
+    meetups: () => ['safety', 'meetups'] as const,
+    meetup: (id: string) => ['safety', 'meetups', id] as const,
+    locations: (id: string) => ['safety', 'meetups', id, 'locations'] as const,
+    contacts: () => ['safety', 'contacts'] as const,
+    sos: () => ['safety', 'sos'] as const,
+  },
+  procurement: {
+    all: ['procurement'] as const,
+    organizations: () => ['procurement', 'organizations'] as const,
+    members: (orgId: string) => ['procurement', 'members', orgId] as const,
+    orders: (scope: string, orgId: string | null) => ['procurement', 'orders', scope, orgId] as const,
+    order: (id: string) => ['procurement', 'order', id] as const,
+    summary: (orgId: string | null) => ['procurement', 'summary', orgId] as const,
+    held: () => ['procurement', 'held'] as const,
+  },
+  social: {
+    all: ['social'] as const,
+    feed: (kind: string | null, authorId: string | null) => ['social', 'feed', kind, authorId] as const,
+    streams: () => ['social', 'streams'] as const,
+    stream: (id: string) => ['social', 'streams', id] as const,
+    streamProducts: (id: string) => ['social', 'streams', id, 'products'] as const,
+    streamMessages: (id: string) => ['social', 'streams', id, 'messages'] as const,
+  },
+  security: {
+    all: ['security'] as const,
+    devices: () => ['security', 'devices'] as const,
+    events: () => ['security', 'events'] as const,
+    factors: () => ['security', 'factors'] as const,
+  },
   admin: {
+    user: (id: string) => ['admin', 'user', id] as const,
+    risk: () => ['admin', 'risk'] as const,
+    businessVerifications: () => ['admin', 'business-verifications'] as const,
+    analytics: (from: string, through: string) => ['admin', 'analytics', from, through] as const,
     all: ['admin'] as const,
     disputes: () => ['admin', 'disputes'] as const,
     orders: () => ['admin', 'orders'] as const,

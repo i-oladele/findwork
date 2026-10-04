@@ -11,7 +11,7 @@ import { PhotoPicker } from '../../components/ui/PhotoPicker'
 import { SectionLabel } from '../../components/ui/SectionLabel'
 import { FullScreenLoader } from '../../components/system/States'
 import { useAuth } from '../../lib/authContext'
-import { useMyVerification, useProfile, useSubmitVerification } from '../../lib/api'
+import { useMyBusinessVerification, useMyVerification, useProfile, useSubmitBusinessVerification, useSubmitVerification } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatDateTime } from '../../lib/format'
 import { formatPhone } from '../../lib/phone'
@@ -101,8 +101,52 @@ export function GetVerified() {
             </Link>
           </>
         )}
+        <BusinessSection verifiedAt={profile?.business_verified_at ?? null} />
       </div>
     </Screen>
+  )
+}
+
+/** The top tier: a CAC registration number and certificate, checked by the team. */
+function BusinessSection({ verifiedAt }: { verifiedAt: string | null }) {
+  const { data: latest } = useMyBusinessVerification()
+  const submit = useSubmitBusinessVerification()
+  const [rcNumber, setRcNumber] = useState('')
+  const [businessName, setBusinessName] = useState('')
+  const [certificate, setCertificate] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const cleaned = rcNumber.replace(/[^0-9A-Za-z]/g, '').toUpperCase()
+  const canSend = /^(RC|BN|IT|LP|LLP)?\d{4,8}$/.test(cleaned) && businessName.trim().length >= 2 && certificate.length === 1
+
+  return (
+    <div className="mt-8 border-t border-line pt-6">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-display font-semibold text-[18px] text-ink">Verify a business</h2>
+        {verifiedAt && <Badge tone="success" icon="buildings">Business verified</Badge>}
+      </div>
+      <p className="mt-1.5 text-[14.5px] leading-[1.5] text-muted">
+        For registered businesses: send your CAC number and certificate. A verified business has the highest withdrawal and transfer limits.
+      </p>
+      {verifiedAt ? null : latest?.status === 'pending' ? (
+        <Alert tone="info" className="mt-4">We are checking {latest.business_name}, sent {formatDateTime(latest.created_at)}.</Alert>
+      ) : (
+        <>
+          {latest?.status === 'rejected' && <Alert className="mt-4">Your last submission was not approved: {latest.note ?? 'please send it again.'}</Alert>}
+          <div className="mt-4 space-y-4">
+            <Input label="CAC registration number" value={rcNumber} onChange={setRcNumber} placeholder="RC1234567" autoCapitalize="none" />
+            <Input label="Registered business name" value={businessName} onChange={setBusinessName} autoCapitalize="words" />
+          </div>
+          <SectionLabel className="mt-5 mb-1.5">Photo of your CAC certificate</SectionLabel>
+          <PhotoPicker bucket="verification-documents" value={certificate} onChange={setCertificate} onError={setError} max={1} />
+          {error && <Alert className="mt-4">{error}</Alert>}
+          <Button className="mt-5 w-full" disabled={!canSend} loading={submit.isPending} onClick={async () => {
+            setError(null)
+            try { await submit.mutateAsync({ rcNumber: cleaned, businessName: businessName.trim(), documentPath: certificate[0] }) }
+            catch (err) { setError(friendlyError(err)) }
+          }}>Send business for checking</Button>
+        </>
+      )}
+    </div>
   )
 }
 

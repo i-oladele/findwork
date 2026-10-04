@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { keys } from './keys'
-import type { Rfq, RfqQuote } from '../database.types'
+import type { RfqItem, Rfq, RfqQuote } from '../database.types'
 
 /**
  * 'mine': RFQs the signed-in user posted. 'open': other people's RFQs still
@@ -63,7 +63,7 @@ export function usePostRfq() {
 }
 
 export type RfqQuoteWithSupplier = RfqQuote & {
-  supplier: { id: string; full_name: string; avatar_url: string | null } | null
+  supplier: { id: string; full_name: string; avatar_url: string | null; verification_tier: number; trust_score: number } | null
 }
 
 /** The buyer sees every quote; a supplier sees only their own (RLS). */
@@ -74,7 +74,7 @@ export function useRfqQuotes(rfqId: string | undefined) {
     queryFn: async (): Promise<RfqQuoteWithSupplier[]> => {
       const { data, error } = await supabase
         .from('rfq_quotes')
-        .select('*, supplier:profiles!rfq_quotes_supplier_id_fkey(id, full_name, avatar_url)')
+        .select('*, supplier:profiles!rfq_quotes_supplier_id_fkey(id, full_name, avatar_url, verification_tier, trust_score)')
         .eq('rfq_id', rfqId!)
         .order('price')
       if (error) throw error
@@ -104,12 +104,15 @@ export function useAcceptRfqQuote() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async (quoteId: string) => {
-      const { error } = await supabase.rpc('accept_rfq_quote', { p_quote_id: quoteId })
+    mutationFn: async (quoteId: string): Promise<string> => {
+      const { data, error } = await supabase.rpc('accept_rfq_quote', { p_quote_id: quoteId })
       if (error) throw error
+      return data
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.rfqs.all })
+      qc.invalidateQueries({ queryKey: keys.procurement.all })
+      qc.invalidateQueries({ queryKey: keys.wallet.all })
     },
   })
 }
@@ -124,6 +127,39 @@ export function useCloseRfq() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.rfqs.all })
+    },
+  })
+}
+
+export type RfqLine = { description: string; quantity: number; unit: string }
+
+/** Posts a request, optionally for an organisation, with the lines of a bulk order. */
+export function usePostBulkRfq() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      organizationId: string | null; title: string; description: string; deadline: string | null
+      budgetMax: number | null; minSupplierTier: 0 | 2 | 3; items: RfqLine[]
+    }): Promise<string> => {
+      const { data, error } = await supabase.rpc('post_rfq', {
+        p_organization_id: input.organizationId, p_title: input.title, p_description: input.description, p_deadline: input.deadline,
+        p_budget_max: input.budgetMax, p_min_supplier_tier: input.minSupplierTier, p_items: input.items,
+      })
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.rfqs.all }),
+  })
+}
+
+export function useRfqItems(rfqId: string | undefined) {
+  return useQuery({
+    queryKey: keys.rfqs.items(rfqId ?? ''),
+    enabled: Boolean(rfqId),
+    queryFn: async (): Promise<RfqItem[]> => {
+      const { data, error } = await supabase.from('rfq_items').select('*').eq('rfq_id', rfqId!).order('position')
+      if (error) throw error
+      return data
     },
   })
 }

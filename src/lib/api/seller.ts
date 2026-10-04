@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { keys } from './keys'
-import type { Product } from '../database.types'
+import type { Coupon, Product } from '../database.types'
 import type { OrderWithItems } from './commerce'
 
 /**
@@ -121,5 +121,57 @@ export function useDispatchOrder() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.seller.orders() })
     },
+  })
+}
+
+export type VariantInput = { id?: string; name: string; price: number; stock: number | null }
+
+/** Replaces a product's options with the list given; options left out are removed. */
+export function useSaveProductVariants() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ productId, variants }: { productId: string; variants: VariantInput[] }) => {
+      const { error } = await supabase.rpc('save_product_variants', { p_product_id: productId, p_variants: variants })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.seller.products() })
+      qc.invalidateQueries({ queryKey: keys.commerce.products() })
+    },
+  })
+}
+
+/** The seller's own coupons, or FindWork's for finance staff. */
+export function useCoupons(platform: boolean) {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: keys.commerce.coupons(platform),
+    enabled: Boolean(user),
+    queryFn: async (): Promise<Coupon[]> => {
+      const base = supabase.from('coupons').select('*')
+      const { data, error } = await (platform ? base.is('seller_id', null) : base.eq('seller_id', user!.id)).order('created_at', { ascending: false })
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export type CouponInput = {
+  id?: string; code: string; kind: 'percent' | 'fixed'; value: number; minSpend: number; maxDiscount: number | null
+  endsAt: string | null; usageLimit: number | null; perCustomer: number; active: boolean; platform: boolean
+}
+
+export function useSaveCoupon() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: CouponInput) => {
+      const { error } = await supabase.rpc('save_coupon', {
+        p_id: input.id ?? null, p_code: input.code, p_kind: input.kind, p_value: input.value, p_min_spend: input.minSpend,
+        p_max_discount: input.maxDiscount, p_ends_at: input.endsAt, p_usage_limit: input.usageLimit,
+        p_per_customer_limit: input.perCustomer, p_active: input.active, p_platform: input.platform,
+      })
+      if (error) throw error
+    },
+    onSuccess: (_d, input) => qc.invalidateQueries({ queryKey: keys.commerce.coupons(input.platform) }),
   })
 }

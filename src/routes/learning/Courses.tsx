@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
 import { Chip } from '../../components/ui/Chip'
@@ -13,10 +13,12 @@ const TABS = ['Courses', 'Internships'] as const
 
 export function Courses() {
   const [tab, setTab] = useState<(typeof TABS)[number]>('Courses')
+  const navigate = useNavigate()
   const courses = useCourses()
   const { data: enrollments } = useEnrollments()
   const enrolled = new Set((enrollments ?? []).map((e) => e.course_id))
-  const filtered = courses.data?.filter((c) => (tab === 'Courses' ? c.kind === 'course' : c.kind === 'internship'))
+  // Internships have their own listings and applications now.
+  const filtered = courses.data?.filter((c) => c.kind === 'course')
 
   return (
     <Screen bottomNav="customer">
@@ -34,7 +36,7 @@ export function Courses() {
           {TABS.map((t) => (
             <button
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() => (t === 'Internships' ? navigate('/internships') : setTab(t))}
               className={`flex-1 h-10 rounded-md text-[14.5px] ${tab === t ? 'bg-white font-semibold text-ink' : 'font-medium text-muted'}`}
             >
               {t}

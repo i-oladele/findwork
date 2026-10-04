@@ -27,11 +27,38 @@ export function useDispute(id: string | undefined) {
   return useQuery({
     queryKey: keys.disputes.detail(id ?? ''),
     enabled: Boolean(id),
+    refetchInterval: (query) => query.state.data?.status === 'open' ? 15_000 : false,
     queryFn: async (): Promise<Dispute | null> => {
       const { data, error } = await supabase.from('disputes').select('*').eq('id', id!).maybeSingle()
       if (error) throw error
       return data
     },
+  })
+}
+
+export function useDisputeResponses(disputeId: string) {
+  return useQuery({
+    queryKey: keys.disputes.responses(disputeId),
+    refetchInterval: 15_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dispute_responses').select('*').eq('dispute_id', disputeId).order('created_at').order('id')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export function useRespondToDispute() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; disputeId: string; body: string; evidencePaths: string[] }) => {
+      const { data, error } = await supabase.rpc('respond_to_dispute', {
+        p_id: input.id, p_dispute_id: input.disputeId, p_body: input.body, p_evidence_paths: input.evidencePaths,
+      })
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: keys.disputes.all }); qc.invalidateQueries({ queryKey: keys.admin.all }) },
   })
 }
 

@@ -25,6 +25,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: PRD traceability
+        run: npm run prd:check
+
       - name: Typecheck
         run: npm run typecheck
 

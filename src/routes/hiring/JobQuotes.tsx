@@ -1,3 +1,4 @@
+import { explainMatch, useInviteProvider, useJobMatches } from '../../lib/api/matching'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
@@ -8,6 +9,7 @@ import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
 import { StarRating } from '../../components/ui/StarRating'
 import { SlotPicker } from '../../components/ui/SlotPicker'
+import { QuoteHistory } from '../../components/ui/QuoteHistory'
 import { PlaceholderImage } from '../../components/ui/PlaceholderImage'
 import { QueryState } from '../../components/system/QueryState'
 import { EmptyState, FullScreenLoader } from '../../components/system/States'
@@ -101,8 +103,14 @@ export function JobQuotes() {
                   </div>
                 </div>
                 {q.message && <p className="mt-3 text-[14.5px] leading-[1.5] text-text-soft">“{q.message}”</p>}
+                {q.milestones && q.milestones.length > 0 && (
+                  <div className="mt-3 bg-cream rounded-xl p-3 text-[13.5px] text-text-soft">
+                    <div className="font-semibold text-ink">Paid in {q.milestones.length} stages, released as each is done</div>
+                    <ol className="mt-1.5 space-y-1">{q.milestones.map((m, i) => <li key={i} className="flex justify-between gap-3"><span className="truncate">{i + 1}. {m.title}</span><span>{formatNaira(m.amount)}</span></li>)}</ol>
+                  </div>
+                )}
                 <div className="flex gap-2.5 mt-3.5">
-                  {j.status === 'open' ? (
+                  {j.status === 'open' && q.status === 'sent' ? (
                     <button
                       onClick={() => setAccepting(q)}
                       className="flex-1 flex items-center justify-center h-[46px] bg-brand text-white rounded-lg text-[15px] font-semibold"
@@ -114,7 +122,7 @@ export function JobQuotes() {
                       <Badge tone="success" icon="check-circle">Accepted</Badge>
                     </span>
                   ) : (
-                    <span className="flex-1" />
+                    <span className="flex-1 text-sm text-muted">{q.status === 'withdrawn' ? 'Withdrawn by provider' : 'Not accepted'}</span>
                   )}
                   <Link
                     to={`/chat/with/${q.provider_id}`}
@@ -124,10 +132,13 @@ export function JobQuotes() {
                     <i className="ph ph-chat-circle-dots text-[19px]" />
                   </Link>
                 </div>
+                <QuoteHistory quoteId={q.id} />
               </Card>
             ))
           }
         </QueryState>
+
+        {j.status === 'open' && <Matches jobId={j.id} />}
 
         {j.status === 'open' && (
           <button
@@ -160,7 +171,7 @@ function AcceptQuote({ quote, jobTitle, onBack }: { quote: QuoteWithProvider; jo
     if (!at) return
     setError(null)
     try {
-      const bookingId = await accept.mutateAsync({ quoteId: quote.id, startAt: at })
+      const bookingId = await accept.mutateAsync({ quoteId: quote.id, startAt: at, revision: quote.revision })
       navigate(`/bookings/${bookingId}/confirmed`, { replace: true })
     } catch (err) {
       setError(friendlyError(err))
@@ -209,5 +220,37 @@ function AcceptQuote({ quote, jobTitle, onBack }: { quote: QuoteWithProvider; jo
         )}
       </div>
     </Screen>
+  )
+}
+
+/** Providers who fit the job and have not quoted yet, with why, and a way to invite them. */
+function Matches({ jobId }: { jobId: string }) {
+  const matches = useJobMatches(jobId, true)
+  const invite = useInviteProvider()
+  const [error, setError] = useState<string | null>(null)
+  const rows = (matches.data ?? []).filter((m) => !m.quoted).slice(0, 6)
+  if (rows.length === 0) return null
+  return (
+    <>
+      <div className="font-display font-bold text-[17px] text-ink mt-6">Providers who fit this job</div>
+      <p className="text-[13px] leading-[1.45] text-muted-2 mt-1">Scored on trade, distance, your budget, availability and reviews. Invite the ones you like to quote.</p>
+      {error && <Alert className="mt-3">{error}</Alert>}
+      {rows.map((m) => (
+        <div key={m.id} className="bg-white border border-line rounded-2xl p-4 mt-3">
+          <div className="flex items-center justify-between gap-2">
+            <Link to={`/provider/${m.id}`} className="font-display font-semibold text-[15.5px] text-ink truncate">{m.business_name}</Link>
+            <Badge tone={m.match.score >= 60 ? 'success' : 'neutral'}>{m.match.score}% fit</Badge>
+          </div>
+          <div className="text-[13px] text-muted-2 mt-1">{explainMatch(m.match)}</div>
+          <button
+            disabled={m.invited || invite.isPending}
+            className="min-h-11 mt-1 text-[14px] font-semibold text-brand disabled:text-muted"
+            onClick={() => { setError(null); invite.mutate({ jobId, providerId: m.id }, { onError: (e) => setError(friendlyError(e)) }) }}
+          >
+            {m.invited ? 'Invited' : 'Invite to quote'}
+          </button>
+        </div>
+      ))}
+    </>
   )
 }

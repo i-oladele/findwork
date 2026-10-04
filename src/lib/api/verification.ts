@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { keys } from './keys'
-import type { Verification, VerificationIdType } from '../database.types'
+import type { BusinessVerification, Verification, VerificationIdType } from '../database.types'
 
 /**
  * Verifying an account: the person sends an ID and a selfie, and the
@@ -53,5 +53,33 @@ export function useSubmitVerification() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.verification.mine() })
     },
+  })
+}
+
+/** Their most recent business (CAC) submission, or null. */
+export function useMyBusinessVerification() {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: keys.verification.business(),
+    enabled: Boolean(user),
+    queryFn: async (): Promise<BusinessVerification | null> => {
+      const { data, error } = await supabase.from('business_verifications').select('*').eq('profile_id', user!.id)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export function useSubmitBusinessVerification() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { rcNumber: string; businessName: string; documentPath: string }) => {
+      const { error } = await supabase.rpc('submit_business_verification', {
+        p_rc_number: input.rcNumber, p_business_name: input.businessName, p_document_path: input.documentPath,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.verification.business() }),
   })
 }

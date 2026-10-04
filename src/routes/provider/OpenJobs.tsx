@@ -1,3 +1,4 @@
+import { explainMatch, useRecommendedJobs } from '../../lib/api/matching'
 import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
 import { Card } from '../../components/ui/Card'
@@ -12,15 +13,17 @@ export function OpenJobs() {
 
 function JobList() {
   const jobs = useOpenJobs()
+  const { data: recommended } = useRecommendedJobs()
+  const fit = new Map((recommended ?? []).map((j) => [j.id, j]))
   const { data: sent } = useMySentQuotes()
-  const quoted = new Set((sent ?? []).map((q) => q.job_id))
+  const quoted = new Set((sent ?? []).filter((q) => q.status !== 'withdrawn').map((q) => q.job_id))
 
   return (
     <Screen bottomNav="provider">
       <StatusBar />
       <div className="px-[22px] pt-2.5 pb-6">
         <h2 className="font-display font-bold text-[28px] tracking-[-0.03em] text-ink">Open jobs</h2>
-        <p className="text-[13.5px] text-muted mt-1.5">Jobs customers have posted. Send a quote; if they accept, it is booked and paid into escrow.</p>
+        <p className="text-[13.5px] text-muted mt-1.5">Jobs customers have posted, the best fit for you first. Send a quote; if they accept, it is booked and paid into escrow.</p>
 
         <QueryState
           query={jobs}
@@ -28,7 +31,7 @@ function JobList() {
           empty={{ icon: 'ph-briefcase', title: 'No open jobs right now', body: 'New jobs appear here as customers post them.' }}
         >
           {(list) =>
-            list.map((job) => (
+            [...list].sort((a, b) => (fit.get(b.id)?.match.score ?? -1) - (fit.get(a.id)?.match.score ?? -1)).map((job) => (
               <Card key={job.id} to={`/provider/jobs/${job.id}/quote`} className="p-4 mt-4">
                 <div className="flex items-start justify-between gap-3">
                   <span className="font-display font-semibold text-[16.5px] leading-[1.25] text-ink">{job.title}</span>
@@ -36,6 +39,14 @@ function JobList() {
                 </div>
                 <p className="mt-2 text-sm leading-[1.5] text-muted line-clamp-3">{job.description}</p>
                 <div className="flex flex-wrap gap-1.5 mt-3">
+                  {fit.get(job.id)?.invited && (
+                    <span className="bg-success-bg text-success-text rounded-full px-2.5 py-1 text-[11.5px] font-bold">Invited to quote</span>
+                  )}
+                  {(fit.get(job.id)?.match.score ?? 0) >= 50 && (
+                    <span className="bg-cream rounded-full px-2.5 py-1 text-[11.5px] font-semibold text-text-soft" title={explainMatch(fit.get(job.id)!.match)}>
+                      {fit.get(job.id)!.match.score}% fit · {explainMatch(fit.get(job.id)!.match)}
+                    </span>
+                  )}
                   {job.needed_by && (
                     <span className="inline-flex items-center gap-1.5 bg-cream rounded-full px-2.5 py-1 text-[11.5px] font-semibold text-text-soft">
                       <i className="ph ph-calendar text-xs" />

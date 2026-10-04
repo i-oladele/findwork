@@ -1,43 +1,51 @@
 import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { PageHeader } from '../../components/chrome/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
 import { SectionLabel } from '../../components/ui/SectionLabel'
-import { FullScreenLoader } from '../../components/system/States'
-import { DELIVERY_FEE, usePlaceOrder, useCheckoutQuote, useProfile, useUpdateProfile, useWalletSummary } from '../../lib/api'
-import { useCart } from '../../store/cart'
+import { ErrorState, FullScreenLoader } from '../../components/system/States'
+import { COUPON_ERRORS, DELIVERY_FEE, useAddresses, usePlaceOrder, useCheckoutQuote, useProfile, useUpdateProfile, useWalletSummary } from '../../lib/api'
+import { cartItems, useCart } from '../../store/cart'
 import { friendlyError } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
-import { formatPhone } from '../../lib/phone'
-import type { DeliverySpeed, Profile } from '../../lib/database.types'
+import { DEFAULT_COUNTRY, formatPhone, fromInternational, isPhoneNumber, toE164 } from '../../lib/phone'
+import type { DeliverySpeed, Profile, SavedAddress } from '../../lib/database.types'
 
 export function Checkout() {
-  const { data: profile, isLoading } = useProfile()
+  const profile = useProfile()
+  const addresses = useAddresses()
   const lines = useCart((s) => s.lines)
 
   if (lines.length === 0) return <Navigate to="/cart" replace />
-  if (isLoading || !profile) return <FullScreenLoader />
-  return <CheckoutForm profile={profile} />
+  if (profile.isLoading || addresses.isLoading) return <FullScreenLoader />
+  if (profile.isError || !profile.data) return <Screen><PageHeader title="Checkout" back="/cart" /><ErrorState message="We could not load your profile." onRetry={() => void profile.refetch()} /></Screen>
+  return <CheckoutForm profile={profile.data} initialAddresses={addresses.data ?? []} />
 }
 
-function CheckoutForm({ profile }: { profile: Profile }) {
+function CheckoutForm({ profile, initialAddresses }: { profile: Profile; initialAddresses: SavedAddress[] }) {
   const navigate = useNavigate()
   const lines = useCart((s) => s.lines)
   const clear = useCart((s) => s.clear)
   const { data: wallet, isFetching: walletLoading } = useWalletSummary()
   const place = usePlaceOrder()
   const updateProfile = useUpdateProfile()
+  const addresses = useAddresses()
+  const defaultAddress = initialAddresses.find((a) => a.is_default)
 
   const [speed, setSpeed] = useState<DeliverySpeed>('standard')
   // A pinned location is a good first guess at where to deliver.
-  const [address, setAddress] = useState(profile.address ?? profile.location_label ?? '')
-  const [phone, setPhone] = useState(profile.phone ? formatPhone(profile.phone) : '')
+  const [address, setAddress] = useState(defaultAddress?.address ?? profile.address ?? profile.location_label ?? '')
+  const [phone, setPhone] = useState(formatPhone(defaultAddress?.phone ?? profile.phone ?? ''))
+  const [recipient, setRecipient] = useState(defaultAddress?.recipient ?? profile.full_name)
+  const [selectedAddress, setSelectedAddress] = useState(defaultAddress?.id ?? '')
   const [error, setError] = useState<string | null>(null)
 
-  const items = lines.map((l) => ({ product_id: l.productId, qty: l.qty }))
-  const quote = useCheckoutQuote(items, speed)
+  const [couponInput, setCouponInput] = useState('')
+  const [coupon, setCoupon] = useState('')
+  const items = cartItems(lines)
+  const quote = useCheckoutQuote(items, speed, coupon)
   // Only a settled, current quote is shown or paid: the server charges one
   // delivery fee per seller, which the cart cannot know on its own.
   const priced = quote.data && !quote.isFetching && !quote.isError ? quote.data : null
@@ -46,7 +54,10 @@ function CheckoutForm({ profile }: { profile: Profile }) {
   const balance = wallet?.balance ?? 0
   const shortfall = Math.max(0, total - balance)
   const walletReady = Boolean(wallet) && !walletLoading
-  const canPay = address.trim().length > 5 && shortfall === 0 && priced !== null && walletReady
+  const deliveryPhone = fromInternational(phone) ?? { country: DEFAULT_COUNTRY, number: phone }
+  const phoneValid = isPhoneNumber(deliveryPhone)
+  const couponError = priced?.coupon?.error ? COUPON_ERRORS[priced.coupon.error] : null
+  const canPay = recipient.trim().length > 0 && phoneValid && address.trim().length > 5 && shortfall === 0 && priced !== null && walletReady && !couponError
 
   async function pay() {
     if (!canPay || !priced) return
@@ -55,9 +66,11 @@ function CheckoutForm({ profile }: { profile: Profile }) {
       const orderIds = await place.mutateAsync({
         items,
         deliverySpeed: speed,
-        address: address.trim(),
-        phone: phone.trim(),
+        // Orders retain a delivery snapshot even if this address is edited later.
+        address: `${recipient.trim()}\n${address.trim()}`,
+        phone: toE164(deliveryPhone),
         expectedTotal: priced.total,
+        ...(coupon ? { couponCode: coupon } : {}),
       })
       // Remember the address for next time; a failure here must not undo the order.
       if (address.trim() !== (profile.address ?? '')) {
@@ -79,10 +92,22 @@ function CheckoutForm({ profile }: { profile: Profile }) {
       <div className="px-[22px] pb-6">
         <SectionLabel className="mt-[18px] mb-2.5">Deliver to</SectionLabel>
         <div className="bg-white border-[1.5px] border-line rounded-2xl p-4 space-y-3">
-          <div className="text-[15.5px] font-semibold text-ink">{profile.full_name}</div>
+          <div className="flex items-center justify-between text-sm"><span>Saved addresses</span><Link to="/addresses" className="text-brand underline">Manage</Link></div>
+          {addresses.isError && <Alert>Saved addresses could not be loaded. You can enter one below. <button type="button" className="underline" onClick={() => void addresses.refetch()}>Retry</button></Alert>}
+          {!!addresses.data?.length && <select aria-label="Saved delivery address" value={selectedAddress} className="w-full rounded-lg border border-line p-3 bg-white"
+            onChange={(e) => {
+              setSelectedAddress(e.target.value)
+              const saved = addresses.data?.find((a) => a.id === e.target.value)
+              if (saved) { setAddress(saved.address); setPhone(formatPhone(saved.phone)); setRecipient(saved.recipient) }
+            }}>
+            <option value="">Enter an address</option>
+            {addresses.data.map((a) => <option key={a.id} value={a.id}>{a.label}{a.is_default ? ' (default)' : ''}</option>)}
+          </select>}
+          <input aria-label="Recipient name" value={recipient} maxLength={120} onChange={(e) => { setRecipient(e.target.value); setSelectedAddress('') }} className="w-full bg-cream rounded-lg p-3" />
           <textarea
             value={address}
-            onChange={(e) => setAddress(e.target.value)}
+            onChange={(e) => { setAddress(e.target.value); setSelectedAddress('') }}
+            maxLength={500}
             rows={2}
             placeholder="House number, street, area, and a landmark"
             aria-label="Delivery address"
@@ -90,7 +115,7 @@ function CheckoutForm({ profile }: { profile: Profile }) {
           />
           <input
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => { setPhone(e.target.value); setSelectedAddress('') }}
             inputMode="tel"
             placeholder="Phone number for the rider"
             aria-label="Phone number for the rider"
@@ -116,12 +141,34 @@ function CheckoutForm({ profile }: { profile: Profile }) {
           fee={DELIVERY_FEE['same-day']}
         />
 
+        <SectionLabel className="mt-5 mb-2.5">Coupon</SectionLabel>
+        <form className="flex gap-2.5" onSubmit={(e) => { e.preventDefault(); setCoupon(couponInput.trim().toUpperCase()) }}>
+          <input value={couponInput} onChange={(e) => setCouponInput(e.target.value)} maxLength={20} autoCapitalize="characters" spellCheck={false}
+            placeholder="Enter a code" aria-label="Coupon code"
+            className="flex-1 min-w-0 bg-white border-[1.5px] border-line rounded-lg h-12 px-3.5 text-[15.5px] uppercase text-ink outline-none placeholder:normal-case placeholder:text-muted-2" />
+          {coupon ? (
+            <button type="button" className="px-4 h-12 border border-line rounded-lg text-[14.5px] font-semibold text-muted" onClick={() => { setCoupon(''); setCouponInput('') }}>Remove</button>
+          ) : (
+            <button type="submit" disabled={couponInput.trim().length < 4} className="px-4 h-12 bg-ink text-cream rounded-lg text-[14.5px] font-semibold disabled:opacity-50">Apply</button>
+          )}
+        </form>
+        {couponError && <Alert className="mt-3">{couponError} Remove it to continue.</Alert>}
+        {priced?.coupon && !priced.coupon.error && (
+          <Alert tone="success" className="mt-3">{priced.coupon.code} from {priced.coupon.issuer ?? 'the seller'}: {formatNaira(priced.discount)} off.</Alert>
+        )}
+
         <SectionLabel className="mt-5 mb-2.5">Order summary</SectionLabel>
         <div className="bg-white border border-line rounded-2xl p-[18px]">
           <div className="flex justify-between text-[15px] text-text-soft">
             <span>Items · {itemCount}</span>
             <span className="text-ink">{priced ? formatNaira(priced.items_total) : '…'}</span>
           </div>
+          {priced && priced.discount > 0 && (
+            <div className="flex justify-between text-[15px] text-success-text mt-2.5">
+              <span>Coupon {priced.coupon?.code}</span>
+              <span>−{formatNaira(priced.discount)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-[15px] text-text-soft mt-2.5">
             <span>
               Delivery{priced && ` · ${priced.seller_count} shipment${priced.seller_count === 1 ? '' : 's'}`}
@@ -154,9 +201,10 @@ function CheckoutForm({ profile }: { profile: Profile }) {
           <Button onClick={pay} disabled={!canPay} loading={place.isPending} className="w-full">
             {!priced
               ? quote.isError ? 'Total unavailable' : 'Checking total…'
-              : address.trim().length > 5
-                ? `Pay ${formatNaira(total)} from wallet`
-                : 'Add a delivery address'}
+              : !recipient.trim() ? 'Add a recipient name'
+                : address.trim().length <= 5 ? 'Add a delivery address'
+                  : !phoneValid ? 'Add a valid phone number'
+                    : `Pay ${formatNaira(total)} from wallet`}
           </Button>
         )}
       </div>

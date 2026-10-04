@@ -1,3 +1,6 @@
+import { AreaPicker } from '../../components/ui/AreaPicker'
+import { Chip } from '../../components/ui/Chip'
+import { CATEGORIES } from '../../lib/categories'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
@@ -17,6 +20,8 @@ export function PostJob() {
   const [description, setDescription] = useState('')
   const [budget, setBudget] = useState('')
   const [neededBy, setNeededBy] = useState('')
+  const [category, setCategory] = useState<string | null>(null)
+  const [area, setArea] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const canSubmit = title.trim().length > 3 && description.trim().length > 0 && parseNaira(budget) > 0
@@ -29,6 +34,8 @@ export function PostJob() {
         description: description.trim(),
         budget: parseNaira(budget),
         needed_by: neededBy.trim() || undefined,
+        category,
+        area,
       })
       navigate(`/jobs/${id}`, { replace: true })
     } catch (err) {
@@ -85,6 +92,14 @@ export function PostJob() {
               className="w-full bg-white border-[1.5px] border-line rounded-lg h-[52px] px-3.5 text-[15.5px] text-ink outline-none placeholder:text-muted-2"
             />
           </div>
+        </div>
+
+        <SectionLabel className="mt-4 mb-2">Which trade</SectionLabel>
+        <div className="flex flex-wrap gap-2">
+          {CATEGORIES.map((c) => <Chip key={c.name} active={category === c.name} onClick={() => setCategory(category === c.name ? null : c.name)}>{c.name}</Chip>)}
+        </div>
+        <div className="mt-4">
+          <AreaPicker value={area} onChange={setArea} label="Where" hint="The trade and area let us suggest the providers who fit best." />
         </div>
 
         <Alert tone="info" className="mt-4">

@@ -9,9 +9,11 @@ import { SectionLabel } from '../../components/ui/SectionLabel'
 import { StarRating } from '../../components/ui/StarRating'
 import { ReportButton } from '../../components/ui/ReportButton'
 import { SaveProviderButton } from '../../components/ui/SaveProviderButton'
+import { PortfolioAsset } from '../../components/ui/PortfolioAsset'
+import { QueryState } from '../../components/system/QueryState'
 import { EmptyState, ErrorState, ListSkeleton } from '../../components/system/States'
 import { useAuth } from '../../lib/authContext'
-import { useProfile, useProvider, useProviderPackages, useProviderReviews } from '../../lib/api'
+import { useCertificates, useProfile, useProvider, useProviderPackages, useProviderReviews, usePortfolio } from '../../lib/api'
 import { formatDate, formatNaira } from '../../lib/format'
 import { describeDistance, distanceBetween } from '../../lib/distance'
 
@@ -20,6 +22,8 @@ export function ProviderProfile() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const provider = useProvider(id)
+  const portfolio = usePortfolio(id)
+  const { data: certificates } = useCertificates(id)
   const { data: packages } = useProviderPackages(id)
   const { data: reviews } = useProviderReviews(id)
   const { data: me } = useProfile()
@@ -99,6 +103,7 @@ export function ProviderProfile() {
           ) : (
             <Badge tone="neutral">Not yet verified</Badge>
           )}
+          <Badge tone={p.trust_score >= 60 ? 'success' : 'neutral'}>Trust {p.trust_score}</Badge>
           {p.plan !== 'free' && (
             <Badge tone="warning" icon="medal">
               Pro
@@ -142,6 +147,26 @@ export function ProviderProfile() {
             </div>
           </>
         )}
+
+        {(certificates?.length ?? 0) > 0 && (
+          <>
+            <SectionLabel className="mt-5 mb-2.5">FindWork certificates</SectionLabel>
+            <div className="flex flex-wrap gap-2">
+              {certificates!.map((c) => (
+                <Link key={c.id} to={`/certificate/${c.code}`} className="inline-flex items-center gap-1.5 rounded-full bg-success-bg text-success-text px-3 py-1.5 text-[13px] font-semibold">
+                  <i className="ph-fill ph-certificate" />{c.course_title}
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+
+        <QueryState query={portfolio} errorMessage="We could not load this portfolio." skeletonRows={1}>
+          {(items) => items.length > 0 && <>
+            <SectionLabel className="mt-5 mb-2.5">Portfolio & credentials</SectionLabel>
+            <div className="space-y-3">{items.map((item) => <article key={item.id} className="bg-white border border-line rounded-2xl p-4"><PortfolioAsset item={item} /></article>)}</div>
+          </>}
+        </QueryState>
 
         <SectionLabel className="mt-5 mb-2.5">Services</SectionLabel>
         {livePackages.length === 0 ? (

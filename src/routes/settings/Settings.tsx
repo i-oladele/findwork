@@ -157,16 +157,22 @@ export function Settings() {
 
             <div className="mt-5 bg-white border border-line rounded-2xl overflow-hidden">
               <SettingsLink to="/get-verified" icon="ph-seal-check" label="Verification" />
+              <SettingsLink to="/security" icon="ph-lock-key" label="Sign-in and security" />
               <SettingsLink to="/notifications" icon="ph-bell" label="Notifications" />
+              <SettingsLink to="/preferences" icon="ph-sliders-horizontal" label="Preferences and push" />
               <SettingsLink to="/orders" icon="ph-package" label="My orders" />
+              <SettingsLink to="/addresses" icon="ph-map-pin" label="Delivery addresses" />
+              <SettingsLink to="/rider" icon="ph-moped" label="Deliver with FindWork" />
               <SettingsLink to="/quotes" icon="ph-note-pencil" label="My posted jobs" />
+              <SettingsLink to="/procurement" icon="ph-buildings" label="Procurement and purchase orders" />
               <SettingsLink to="/billing" icon="ph-credit-card" label="Plan and billing" />
               <SettingsLink to="/disputes" icon="ph-scales" label="Disputes" />
               <SettingsLink to="/trust" icon="ph-shield-check" label="Safety and trust" />
+              <SettingsLink to="/meetups" icon="ph-handshake" label="Meet-ups and SOS" />
               <SettingsLink to="/help" icon="ph-lifebuoy" label="Help and support" last />
             </div>
 
-            {profile.is_admin && (
+            {profile.staff_role && (
               <div className="mt-5 bg-white border border-line rounded-2xl overflow-hidden">
                 <SettingsLink to="/admin" icon="ph-user-circle-gear" label="Operations console" last />
               </div>

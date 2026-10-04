@@ -39,12 +39,56 @@ supabase login
 supabase link --project-ref <your-project-ref>
 supabase db push --include-seed         # migrations + demo catalog and accounts
 supabase functions deploy delete-account paystack-initialize paystack-verify
-supabase functions deploy paystack-webhook send-sms --no-verify-jwt
+supabase functions deploy mfa-recover route-estimate assistant
+supabase functions deploy paystack-webhook send-sms send-push --no-verify-jwt
 supabase secrets set PAYSTACK_SECRET_KEY=sk_test_... APP_URL=https://your-app-url
 ```
 
 In the Paystack dashboard, set the webhook URL to
 `https://<project-ref>.supabase.co/functions/v1/paystack-webhook`.
+
+Four things work without any further setup and get better with a key. Each is
+optional, and the app says so on screen rather than failing when one is
+missing:
+
+| What | Without it | To switch it on |
+| --- | --- | --- |
+| Assistant: voice commands beyond the built-in phrases, support answers, chat translation, lesson help, dispute summaries | Common English and Pidgin commands still work on the device; everything else shows a hint | `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...` (`ASSISTANT_MODEL` optionally picks the model) |
+| Routed arrival times for deliveries | A straight-line estimate, labelled as an estimate | `supabase secrets set GOOGLE_MAPS_API_KEY=...` with the Routes API enabled |
+| Push notifications | The in-app inbox only; the push switch is hidden | See below |
+| Second sign-in step (authenticator app) | Not offered | Authentication → Multi-Factor: enable TOTP |
+
+Push takes three steps. Make a key pair with `npx web-push generate-vapid-keys`,
+then:
+
+```bash
+supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... \
+  VAPID_SUBJECT=mailto:you@your-domain PUSH_HOOK_SECRET=<a long random string>
+```
+
+Put the public key in `.env.local` as `VITE_VAPID_PUBLIC_KEY`, and tell the
+database where the function is (SQL editor, once per project):
+
+```sql
+insert into private.settings values
+  ('push_url', 'https://<project-ref>.supabase.co/functions/v1/send-push'),
+  ('push_secret', '<the same PUSH_HOOK_SECRET>');
+```
+
+Two things to confirm on the hosted project after the first push, because a
+plain Postgres cannot prove either:
+
+- **The API gate.** Suspended accounts, and accounts that have a second
+  sign-in step but have not passed it, are refused by a PostgREST pre-request
+  hook. The migration installs it; check with
+  `select rolconfig from pg_roles where rolname = 'authenticator'`, which
+  should list `pgrst.db_pre_request=public.check_request`. If it does not, run
+  `alter role authenticator set pgrst.db_pre_request = 'public.check_request';`
+  then `notify pgrst, 'reload config';`.
+- **Scheduled jobs.** With `pg_cron` enabled (Database → Extensions),
+  `select jobname from cron.job` should list renewals, renewal reminders,
+  order and purchase-order auto-release, and the activity purge. Push needs
+  `pg_net` enabled the same way.
 
 Then regenerate types whenever the schema changes:
 
@@ -113,7 +157,8 @@ src/
   store/cart.ts   The cart — the only state kept on the device
 supabase/
   migrations/     Schema, RLS policies, and business-logic RPCs
-  functions/      Edge Functions (Deno): account deletion, Paystack
+  functions/      Edge Functions (Deno): account deletion, Paystack, SMS codes,
+                  push, sign-in recovery, route estimates, the assistant
   checks/         SQL suite that exercises every money rule as real users
 ```
 
@@ -154,11 +199,19 @@ Escrow is refunded in full when a provider declines, when either side cancels
 before the start time, or when an admin resolves a dispute that way. Opening a
 dispute freezes the money until a human settles it in `/admin`.
 
-## The 11 feature areas
+## Feature areas
 
-Identity and onboarding · hiring and bookings · commerce · wallet and escrow ·
-chat and trust · provider tools · B2B wholesale RFQs · local classifieds ·
-learning and certification · dispute resolution · subscription billing.
+Identity, onboarding and account security · hiring, bookings and milestone
+payments · commerce with options, coupons and seller stores · wallet, escrow
+and transfers · chat, trust score and safe meetups · provider tools · delivery
+riders and tracking · wholesale RFQs, purchase orders and invoices · local
+classifieds · courses, quizzes, certificates and internships · social feed and
+live selling · disputes · subscription billing · staff console with roles,
+risk alerts and analytics · the assistant.
+
+[docs/requirements/prd-completion.md](docs/requirements/prd-completion.md)
+tracks each PRD requirement against the code, and says plainly which ones stop
+at an account that has not been opened yet.
 
 ## Commands
 
@@ -169,6 +222,9 @@ npm run typecheck   # types only
 npm run lint        # oxlint
 npm test            # vitest
 npm run test:watch
+
+npm run prd:report  # rebuild the PRD checklist from prd-status.json
+npm run prd:check   # fail if the checklist is out of date (CI runs this)
 
 # Business rules, against any seeded database (never production):
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/checks/business_rules.sql
@@ -195,8 +251,10 @@ dashboard.
 dispatched and delivered in `/admin`, and goods listed by providers, who send
 their own orders from the provider dashboard. A provider's money is held in
 escrow until the customer confirms the order arrived, or for a week after
-dispatch. There is no rider tracking, so the order screen shows status rather
-than a map.
+dispatch. Riders apply in the app, are approved by staff, and take deliveries
+from a queue; the customer follows the rider on a map and hands over a code on
+arrival. Arrival times are straight-line estimates until a Google Maps key is
+set, and nothing reads live traffic.
 
 **Maps.** Address search and the map on "Add your area" use free
 OpenStreetMap services (Photon for search, openstreetmap.org for map tiles),
@@ -205,19 +263,28 @@ a paid provider: search lives in `src/lib/geocoding.ts`, tiles in
 `src/components/ui/LocationMap.tsx`.
 
 **Native.** There is no mobile app yet — this is a mobile-shaped web app that
-handles phone safe areas, so it behaves correctly in a phone browser. A store
-build needs Capacitor, push notifications, camera access for KYC, biometric
-sign-in, an app icon and splash screens, and a web manifest if you want
-"add to home screen" to work properly first.
+handles phone safe areas, so it behaves correctly in a phone browser, and can
+be added to a phone's Home Screen. A store build needs Capacitor, native push,
+camera access for KYC, biometric sign-in, an app icon and splash screens.
 
 **Store review.** Privacy policy and terms are still placeholders and must be
 written before submission. Selling subscription plans on iOS outside Apple's
 in-app purchase is the most common cause of marketplace-app rejection and
 needs a decision before an iOS build.
 
-**Product gaps.** Course lessons have no written content yet. There is no
-trust score formula, so profiles show the underlying signals instead of a
-number. Every plan now advertises only what it actually does — if you add a
+**Rules, not models.** Job matching, recommendations, the trust score and the
+fraud alerts are fixed rules with weights and thresholds chosen while
+building. They explain themselves on screen, and none of them has seen real
+activity, so expect to tune them. The assistant is the only part that calls a
+model, and it has not yet been run against the live API.
+
+**Live selling.** A seller can schedule a stream, pin products, chat and take
+orders, but FindWork does not carry video: the stream plays from a link the
+seller pastes in. Hosting video means choosing a streaming provider.
+
+**Product gaps.** Course lessons have no written content yet; staff can now
+write lessons and quizzes in `/admin/courses`. Every plan now advertises only
+what it actually does — if you add a
 feature to the pricing, add it to `subscription_plans.features` and make it
 real, because the fee test checks the advertised percentage against the
 commission actually charged.

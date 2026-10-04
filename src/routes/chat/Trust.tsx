@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { PageHeader } from '../../components/chrome/PageHeader'
 import { SectionLabel } from '../../components/ui/SectionLabel'
-import { useMyProviderProfile } from '../../lib/api'
+import { TIER_LABEL, useMyProviderProfile, useTrust } from '../../lib/api'
+import { useAuth } from '../../lib/authContext'
 
 const PROTECTIONS = [
   {
@@ -32,18 +33,50 @@ const PROTECTIONS = [
   },
 ]
 
+const PARTS = [
+  { key: 'verification', label: 'Verification', max: 30, hint: 'Confirm your contact, then your ID, then your business.' },
+  { key: 'reputation', label: 'Reputation', max: 30, hint: 'Reviews from customers and jobs completed.' },
+  { key: 'history', label: 'History', max: 20, hint: 'Time on FindWork and bookings or orders completed.' },
+  { key: 'conduct', label: 'Conduct', max: 20, hint: 'Starts full. Lost disputes, upheld reports and open risk flags reduce it.' },
+] as const
+
 /**
- * How FindWork keeps people safe, plus — for providers — the signals that
- * customers see. These are the real stored facts; there is no composite
- * "trust score" formula yet, so none is shown.
+ * How FindWork keeps people safe, your own trust score and what it is made
+ * of, and — for providers — the signals customers see.
  */
 export function Trust() {
+  const { user } = useAuth()
   const { data: provider } = useMyProviderProfile()
+  const { data: trust } = useTrust(user?.id)
 
   return (
     <Screen>
       <PageHeader title="Safety and trust" back="/settings" />
       <div className="px-[22px] pb-8">
+        {trust && (
+          <div className="mt-4 bg-ink rounded-2xl p-[18px]">
+            <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2">Your trust score</div>
+            <div className="flex items-end justify-between mt-1">
+              <div className="font-display font-bold text-[40px] leading-none text-cream">{trust.score}<span className="text-[18px] text-muted-3"> / 100</span></div>
+              <div className="text-[13.5px] text-muted-3">{TIER_LABEL[Math.min(3, trust.tier)]}</div>
+            </div>
+            <div className="mt-4 space-y-3">
+              {PARTS.map((part) => {
+                const value = trust[part.key] ?? 0
+                return (
+                  <div key={part.key}>
+                    <div className="flex justify-between text-[13.5px] text-cream"><span>{part.label}</span><span>{value} / {part.max}</span></div>
+                    <div className="mt-1 h-1.5 rounded-full bg-ink-line overflow-hidden" role="progressbar" aria-label={part.label} aria-valuenow={value} aria-valuemin={0} aria-valuemax={part.max}>
+                      <div className="h-full bg-brand" style={{ width: `${(value / part.max) * 100}%` }} />
+                    </div>
+                    <p className="mt-1 text-[12.5px] leading-[1.4] text-muted-3">{part.hint}</p>
+                  </div>
+                )
+              })}
+            </div>
+            {trust.tier < 3 && <Link to="/get-verified" className="inline-block mt-3 min-h-11 pt-2.5 text-[14px] font-semibold text-brand">Raise your verification tier</Link>}
+          </div>
+        )}
         {provider && (
           <>
             <SectionLabel className="mt-5 mb-2.5">What customers see about you</SectionLabel>

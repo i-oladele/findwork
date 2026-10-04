@@ -1,3 +1,4 @@
+import { BookingMilestones } from '../../components/ui/BookingMilestones'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
@@ -131,7 +132,7 @@ function BookingCard({ booking, disputed, reviewed }: { booking: BookingWithCust
             disabled={complete.isPending}
             className="flex-1 flex items-center justify-center h-11 bg-success text-white rounded-lg text-[14.5px] font-semibold disabled:opacity-50"
           >
-            Job done — release payment
+            {booking.released_amount > 0 ? 'All done — release the rest' : 'Job done — release payment'}
           </button>
         )}
         {booking.status === 'pending' && (
@@ -155,6 +156,8 @@ function BookingCard({ booking, disputed, reviewed }: { booking: BookingWithCust
           <i className="ph ph-chat-circle-dots text-[19px]" />
         </Link>
       </div>
+
+      <BookingMilestones bookingId={booking.id} canRelease={booking.status === 'active' && !disputed} />
 
       {(booking.status === 'pending' || booking.status === 'active') && (
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-line-soft">

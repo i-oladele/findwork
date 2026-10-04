@@ -1,10 +1,12 @@
+import { VoiceAssistant } from '../../components/ui/VoiceAssistant'
+import { useRecommendedProviders } from '../../lib/api/matching'
 import { Link } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
 import { ProviderCard } from '../../components/ui/ProviderCard'
 import { QueryState } from '../../components/system/QueryState'
 import { useMyProviderProfile, useMyVerification, useProfile, useProviders, useUnreadCount } from '../../lib/api'
-import { useIsAdmin } from '../../lib/api/admin'
+import { useStaff } from '../../lib/api/admin'
 import { firstName } from '../../lib/format'
 import { distanceBetween } from '../../lib/distance'
 
@@ -18,9 +20,10 @@ function greeting() {
 export function Home() {
   const { data: profile } = useProfile()
   const { data: myProvider } = useMyProviderProfile()
-  const isAdmin = useIsAdmin()
+  const isAdmin = Boolean(useStaff().role)
   const unread = useUnreadCount()
   const providers = useProviders({ limit: 3 })
+  const { data: suggested } = useRecommendedProviders()
 
   return (
     <Screen bottomNav="customer">
@@ -96,6 +99,21 @@ export function Home() {
           </Link>
         </div>
 
+        {(suggested?.length ?? 0) > 0 && (
+          <>
+            <div className="font-display font-bold text-[19px] text-ink mt-[26px]">Suggested for you</div>
+            <div className="flex gap-3 overflow-x-auto -mx-[22px] px-[22px] pt-3 pb-1">
+              {suggested!.slice(0, 8).map((p) => (
+                <Link key={p.id} to={`/provider/${p.id}`} className="flex-none w-[168px] bg-white border border-line rounded-2xl p-3.5">
+                  <div className="font-display font-semibold text-[14.5px] text-ink truncate">{p.business_name}</div>
+                  <div className="text-[12.5px] text-muted-2 mt-0.5 truncate">{p.category}{p.area ? ` · ${p.area}` : ''}</div>
+                  <div className="text-[12px] font-semibold text-brand-hover mt-2">{p.reason}</div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+
         <div className="flex items-center justify-between mt-[26px]">
           <div className="font-display font-bold text-[19px] text-ink">Top rated pros</div>
           <Link to="/search" className="text-sm font-semibold text-brand-hover">
@@ -129,7 +147,14 @@ export function Home() {
             <div className="font-display font-semibold text-[13.5px] text-ink mt-2.5 leading-[1.2]">Bulk orders</div>
           </Link>
         </div>
-        <Link to="/quotes" className="flex items-center justify-between bg-white border border-line rounded-2xl px-4 py-3.5 mt-3">
+        <Link to="/feed" className="flex items-center justify-between bg-white border border-line rounded-2xl px-4 py-3.5 mt-3">
+          <span className="flex items-center gap-2.5 text-[15px] font-semibold text-ink">
+            <i className="ph ph-film-reel text-lg text-brand" />
+            Stories, reels and live selling
+          </span>
+          <i className="ph-bold ph-caret-right text-sm text-muted-3" />
+        </Link>
+        <Link to="/quotes" className="flex items-center justify-between bg-white border border-line rounded-2xl px-4 py-3.5 mt-2.5">
           <span className="flex items-center gap-2.5 text-[15px] font-semibold text-ink">
             <i className="ph ph-note-pencil text-lg text-brand" />
             My posted jobs and quotes
@@ -144,6 +169,7 @@ export function Home() {
           <i className="ph-bold ph-caret-right text-sm text-muted-3" />
         </Link>
       </div>
+      <VoiceAssistant />
     </Screen>
   )
 }

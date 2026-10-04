@@ -155,3 +155,29 @@ export function useRequestWithdrawal() {
     },
   })
 }
+
+export type TransferRecipient = { id: string; name: string; verification_tier: number }
+
+/** Looks up one account by its exact phone number or email; null when nobody matches. */
+export async function findTransferRecipient(contact: string): Promise<TransferRecipient | null> {
+  const { data, error } = await supabase.rpc('find_transfer_recipient', { p_contact: contact })
+  if (error) throw error
+  return (data as unknown as TransferRecipient | null) ?? null
+}
+
+/** Sends money to another wallet. `id` is made once per attempt, so a retry cannot send twice. */
+export function useTransferFunds() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; recipientId: string; amount: number; note: string }) => {
+      const { error } = await supabase.rpc('transfer_funds', {
+        p_id: input.id, p_recipient_id: input.recipientId, p_amount: input.amount, p_note: input.note.trim() || null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.wallet.all })
+      qc.invalidateQueries({ queryKey: keys.trust.limits() })
+    },
+  })
+}

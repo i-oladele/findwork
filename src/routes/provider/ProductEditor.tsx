@@ -1,3 +1,4 @@
+import { ProductOptions } from './ProductOptions'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
@@ -128,6 +129,9 @@ function Form({ existing }: { existing: Product | null }) {
         <Button onClick={submit} disabled={!valid} loading={save.isPending} className="w-full">
           {existing ? 'Save changes' : 'Add product'}
         </Button>
+        {existing ? <ProductOptions productId={existing.id} /> : (
+          <p className="text-center text-[13px] text-muted-2">Selling it in sizes or colours? Add the product first, then open it again to add options.</p>
+        )}
         {existing && (
           <p className="text-center text-[13px] text-muted-2">
             Sold products keep their order history, so they are hidden rather than deleted.

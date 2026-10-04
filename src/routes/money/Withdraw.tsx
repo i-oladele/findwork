@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { PageHeader } from '../../components/chrome/PageHeader'
 import { Button } from '../../components/ui/Button'
@@ -11,6 +12,7 @@ import {
   usePayoutAccount,
   useRequestWithdrawal,
   useSavePayoutAccount,
+  useMyLimits,
   useWalletSummary,
   useWithdrawals,
 } from '../../lib/api'
@@ -97,9 +99,11 @@ function WithdrawForm({ account, onChangeAccount }: { account: PayoutAccount; on
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState<number | null>(null)
 
+  const { data: limits } = useMyLimits()
   const balance = wallet?.balance ?? 0
   const amount = parseNaira(raw)
-  const valid = amount >= MIN && amount <= balance
+  const left = limits ? Math.max(0, limits.daily_withdrawal - limits.withdrawn_today) : null
+  const valid = amount >= MIN && amount <= balance && (left === null || amount <= left)
 
   async function submit() {
     if (!window.confirm(`Send ${formatNaira(amount)} to ${account.bank_name} ···${account.account_number.slice(-4)}?`)) return
@@ -158,7 +162,14 @@ function WithdrawForm({ account, onChangeAccount }: { account: PayoutAccount; on
           {formatNaira(sent)} is on its way. You will get a notification when it has been sent.
         </Alert>
       )}
+      {limits && (
+        <p className="mt-1.5 text-[13px] text-muted-2">
+          {limits.label}: up to {formatNaira(limits.daily_withdrawal)} a day, {formatNaira(left ?? 0)} left today.
+          {limits.tier < 3 && <> <Link to="/get-verified" className="font-semibold text-brand-hover">Raise your limit</Link></>}
+        </p>
+      )}
       {amount > balance && <Alert className="mt-4">That is more than your balance.</Alert>}
+      {left !== null && amount <= balance && amount > left && <Alert className="mt-4">That is more than you can withdraw today.</Alert>}
       {error && <Alert className="mt-4">{error}</Alert>}
 
       <Button onClick={submit} disabled={!valid} loading={request.isPending} className="mt-5 w-full">

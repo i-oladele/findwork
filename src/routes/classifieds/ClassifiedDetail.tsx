@@ -1,3 +1,4 @@
+import { TrustBadge } from '../../components/ui/TrustBadge'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
@@ -93,7 +94,7 @@ export function ClassifiedDetail() {
           <PlaceholderImage shape="circle" src={ad.seller?.avatar_url ?? undefined} className="w-11 h-11 flex-none" />
           <div className="flex-1 min-w-0">
             <div className="text-[15px] font-semibold text-ink truncate">{isMine ? 'You' : ad.seller?.full_name || 'FindWork user'}</div>
-            <div className="text-[12.5px] text-muted-2 mt-0.5">Seller on FindWork</div>
+            <div className="mt-1"><TrustBadge tier={ad.seller?.verification_tier} score={ad.seller?.trust_score} /></div>
           </div>
         </div>
 
@@ -118,12 +119,20 @@ export function ClassifiedDetail() {
             Take this listing down
           </button>
         ) : (
-          <Link
-            to={`/chat/with/${ad.seller_id}`}
-            className="flex items-center justify-center h-14 bg-brand text-white rounded-xl font-semibold text-[17px]"
-          >
-            Message seller
-          </Link>
+          <div className="flex gap-3">
+            <Link
+              to={`/meetups/new/${ad.id}`}
+              className="flex-1 flex items-center justify-center h-14 border-[1.5px] border-ink rounded-xl text-ink font-semibold text-[15.5px]"
+            >
+              Arrange to meet
+            </Link>
+            <Link
+              to={`/chat/with/${ad.seller_id}`}
+              className="flex-1 flex items-center justify-center h-14 bg-brand text-white rounded-xl font-semibold text-[15.5px]"
+            >
+              Message seller
+            </Link>
+          </div>
         )}
       </div>
     </Screen>

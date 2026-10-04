@@ -425,3 +425,7 @@ verify_jwt = false
 # Called by Supabase Auth with a webhook signature, not a user's JWT.
 [functions.send-sms]
 verify_jwt = false
+
+# Called by the database through pg_net with a shared secret, not a user's JWT.
+[functions.send-push]
+verify_jwt = false

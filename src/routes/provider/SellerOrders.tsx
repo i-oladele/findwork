@@ -102,7 +102,8 @@ function OrderCard({ order, onError }: { order: SellerOrder; onError: (message: 
       </div>
 
       <div className="text-[15px] font-semibold text-ink mt-2.5">
-        {order.order_items.map((it) => `${it.qty}× ${it.name}`).join(', ')}
+        {order.order_items.map((it) => `${it.qty}× ${it.name}${it.variant_name ? ` (${it.variant_name})` : ''}`).join(', ')}
+        {order.discount > 0 && ` · your coupon ${order.coupon_code} took ${formatNaira(order.discount)} off`}
       </div>
       <div className="text-[13.5px] text-muted-2 mt-1">
         {order.status === 'delivered'
@@ -115,7 +116,7 @@ function OrderCard({ order, onError }: { order: SellerOrder; onError: (message: 
       {open && (
         <div className="bg-cream rounded-xl p-3 mt-3 text-[14px] leading-[1.5] text-text-soft">
           <div className="font-semibold text-ink">{order.customer?.full_name ?? 'Customer'}</div>
-          {order.delivery_address}
+          <div className="whitespace-pre-line">{order.delivery_address}</div>
           {order.contact_phone && <div className="text-muted-2 mt-0.5">{order.contact_phone}</div>}
           <div className="text-muted-2 mt-0.5">{order.delivery_speed === 'same-day' ? 'Same-day delivery' : 'Standard delivery'}</div>
         </div>

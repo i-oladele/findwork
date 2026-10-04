@@ -1,4 +1,10 @@
+import { askAssistant, AssistantUnavailable, type DisputeSummary } from '../../lib/api/assistant'
 import { useState } from 'react'
+import { DisputeConversation } from '../../components/ui/DisputeConversation'
+import { UsersTab } from './UsersTab'
+import { RiskTab } from './RiskTab'
+import { LogisticsTab } from './LogisticsTab'
+import type { StaffArea } from '../../lib/staff'
 import { Link, Navigate } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { PageHeader } from '../../components/chrome/PageHeader'
@@ -12,6 +18,13 @@ import { FullScreenLoader } from '../../components/system/States'
 import {
   adminFindProfiles,
   useAdminAdjustBalance,
+  useAdminBusinessVerifications,
+  useAdminHeldPurchaseOrders,
+  useAdminResolvePurchaseOrder,
+  useAdminSos,
+  useAdminDeliveries,
+  useAdminRiders,
+  useAdminReviewBusinessVerification,
   useAdminDisputes,
   useAdminMarkTopupRefunded,
   useAdminOrders,
@@ -27,14 +40,21 @@ import {
   useAdminWithdrawals,
   useProfile,
   useResolveDispute,
+  useRiskAlerts,
+  useStaff,
   type FoundProfile,
 } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatDateTime, formatNaira, parseNaira, shortId } from '../../lib/format'
 import type { DisputeOutcome, PaymentIntent } from '../../lib/database.types'
 
-const TABS = ['Disputes', 'Orders', 'Payouts', 'Verification', 'Reports', 'Support', 'Wallets'] as const
+const TABS = ['Disputes', 'Orders', 'Deliveries', 'Payouts', 'Verification', 'Reports', 'Support', 'Wallets', 'Users', 'Risk'] as const
 type Tab = (typeof TABS)[number]
+/** The staff area each tab belongs to; a role sees only its own tabs. */
+const TAB_AREA: Record<Tab, StaffArea> = {
+  Disputes: 'disputes', Orders: 'orders', Deliveries: 'logistics', Payouts: 'finance', Verification: 'verification',
+  Reports: 'moderation', Support: 'support', Wallets: 'finance', Users: 'lookup', Risk: 'risk',
+}
 
 /**
  * The operator console: the human side of escrow. Everything here is also
@@ -43,7 +63,10 @@ type Tab = (typeof TABS)[number]
  */
 export function Admin() {
   const { data: profile, isLoading } = useProfile()
-  const [tab, setTab] = useState<Tab>('Disputes')
+  const staff = useStaff()
+  const tabs = TABS.filter((t) => staff.can(TAB_AREA[t]))
+  const [chosen, setTab] = useState<Tab | null>(null)
+  const tab = chosen && tabs.includes(chosen) ? chosen : tabs[0]
   const [error, setError] = useState<string | null>(null)
 
   const disputes = useAdminDisputes()
@@ -53,26 +76,38 @@ export function Admin() {
   const reports = useAdminReports()
   const support = useAdminSupport()
   const verifications = useAdminVerifications()
+  const risk = useRiskAlerts()
+  const sos = useAdminSos()
+  const heldOrders = useAdminHeldPurchaseOrders()
+  const businessVerifications = useAdminBusinessVerifications()
+  const riders = useAdminRiders()
+  const deliveries = useAdminDeliveries()
 
   if (isLoading) return <FullScreenLoader />
-  if (!profile?.is_admin) return <Navigate to="/home" replace />
+  if (!profile?.staff_role || !tab) return <Navigate to="/home" replace />
 
   const counts: Record<Tab, number> = {
-    Disputes: disputes.data?.length ?? 0,
+    Disputes: (disputes.data?.length ?? 0) + (heldOrders.data?.length ?? 0),
     Orders: orders.data?.length ?? 0,
     Payouts: (withdrawals.data?.length ?? 0) + (refunds.data?.length ?? 0),
     Reports: reports.data?.length ?? 0,
     Support: support.data?.length ?? 0,
-    Verification: verifications.data?.length ?? 0,
+    Verification: (verifications.data?.length ?? 0) + (businessVerifications.data?.length ?? 0),
     Wallets: 0,
+    Deliveries: (riders.data?.filter((r) => r.status === 'pending').length ?? 0) + (deliveries.data?.filter((d) => d.status === 'awaiting_rider').length ?? 0),
+    Users: 0,
+    Risk: (risk.data?.length ?? 0) + (sos.data?.length ?? 0),
   }
 
   return (
     <Screen>
       <PageHeader title="Operations" back="/home" />
       <div className="px-[22px] pb-10">
+        {staff.can('analytics') && <Link to="/admin/analytics" className="block min-h-11 py-3 text-sm font-semibold text-brand underline">Platform reports & analytics</Link>}
+        {staff.can('content') && <Link to="/admin/courses" className="block min-h-11 py-2 text-sm font-semibold text-brand underline">Courses and quizzes</Link>}
+        {staff.can('finance') && <Link to="/admin/coupons" className="block min-h-11 py-2 text-sm font-semibold text-brand underline">FindWork coupons</Link>}
         <div className="flex gap-2 overflow-x-auto mt-3 -mx-[22px] px-[22px] pb-1">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button
               key={t}
               onClick={() => {
@@ -103,6 +138,9 @@ export function Admin() {
           {tab === 'Support' && <SupportTab onError={setError} />}
           {tab === 'Verification' && <VerificationTab onError={setError} />}
           {tab === 'Wallets' && <WalletsTab onError={setError} />}
+          {tab === 'Deliveries' && <LogisticsTab onError={setError} />}
+          {tab === 'Users' && <UsersTab onError={setError} />}
+          {tab === 'Risk' && <RiskTab onError={setError} />}
         </div>
       </div>
     </Screen>
@@ -119,12 +157,47 @@ function Panel({ children }: { children: React.ReactNode }) {
   return <div className="bg-white border border-line rounded-2xl p-4 mb-3">{children}</div>
 }
 
+/** Wholesale payments a buyer has put on hold: read both sides, then pay the supplier or refund the buyer. */
+function HeldPurchaseOrders({ onError }: TabProps) {
+  const { data } = useAdminHeldPurchaseOrders()
+  const resolve = useAdminResolvePurchaseOrder()
+  const [note, setNote] = useState<Record<string, string>>({})
+  if (!data?.length) return null
+  return (
+    <>
+      <SectionLabel className="mb-2.5">Purchase orders on hold</SectionLabel>
+      {data.map((po) => (
+        <Panel key={po.id}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-display font-semibold text-[15.5px] text-ink">PO-{po.number} · {formatNaira(po.amount)}</span>
+            <Badge tone="danger">On hold</Badge>
+          </div>
+          <div className="text-[13px] text-muted-2 mt-1">{po.buyer?.full_name}{po.organization ? ` (${po.organization.name})` : ''} vs {po.supplier?.full_name}</div>
+          <p className="mt-2 text-[14px] leading-[1.45] text-text-soft">{po.title}: “{po.hold_reason}”</p>
+          <input value={note[po.id] ?? ''} onChange={(e) => setNote((n) => ({ ...n, [po.id]: e.target.value }))} placeholder="Decision note (both sides see it)"
+            aria-label={`Decision note for PO-${po.number}`} className="w-full h-11 mt-3 bg-cream rounded-lg px-3 text-[14px] text-ink outline-none placeholder:text-muted-2" />
+          <div className="flex gap-2 mt-3">
+            {(['release', 'refund'] as const).map((outcome) => (
+              <button key={outcome} disabled={resolve.isPending} className={`flex-1 h-11 rounded-lg text-[14px] font-semibold disabled:opacity-50 ${outcome === 'release' ? 'bg-success text-white' : 'border border-line text-muted'}`} onClick={() => {
+                if (!window.confirm(outcome === 'release' ? `Pay ${po.supplier?.full_name ?? 'the supplier'} ${formatNaira(po.amount)}?` : `Refund ${formatNaira(po.amount)} to the buyer?`)) return
+                onError(null)
+                resolve.mutate({ id: po.id, outcome, note: note[po.id] ?? '' }, { onError: (e) => onError(friendlyError(e)) })
+              }}>{outcome === 'release' ? 'Pay the supplier' : 'Refund the buyer'}</button>
+            ))}
+          </div>
+        </Panel>
+      ))}
+    </>
+  )
+}
+
 function DisputesTab({ onError }: TabProps) {
   const { data } = useAdminDisputes()
+  const held = useAdminHeldPurchaseOrders()
   const resolve = useResolveDispute()
   const [note, setNote] = useState<Record<string, string>>({})
 
-  if (!data?.length) return <Empty text="No open disputes." />
+  if (!data?.length) return held.data?.length ? <HeldPurchaseOrders onError={onError} /> : <Empty text="No open disputes." />
 
   function settle(id: string, outcome: DisputeOutcome, refType: string) {
     const what =
@@ -142,6 +215,7 @@ function DisputesTab({ onError }: TabProps) {
 
   return (
     <>
+      <HeldPurchaseOrders onError={onError} />
       {data.map((d) => (
         <Panel key={d.id}>
           <div className="flex items-center justify-between">
@@ -156,6 +230,8 @@ function DisputesTab({ onError }: TabProps) {
             {d.evidence_paths.length > 0 && ` · ${d.evidence_paths.length} photo(s)`}
           </div>
           {d.evidence_paths.length > 0 && <EvidenceGallery paths={d.evidence_paths} />}
+          <DisputeConversation disputeId={d.id} open={d.status === 'open'} />
+          <CaseSummary disputeId={d.id} />
           <input
             value={note[d.id] ?? ''}
             onChange={(e) => setNote((n) => ({ ...n, [d.id]: e.target.value }))}
@@ -204,12 +280,12 @@ function OrdersTab({ onError }: TabProps) {
             <span className="font-display font-bold text-[15px] text-ink">{formatNaira(o.total)}</span>
           </div>
           <div className="text-[14px] text-ink mt-2">
-            {o.order_items.map((it) => `${it.qty}× ${it.name}`).join(', ')}
+            {o.order_items.map((it) => `${it.qty}× ${it.name}${it.variant_name ? ` (${it.variant_name})` : ''}`).join(', ')}
           </div>
           <div className="text-[13px] text-muted-2 mt-1.5">
             {o.customer?.full_name} · {o.delivery_speed} · {formatDateTime(o.placed_at)}
           </div>
-          {o.delivery_address && <div className="text-[13.5px] text-text-soft mt-1.5">{o.delivery_address}</div>}
+          {o.delivery_address && <div className="text-[13.5px] text-text-soft mt-1.5 whitespace-pre-line">{o.delivery_address}</div>}
           {o.contact_phone && <div className="text-[13.5px] text-text-soft">{o.contact_phone}</div>}
           <div className="flex gap-2 mt-3">
             <button
@@ -431,11 +507,45 @@ const ID_TYPE_LABELS: Record<string, string> = {
 }
 
 /** IDs sent for checking: compare the photo, the selfie and the name. */
+function BusinessVerifications({ onError }: TabProps) {
+  const { data } = useAdminBusinessVerifications()
+  const review = useAdminReviewBusinessVerification()
+  const [note, setNote] = useState<Record<string, string>>({})
+  if (!data?.length) return null
+  return (
+    <>
+      <SectionLabel className="mb-2.5">Businesses (CAC)</SectionLabel>
+      {data.map((v) => (
+        <Panel key={v.id}>
+          <div className="font-display font-semibold text-[16px] text-ink">{v.business_name}</div>
+          <div className="text-[14px] text-ink mt-1"><span className="font-mono">{v.rc_number}</span> · {v.profile?.full_name || 'Unnamed account'}</div>
+          <PrivatePhoto bucket="verification-documents" path={v.document_path} label="CAC certificate" className="w-40 h-28 mt-3" />
+          <input value={note[v.id] ?? ''} onChange={(e) => setNote((n) => ({ ...n, [v.id]: e.target.value }))}
+            placeholder="Reason, if rejecting (they will see it)" aria-label={`Reason for ${v.business_name}`}
+            className="w-full h-11 mt-3 bg-cream rounded-lg px-3 text-[14px] text-ink outline-none placeholder:text-muted-2" />
+          <div className="flex gap-2 mt-3">
+            <button disabled={review.isPending} className="flex-1 h-11 bg-success text-white rounded-lg text-[14px] font-semibold disabled:opacity-50" onClick={() => {
+              if (!window.confirm(`Verify ${v.business_name} as a registered business?`)) return
+              onError(null)
+              review.mutate({ id: v.id, approve: true, note: note[v.id] ?? '' }, { onError: (e) => onError(friendlyError(e)) })
+            }}>Approve</button>
+            <button disabled={review.isPending || !(note[v.id] ?? '').trim()} className="flex-1 h-11 border border-line rounded-lg text-[14px] font-semibold text-muted disabled:opacity-50" onClick={() => {
+              onError(null)
+              review.mutate({ id: v.id, approve: false, note: note[v.id] ?? '' }, { onError: (e) => onError(friendlyError(e)) })
+            }}>Reject</button>
+          </div>
+        </Panel>
+      ))}
+    </>
+  )
+}
+
 function VerificationTab({ onError }: TabProps) {
   const { data } = useAdminVerifications()
+  const business = useAdminBusinessVerifications()
   const review = useAdminReviewVerification()
   const [note, setNote] = useState<Record<string, string>>({})
-  if (!data?.length) return <Empty text="No IDs waiting to be checked." />
+  if (!data?.length) return business.data?.length ? <BusinessVerifications onError={onError} /> : <Empty text="No IDs or businesses waiting to be checked." />
 
   function decide(id: string, name: string, approve: boolean) {
     const reason = note[id] ?? ''
@@ -446,6 +556,7 @@ function VerificationTab({ onError }: TabProps) {
 
   return (
     <>
+      <BusinessVerifications onError={onError} />
       {data.map((v) => {
         const name = v.profile?.full_name || 'Unnamed account'
         return (
@@ -581,5 +692,42 @@ function WalletsTab({ onError }: TabProps) {
         </Panel>
       ))}
     </>
+  )
+}
+
+/**
+ * An AI summary of a dispute: what happened, what the two sides agree and
+ * differ on, and what to ask. It never recommends an outcome; the decision
+ * is the member of staff's.
+ */
+function CaseSummary({ disputeId }: { disputeId: string }) {
+  const [state, setState] = useState<{ status: 'idle' | 'busy' | 'off' | 'error'; summary?: DisputeSummary; error?: string }>({ status: 'idle' })
+  if (state.status === 'off') return null
+  const s = state.summary
+  const list = (title: string, items: string[]) => items.length > 0 && (
+    <div className="mt-2"><div className="font-semibold text-ink">{title}</div><ul className="list-disc pl-5">{items.map((item, i) => <li key={i}>{item}</li>)}</ul></div>
+  )
+  return (
+    <div className="mt-3 text-[13.5px] leading-[1.45] text-text-soft">
+      {s ? (
+        <div className="bg-cream rounded-xl p-3">
+          <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted-2">AI summary · check it against the case · it does not decide</div>
+          <p className="mt-1.5">{s.summary}</p>
+          {list('Both sides accept', s.agreed)}
+          {list('They differ on', s.contested)}
+          {list('Not in the file', s.missing)}
+          {list('Worth asking', s.questions)}
+        </div>
+      ) : (
+        <button disabled={state.status === 'busy'} className="min-h-11 font-semibold text-brand" onClick={() => {
+          setState({ status: 'busy' })
+          askAssistant<DisputeSummary>('dispute', { dispute_id: disputeId }).then(
+            (summary) => setState({ status: 'idle', summary }),
+            (err) => setState(err instanceof AssistantUnavailable ? { status: 'off' } : { status: 'error', error: friendlyError(err) }),
+          )
+        }}>{state.status === 'busy' ? 'Reading the case…' : 'Summarise this case'}</button>
+      )}
+      {state.status === 'error' && <p className="text-danger">{state.error}</p>}
+    </div>
   )
 }

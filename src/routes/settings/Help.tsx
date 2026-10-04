@@ -1,3 +1,4 @@
+import { AskAssistant } from '../../components/ui/AskAssistant'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
@@ -67,6 +68,10 @@ export function Help() {
     <Screen>
       <PageHeader title="Help and support" back="/settings" />
       <div className="px-[22px] pb-8">
+        <div className="mt-4">
+          <AskAssistant task="support" title="Ask how something works" placeholder="How do I get a refund?"
+            note="Answered by an AI assistant from FindWork's own rules. It cannot see your account or change anything: for a specific payment or order, write to the team below." />
+        </div>
         <SectionLabel className="mt-5 mb-2.5">Common questions</SectionLabel>
         <div className="bg-white border border-line rounded-2xl overflow-hidden">
           {FAQS.map((f, i) => (
