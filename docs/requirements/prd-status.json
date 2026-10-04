@@ -65,7 +65,7 @@
         "src/components/system/MfaChallenge.tsx",
         "supabase/functions/mfa-recover/index.ts"
       ],
-      "remaining": "Two-step sign-in with an authenticator app and single-use recovery codes is built, and an account that has it cannot use the API or spend on a password-only session. A sign-in from a new device notifies the owner and unusual patterns raise a risk alert. The mfa-recover function and the API pre-request hook must be deployed and confirmed on the hosted project. Email, SMS, OAuth and passkeys need hosted/device verification.",
+      "remaining": "Two-step sign-in with an authenticator app and single-use recovery codes is built, and an account that has it cannot use the API or spend on a password-only session. A sign-in from a new device notifies the owner and unusual patterns raise a risk alert. On 4 October 2026 the mfa-recover function was deployed and the API pre-request hook was confirmed installed on the hosted project; neither has been exercised there yet with a real second step or a suspended account. Phone codes cannot be sent until the Termii secrets are set. Email, SMS, OAuth and passkeys need hosted/device verification.",
       "acceptance": "Register with email and phone, verify/resend/expire a code, recover a password, sign in socially and with a passkey, challenge MFA, revoke a session, and review a suspicious-login event.",
       "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql sections 27 and 28). Deployed integration and user-journey acceptance are still pending."
     },
@@ -900,9 +900,9 @@
         "src/components/ui/AskAssistant.tsx",
         "supabase/migrations/20261004001900_assistant_usage.sql"
       ],
-      "remaining": "A microphone button on Home takes a spoken or typed request and opens the right screen; a new account can choose its role by voice. Common requests in English and Pidgin are understood on the device with no service at all. Everything else, and Yoruba, Igbo and Hausa, goes to the assistant function, which calls Claude and needs an Anthropic API key that has not been set: until then those requests get a hint instead. The same function answers support questions from FindWork's own rules, translates chat messages, and helps with lessons. None of the model calls has been run against the real API. Speech uses the browser's own engines: it is absent in Firefox, and whether a browser can hear Yoruba, Igbo or Hausa has not been tested. The app's own text is English only.",
+      "remaining": "A microphone button on Home takes a spoken or typed request and opens the right screen; a new account can choose its role by voice. Common requests in English and Pidgin are understood on the device with no service at all. Everything else, and Yoruba, Igbo and Hausa, goes to the assistant function, which calls Claude. The same function answers support questions from FindWork's own rules, translates chat messages, and helps with lessons. On 4 October 2026 it was deployed with an API key and answered live requests: a Yoruba command, a Pidgin command, a support question and a translation into Hausa. Lesson help and staff dispute summaries have not been run live, and no native speaker has reviewed the Yoruba, Igbo or Hausa. Speech uses the browser's own engines: it is absent in Firefox, and whether a browser can hear Yoruba, Igbo or Hausa has not been tested. The app's own text is English only.",
       "acceptance": "Complete onboarding/navigation in agreed languages by voice and text, handle failed recognition, request confirmation for consequential actions and hand off to support.",
-      "verification": "Command parsing, prompts and answer handling are unit tested; metering executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 39). No request has been made to the model, and speech has not been tried on devices."
+      "verification": "Command parsing, prompts and answer handling are unit tested; metering executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 39). Four live requests succeeded on the hosted project the same day. Speech has not been tried on devices."
     },
     {
       "id": "F19",
@@ -1042,7 +1042,7 @@
         "supabase/migrations/20260925000300_subscription_serialisation.sql",
         "supabase/migrations/20261004000300_subscription_reminders.sql"
       ],
-      "remaining": "An in-app reminder is sent once, three days before each paid renewal; it also arrives as a push on devices that have push switched on, once the push keys are set, but not by email or SMS. The reminder and renewal schedules must be confirmed on the hosted project. Insufficient-funds behavior and premium entitlements need validation. Gateway is indirect through wallet.",
+      "remaining": "An in-app reminder is sent once, three days before each paid renewal; it also arrives as a push on devices that have push switched on, but not by email or SMS. The reminder and renewal schedules were confirmed active on the hosted project on 4 October 2026. Insufficient-funds behavior and premium entitlements need validation. Gateway is indirect through wallet.",
       "acceptance": "Subscribe/change plan once, send a reminder before renewal, renew or downgrade on insufficient funds and verify billing history/actual entitlements.",
       "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 23). Deployed integration and user-journey acceptance are still pending."
     },
@@ -1131,7 +1131,7 @@
         "supabase/functions/route-estimate/index.ts",
         "supabase/migrations/20261004001200_logistics.sql"
       ],
-      "remaining": "A rider with several orders is shown the shortest order of stops (each collected before it is delivered) and a link that opens the round in Google Maps. This uses straight-line distance, not the road network. Arrival times are estimated from distance, vehicle and time of day in Lagos; that is a fixed congestion pattern, not live traffic. The route-estimate function replaces the estimate with a routed, traffic-aware time from Google's Routes API, but it needs a maps key and has not been run against the real service. No AI.",
+      "remaining": "A rider with several orders is shown the shortest order of stops (each collected before it is delivered) and a link that opens the round in Google Maps. This uses straight-line distance, not the road network. Arrival times are estimated from distance, vehicle and time of day in Lagos; that is a fixed congestion pattern, not live traffic. The route-estimate function replaces the estimate with a routed, traffic-aware time from Google's Routes API; it is deployed, but has no maps key and has not been run against the real service.",
       "acceptance": "Route assigned deliveries using traffic-aware travel time, refresh ETA, handle provider failures and prevent exposure outside the active delivery.",
       "verification": "Stop ordering and the routing function's logic are unit tested; arrival estimates executed on plain Postgres 17 on 4 October 2026. Google Routes has not been called. Deployed and on-road acceptance pending."
     },

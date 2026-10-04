@@ -9,7 +9,8 @@
 // Without the key the function answers { configured: false } and the app
 // hides or falls back for each feature. ASSISTANT_MODEL may be set to
 // claude-sonnet-5-5 to trade some quality for cost; the default is
-// claude-opus-5-5.
+// claude-opus-5-5. A key that is not scoped to a workspace is refused by the
+// API unless ANTHROPIC_WORKSPACE_ID names the workspace to use.
 //
 // Deno runtime. Not part of the Vite build (tsconfig.app.json covers src/ only).
 import Anthropic from 'npm:@anthropic-ai/sdk'
@@ -70,7 +71,8 @@ Deno.serve(async (req: Request) => {
 
   const configured = Deno.env.get('ASSISTANT_MODEL')
   const model = configured && MODELS.includes(configured) ? configured : 'claude-opus-5-5'
-  const client = new Anthropic({ apiKey })
+  const workspace = Deno.env.get('ANTHROPIC_WORKSPACE_ID')
+  const client = new Anthropic({ apiKey, ...(workspace ? { defaultHeaders: { 'anthropic-workspace-id': workspace } } : {}) })
   try {
     // Thinking is always on for these models and is left at its default; how
     // hard the model works is set by effort.

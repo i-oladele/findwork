@@ -57,17 +57,17 @@ Each feature lists source evidence, remaining work and an acceptance scenario. T
 ## Current constraints and decisions
 
 - Keep React/Vite and Supabase, as previously approved; the roadmap's Next.js/DigitalOcean stack is superseded, not its functional requirements.
-- No local Supabase stack. SQL checks run on plain Postgres 17, as CI does, and were last run on 4 October 2026; they must still pass against Supabase staging before these migrations reach live data.
-- On 4 October 2026 the user asked for every PRD item to be built first, with testing and refinement to follow. Everything marked implemented below is source code that has passed unit tests and database checks on plain Postgres; none of it has been deployed or used in a browser by a person.
-- External accounts remain deferred. Features that depend on one are built up to that boundary and say so: identity registries, automatic bank payouts, a maps key for routed arrival times, push keys, a streaming provider for live video, and an Anthropic API key for the assistant.
+- No local Supabase stack. SQL checks run on plain Postgres 17, as CI does, and were last run on 4 October 2026. They have not been run against the hosted project, which holds demo data only.
+- On 4 October 2026 the user asked for every PRD item to be built first, with testing and refinement to follow. Everything marked implemented below is source code that has passed unit tests and database checks on plain Postgres. The same day the migrations were applied to the hosted FindWork project and all nine Edge Functions were deployed; the new screens have not yet been used in a browser by a person.
+- External accounts remain deferred. Features that depend on one are built up to that boundary and say so: identity registries, automatic bank payouts, a maps key for routed arrival times, and a streaming provider for live video. Push keys and the assistant's API key are set on the hosted project; the Paystack and Termii secrets are not, so card top-ups and SMS codes do not work there yet.
 - Policy numbers chosen while building are first proposals to confirm: the trust score weights, the daily limits per verification tier, the rider's 80% share of the delivery fee, the risk-rule thresholds, and coupons being funded by whoever issues them.
 - Preserve the historical September audits. Several of their missing-feature findings were completed by later commits; this checklist is the current status source.
 - Legal documents and lesson content still need real approved material. Do not treat invented policies, empty lessons or fabricated verification as completion.
 
 ## What happens next
 
-1. Apply the October migrations to Supabase staging and run the business-rule checks there.
-2. Deploy the new Edge Functions and set their secrets; install the API pre-request hook and the scheduled jobs; confirm each on the hosted project.
+1. Done on 4 October 2026: migrations applied to the hosted project, Edge Functions deployed, API pre-request hook and scheduled jobs confirmed, push and assistant secrets set.
+2. Set the Paystack and Termii secrets, and run the business-rule checks against the hosted database.
 3. Walk each journey in a browser and on phones, as each kind of user: customer, provider, seller, rider, business buyer, staff role.
 4. Confirm or change the policy numbers above, then tune the risk rules and matching against real activity.
 5. Decide the deferred integrations, write the legal pages and the course content, and plan the native apps.
@@ -92,7 +92,7 @@ The PRD introduction and conclusion also describe the following expectations. Ro
 | Phase 9: classifieds and safety | F14–F15. |
 | Phase 10: wholesale and procurement | F12–F13. |
 | Phase 11: learning | F26–F27, with certificate issuance, public verification, completion rules and profile badges built. Lesson content is still to be authored. |
-| Phase 12: AI and automation | F16–F17 are fixed, explainable rules rather than models. F18 and the support, lesson and dispute helpers call Claude through one metered function, grounded in FindWork's own material with a hand-off to staff; no model call has been run or evaluated yet. Predictive insight is a labelled trend line only. |
+| Phase 12: AI and automation | F16–F17 are fixed, explainable rules rather than models. F18 and the support, lesson and dispute helpers call Claude through one metered function, grounded in FindWork's own material with a hand-off to staff; commands, support answers and translation have answered live, lesson help and dispute summaries have not, and none has been evaluated. Predictive insight is a labelled trend line only. |
 | Phase 13: security/disputes | F28–F30 plus audit history and security review. |
 | Phase 14: admin/reporting | F31–F33 plus role-protected exports, complete revenue definitions and marketplace insights. |
 | Phase 15: hardening and scale | Functional/regression/UX/security/performance QA, penetration testing, cache/database tuning, queues/retries, media processing, load tests, backup automation and disaster recovery remain unverified. |

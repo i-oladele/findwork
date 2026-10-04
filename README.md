@@ -53,7 +53,7 @@ missing:
 
 | What | Without it | To switch it on |
 | --- | --- | --- |
-| Assistant: voice commands beyond the built-in phrases, support answers, chat translation, lesson help, dispute summaries | Common English and Pidgin commands still work on the device; everything else shows a hint | `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...` (`ASSISTANT_MODEL` optionally picks the model) |
+| Assistant: voice commands beyond the built-in phrases, support answers, chat translation, lesson help, dispute summaries | Common English and Pidgin commands still work on the device; everything else shows a hint | `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...` (`ASSISTANT_MODEL` optionally picks the model; a key that is not scoped to a workspace also needs `ANTHROPIC_WORKSPACE_ID=wrkspc_...`) |
 | Routed arrival times for deliveries | A straight-line estimate, labelled as an estimate | `supabase secrets set GOOGLE_MAPS_API_KEY=...` with the Routes API enabled |
 | Push notifications | The in-app inbox only; the push switch is hidden | See below |
 | Second sign-in step (authenticator app) | Not offered | Authentication → Multi-Factor: enable TOTP |
