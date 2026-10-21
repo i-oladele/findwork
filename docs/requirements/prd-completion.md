@@ -1,6 +1,6 @@
 # FindWork PRD completion checklist
 
-Reviewed 2026-10-04 against the original 20-page [functionality document](functionality.pdf), its [text extraction](functionality.md), and the [delivery roadmap](roadmap.md). Baseline commit: `8c5fe9f`, plus the current working-tree implementation. This is a completion ledger, not a claim that the product is finished.
+Reviewed 2026-10-21 against the original 20-page [functionality document](functionality.pdf), its [text extraction](functionality.md), and the [delivery roadmap](roadmap.md). Baseline commit: `7c37b51`, plus the current working-tree implementation. This is a completion ledger, not a claim that the product is finished.
 
 ## Completion standard
 
@@ -9,27 +9,27 @@ Reviewed 2026-10-04 against the original 20-page [functionality document](functi
 - **missing**: no complete implementation was found for this requirement in its PRD context.
 - **verified**: implementation plus recorded acceptance evidence, including authorization and failure cases. A screen, table, mock, unit test or compiling build alone is insufficient.
 
-There are **33 features and 239 component/integration requirements**: 218 implemented, 19 partial, 2 missing, 0 verified. These counts are not a completion percentage; requirements differ substantially in size. Repeated integrations retain separate IDs because each domain must actually integrate.
+There are **33 features and 239 component/integration requirements**: 239 implemented, 0 partial, 0 missing, 0 verified. These counts are not a completion percentage; requirements differ substantially in size. Repeated integrations retain separate IDs because each domain must actually integrate.
 
 Each feature lists source evidence, remaining work and an acceptance scenario. The machine-readable source is [prd-status.json](prd-status.json). Run `npm run prd:report` after updating it; `npm run prd:check` checks every component and integration against the original wording and rejects an out-of-date report. This check verifies traceability, not functionality.
 
 ## Current constraints and decisions
 
 - Keep React/Vite and Supabase, as previously approved; the roadmap's Next.js/DigitalOcean stack is superseded, not its functional requirements.
-- No local Supabase stack. SQL checks run on plain Postgres 17, as CI does, and were last run on 4 October 2026. They have not been run against the hosted project, which holds demo data only.
-- On 4 October 2026 the user asked for every PRD item to be built first, with testing and refinement to follow. Everything marked implemented below is source code that has passed unit tests and database checks on plain Postgres. The same day the migrations were applied to the hosted FindWork project and all nine Edge Functions were deployed; the new screens have not yet been used in a browser by a person.
-- External accounts remain deferred. Features that depend on one are built up to that boundary and say so: identity registries, automatic bank payouts, a maps key for routed arrival times, and a streaming provider for live video. Push keys and the assistant's API key are set on the hosted project; the Paystack and Termii secrets are not, so card top-ups and SMS codes do not work there yet.
-- Policy numbers chosen while building are first proposals to confirm: the trust score weights, the daily limits per verification tier, the rider's 80% share of the delivery fee, the risk-rule thresholds, and coupons being funded by whoever issues them.
+- No local Supabase stack. SQL checks run on plain Postgres 17, as CI does, and were last run on 21 October 2026 (558 checks). They have not been run against the hosted project, which holds demo data only.
+- Every requirement now has a source-code path. On 21 October 2026 the new migrations were applied to the hosted project, all fifteen Edge Functions were deployed, and the app was walked in a browser against it as a customer, a provider and an admin; what that walk found was fixed the same day.
+- Outside services are built to their test or sandbox APIs and stay switched off until their keys are set, saying so on screen: Paystack (card checkout, saved-card renewals, confirmed bank accounts and automatic payouts), Dojah (BVN, NIN, CAC, face and SIM checks), LiveKit (live video), Google Maps (road routing and traffic), Termii (SMS codes). None has been exercised against its provider yet. Push keys and the assistant's API key are set on the hosted project.
+- Policy numbers chosen while building are first proposals to confirm: the trust score weights, the daily limits per verification tier, the rider's 80% share of the delivery fee, the risk-rule thresholds, the automatic-payout limit, and coupons being funded by whoever issues them.
 - Preserve the historical September audits. Several of their missing-feature findings were completed by later commits; this checklist is the current status source.
-- Legal documents and lesson content still need real approved material. Do not treat invented policies, empty lessons or fabricated verification as completion.
+- Lesson content, the terms of service and the privacy policy are written as drafts for review by practitioners and a lawyer; the app shows the legal pages as drafts. The Yoruba, Igbo, Hausa and Pidgin translations need a native speaker's review.
 
 ## What happens next
 
-1. Done on 4 October 2026: migrations applied to the hosted project, Edge Functions deployed, API pre-request hook and scheduled jobs confirmed, push and assistant secrets set.
-2. Set the Paystack and Termii secrets, and run the business-rule checks against the hosted database.
-3. Walk each journey in a browser and on phones, as each kind of user: customer, provider, seller, rider, business buyer, staff role.
-4. Confirm or change the policy numbers above, then tune the risk rules and matching against real activity.
-5. Decide the deferred integrations, write the legal pages and the course content, and plan the native apps.
+1. Set the outside services' test keys (Paystack, Dojah, LiveKit, Google Maps, Termii) and walk each flow end to end.
+2. Have the translations, lessons and legal drafts reviewed; decide in-app purchase on iPhone for plans and paid courses.
+3. Walk every journey on real phones, including push, the second sign-in step and a suspended account; run the business-rule checks against a staging copy of the hosted database.
+4. Confirm or change the policy numbers above, then tune the risk rules, matching and payout limit against real activity.
+5. Harden for launch: security review and penetration test, load test, monitoring, backups and restore drill, store listings for the iPhone and Android apps, and the compliance steps before real money.
 
 ## Introduction and roadmap requirements beyond the component tables
 
@@ -37,8 +37,8 @@ The PRD introduction and conclusion also describe the following expectations. Ro
 
 | Requirement / roadmap phase | Current status and acceptance still required |
 |---|---|
-| Mobile app (PRD p.2), native delivery | Still a web app. It can now be added to a phone's Home Screen (web manifest) and can receive push once keys are set, but there are no native packages or store builds. Validate camera, biometrics, deep links, push, store assets and release pipelines. |
-| Certifications and service packages (PRD introduction) | Packages and provider-supplied credential uploads implemented. Course certificates are issued on passing and can be verified by code without an account; the courses themselves still need writing. |
+| Mobile app (PRD p.2), native delivery | iPhone and Android projects (Capacitor) wrap the web app with FindWork's icon and splash, camera, microphone and location permissions, links that open the app, and payments in an in-app browser. The iPhone build compiles and runs in the simulator. Native push (APNs/FCM), passkeys in the app, store listings and signing remain; plans and paid courses are not sold in the iPhone app pending an in-app purchase decision. |
+| Certifications and service packages (PRD introduction) | Packages and provider-supplied credential uploads implemented. Course certificates are issued on passing and can be verified by code without an account; the three starter courses have lessons and quizzes awaiting practitioner review. |
 | Scale to millions (PRD conclusion) | Unverified aspiration. Define traffic/data targets, then load-test and document capacity, availability and recovery limits. |
 | Phase 1: brand and UI/UX | UI system exists. Brand positioning/messaging/assets, prototype/design handoff, navigation, responsive/device and accessibility acceptance remain unverified. |
 | Phase 2: infrastructure | Supabase migrations and GitHub CI exist. Environment isolation, app hosting/SSL, deployment pipelines, monitoring/logging, backups and restore drills remain unverified. |
@@ -50,12 +50,12 @@ The PRD introduction and conclusion also describe the following expectations. Ro
 | Phase 8: logistics and MVP QA | F22–F23 are built in source. Functional, regression, security, performance and launch testing have not started. |
 | Phase 9: classifieds and safety | F14–F15. |
 | Phase 10: wholesale and procurement | F12–F13. |
-| Phase 11: learning | F26–F27, with certificate issuance, public verification, completion rules and profile badges built. Lesson content is still to be authored. |
-| Phase 12: AI and automation | F16–F17 are fixed, explainable rules rather than models. F18 and the support, lesson and dispute helpers call Claude through one metered function, grounded in FindWork's own material with a hand-off to staff; commands, support answers and translation have answered live, lesson help and dispute summaries have not, and none has been evaluated. Predictive insight is a labelled trend line only. |
+| Phase 11: learning | F26–F27, with certificate issuance, public verification, completion rules and profile badges built. Starter lesson content written; review pending. |
+| Phase 12: AI and automation | F16–F17 are fixed, explainable rules rather than models. F18, the support, lesson and dispute helpers and the staff analyst call Claude through one metered function, grounded in FindWork's own material; commands, support answers, translation, lesson help and the analyst have answered live, dispute summaries have not, and none has been evaluated systematically. Forecasts use a seasonal Holt-Winters model with a backtest; rider routes are optimised exactly on road times. |
 | Phase 13: security/disputes | F28–F30 plus audit history and security review. |
 | Phase 14: admin/reporting | F31–F33 plus role-protected exports, complete revenue definitions and marketplace insights. |
 | Phase 15: hardening and scale | Functional/regression/UX/security/performance QA, penetration testing, cache/database tuning, queues/retries, media processing, load tests, backup automation and disaster recovery remain unverified. |
-| Launch content and policies | Privacy/terms still placeholders; authored learning content and operational support procedures still required. |
+| Launch content and policies | Terms of service and privacy policy (NDPA) drafted from how the app works, shown as drafts pending legal review; support procedures in docs/operations/support-procedures.md (the SOS on-call rota is still missing). |
 
 ## F01 · User Registration & Login
 
@@ -72,12 +72,12 @@ PRD feature begins on page 3.
 | F01-C07 | Multi-factor authentication | implemented |
 | F01-I01 | Integrates with Security Module for authentication validation | implemented |
 | F01-I02 | Connects with User Role System for onboarding | implemented |
-| F01-I03 | Integrates with Notification System for OTP delivery | partial |
+| F01-I03 | Integrates with Notification System for OTP delivery | implemented |
 | F01-I04 | Connects with Fraud Detection System for suspicious login monitoring | implemented |
 
 Evidence / relevant current code: [src/lib/auth.tsx](../../src/lib/auth.tsx), [src/routes/onboarding](../../src/routes/onboarding), [src/lib/passkeys.ts](../../src/lib/passkeys.ts), [supabase/migrations/20261004000700_staff_roles_and_suspension.sql](../../supabase/migrations/20261004000700_staff_roles_and_suspension.sql), [supabase/migrations/20261004000800_mfa.sql](../../supabase/migrations/20261004000800_mfa.sql), [src/routes/settings/Security.tsx](../../src/routes/settings/Security.tsx), [src/components/system/MfaChallenge.tsx](../../src/components/system/MfaChallenge.tsx), [supabase/functions/mfa-recover/index.ts](../../supabase/functions/mfa-recover/index.ts).
 
-Remaining: Two-step sign-in with an authenticator app and single-use recovery codes is built, and an account that has it cannot use the API or spend on a password-only session. A sign-in from a new device notifies the owner and unusual patterns raise a risk alert. On 4 October 2026 the mfa-recover function was deployed and the API pre-request hook was confirmed installed on the hosted project; neither has been exercised there yet with a real second step or a suspended account. Phone codes cannot be sent until the Termii secrets are set. Email, SMS, OAuth and passkeys need hosted/device verification.
+Remaining: Two-step sign-in with an authenticator app and single-use recovery codes is built, and an account that has it cannot use the API or spend on a password-only session. A sign-in from a new device notifies the owner and unusual patterns raise a risk alert. On 4 October 2026 the mfa-recover function was deployed and the API pre-request hook was confirmed installed on the hosted project; neither has been exercised there yet with a real second step or a suspended account. Phone codes go through Termii by the send-sms hook; the code is complete and deployed, and starts working once the Termii secrets and the Supabase SMS hook are set. Email, SMS, OAuth and passkeys need hosted/device verification.
 
 Acceptance: Register with email and phone, verify/resend/expire a code, recover a password, sign in socially and with a passkey, challenge MFA, revoke a session, and review a suspicious-login event.
 
@@ -111,22 +111,22 @@ PRD feature begins on page 4.
 
 | ID | Requirement | Status |
 |---|---|---|
-| F03-C01 | BVN verification | partial |
-| F03-C02 | NIN verification | partial |
-| F03-C03 | CAC verification | partial |
-| F03-C04 | Face verification | partial |
-| F03-C05 | SIM verification | partial |
-| F03-I01 | Connected to Fraud Detection Engine | partial |
+| F03-C01 | BVN verification | implemented |
+| F03-C02 | NIN verification | implemented |
+| F03-C03 | CAC verification | implemented |
+| F03-C04 | Face verification | implemented |
+| F03-C05 | SIM verification | implemented |
+| F03-I01 | Connected to Fraud Detection Engine | implemented |
 | F03-I02 | Linked with Wallet & Payments Module | implemented |
 | F03-I03 | Integrated into Trust Score System | implemented |
 
-Evidence / relevant current code: [src/routes/onboarding/GetVerified.tsx](../../src/routes/onboarding/GetVerified.tsx), [supabase/migrations/20260925000900_identity_verification.sql](../../supabase/migrations/20260925000900_identity_verification.sql), [supabase/migrations/20261004000900_risk_and_trust.sql](../../supabase/migrations/20261004000900_risk_and_trust.sql).
+Evidence / relevant current code: [src/routes/onboarding/GetVerified.tsx](../../src/routes/onboarding/GetVerified.tsx), [supabase/migrations/20260925000900_identity_verification.sql](../../supabase/migrations/20260925000900_identity_verification.sql), [supabase/migrations/20261004000900_risk_and_trust.sql](../../supabase/migrations/20261004000900_risk_and_trust.sql), [supabase/migrations/20261018000400_identity_checks.sql](../../supabase/migrations/20261018000400_identity_checks.sql), [supabase/functions/identity-check/index.ts](../../supabase/functions/identity-check/index.ts), [supabase/functions/identity-check/identityCheck.ts](../../supabase/functions/identity-check/identityCheck.ts), [supabase/functions/_shared/dojah.ts](../../supabase/functions/_shared/dojah.ts), [src/lib/__tests__/identity-check.test.ts](../../src/lib/__tests__/identity-check.test.ts).
 
-Remaining: NIN/BVN documents, selfies and CAC certificates are reviewed by staff; there is still no authoritative BVN, NIN, CAC registry, face-match or NIN-SIM check (phone OTP only proves possession of the SIM). Verification now has four tiers that set daily withdrawal limits and feed the trust score. The fraud rules do not yet use vendor or document signals. External setup deferred.
+Remaining: Built against Dojah: a NIN or BVN is looked up on the national register with the person's name, the selfie is matched to the register's photo, the account's phone number is checked against the register's owner of that ID (SIM), and a business is checked on the CAC register by RC number, name and status. When every required check matches the account is verified at once; anything else stays with staff beside the register's answers, and mismatches, missing records and duplicate IDs raise risk alerts (the fraud link). Nothing is rejected automatically. Needs DOJAH_APP_ID and DOJAH_SECRET_KEY (sandbox first); until then review stays by hand. Not yet run against Dojah's sandbox.
 
 Acceptance: Exercise each verification method, rejection and retry; validate signed vendor callbacks and evidence access/retention; apply verified tiers to trust and payments.
 
-Verification: Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 29). Deployed integration and user-journey acceptance are still pending.
+Verification: Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 43); migrations applied and functions deployed to the hosted project the same day. Matching rules unit tested; not yet exercised against Dojah.
 
 ## F04 · Service Listings
 
@@ -254,17 +254,17 @@ PRD feature begins on page 7.
 | F09-C03 | Coupon system | implemented |
 | F09-C04 | Address management | implemented |
 | F09-C05 | Checkout process | implemented |
-| F09-I01 | Integrated with Payment Gateway | partial |
+| F09-I01 | Integrated with Payment Gateway | implemented |
 | F09-I02 | Connected with Logistics Module | implemented |
 | F09-I03 | Linked with Wallet System | implemented |
 
-Evidence / relevant current code: [src/routes/commerce/Checkout.tsx](../../src/routes/commerce/Checkout.tsx), [src/routes/settings/Addresses.tsx](../../src/routes/settings/Addresses.tsx), [supabase/migrations/20261004000100_saved_addresses.sql](../../supabase/migrations/20261004000100_saved_addresses.sql), [supabase/migrations/20261004001100_variants_and_coupons.sql](../../supabase/migrations/20261004001100_variants_and_coupons.sql), [src/routes/provider/Coupons.tsx](../../src/routes/provider/Coupons.tsx), [src/store/cart.ts](../../src/store/cart.ts).
+Evidence / relevant current code: [src/routes/commerce/Checkout.tsx](../../src/routes/commerce/Checkout.tsx), [src/routes/settings/Addresses.tsx](../../src/routes/settings/Addresses.tsx), [supabase/migrations/20261004000100_saved_addresses.sql](../../supabase/migrations/20261004000100_saved_addresses.sql), [supabase/migrations/20261004001100_variants_and_coupons.sql](../../supabase/migrations/20261004001100_variants_and_coupons.sql), [src/routes/provider/Coupons.tsx](../../src/routes/provider/Coupons.tsx), [src/store/cart.ts](../../src/store/cart.ts), [supabase/migrations/20261018000300_paystack_direct.sql](../../supabase/migrations/20261018000300_paystack_direct.sql), [supabase/functions/_shared/payments.ts](../../supabase/functions/_shared/payments.ts), [src/lib/__tests__/payments.test.ts](../../src/lib/__tests__/payments.test.ts).
 
-Remaining: Coupons are built: percentage or fixed amount, minimum spend, cap, end date, total and per-customer limits. A seller's coupon comes out of that seller's proceeds; a FindWork coupon applies only to FindWork's own catalog. One code per checkout. The quote the customer sees and the amount charged come from the same pricing function. A dispatched order creates a delivery for riders. The payment gateway funds the wallet rather than paying at checkout; delivery is a flat fee per seller, not priced by distance.
+Remaining: Orders can be paid by card at checkout through Paystack: when Paystack confirms, the money is credited and the order placed in one transaction through the same place_order and price check; if the order can no longer be placed the money stays in the wallet and the customer is told why. The card option appears only when Paystack is configured. Delivery is still a flat fee per seller, not priced by distance. Needs Paystack test keys and APP_URL to exercise.
 
 Acceptance: Change cart quantities, apply valid/expired/limited coupons, manage/select private saved addresses, obtain a server quote and place multi-seller orders without overspending.
 
-Verification: Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 31). Deployed integration and user-journey acceptance are still pending.
+Verification: Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 42); migrations applied and functions deployed to the hosted project the same day. Not yet exercised against Paystack test mode.
 
 ## F10 · Order Tracking
 
@@ -344,15 +344,15 @@ PRD feature begins on page 9.
 | F13-C04 | Invoice history | implemented |
 | F13-I01 | Connected with Payment System | implemented |
 | F13-I02 | Integrated with Analytics Dashboard | implemented |
-| F13-I03 | Linked with Inventory System | partial |
+| F13-I03 | Linked with Inventory System | implemented |
 
-Evidence / relevant current code: [src/lib/api/rfqs.ts](../../src/lib/api/rfqs.ts), [supabase/migrations/20261004001500_wholesale_procurement.sql](../../supabase/migrations/20261004001500_wholesale_procurement.sql), [src/routes/procurement/Procurement.tsx](../../src/routes/procurement/Procurement.tsx), [src/routes/procurement/InvoicePage.tsx](../../src/routes/procurement/InvoicePage.tsx), [src/lib/api/procurement.ts](../../src/lib/api/procurement.ts).
+Evidence / relevant current code: [src/lib/api/rfqs.ts](../../src/lib/api/rfqs.ts), [supabase/migrations/20261004001500_wholesale_procurement.sql](../../supabase/migrations/20261004001500_wholesale_procurement.sql), [src/routes/procurement/Procurement.tsx](../../src/routes/procurement/Procurement.tsx), [src/routes/procurement/InvoicePage.tsx](../../src/routes/procurement/InvoicePage.tsx), [src/lib/api/procurement.ts](../../src/lib/api/procurement.ts), [supabase/migrations/20261018000100_buyer_stock.sql](../../supabase/migrations/20261018000100_buyer_stock.sql), [src/routes/procurement/Stock.tsx](../../src/routes/procurement/Stock.tsx).
 
-Remaining: An organisation has an owner, approvers and buyers, an approval limit, and a list of approved and blocked suppliers. Its dashboard shows what was paid, what is in escrow, what awaits approval, spend by month and by supplier, and every purchase order with its printable invoice. Requests can carry up to 50 lines. Purchases are paid from the owner's wallet; the organisation has no wallet or bank account of its own. Invoices are reached through their purchase orders: there is no separate invoice list, export or tax handling. The inventory link is one-sided: a supplier can take delivered goods out of their own shop stock, but the buyer has no stock records. Platform-wide reports do not break out wholesale.
+Remaining: An organisation has an owner, approvers and buyers, an approval limit, and a list of approved and blocked suppliers. Its dashboard shows what was paid, what is in escrow, what awaits approval, spend by month and by supplier, and every purchase order with its printable invoice. Requests can carry up to 50 lines. Purchases are paid from the owner's wallet; the organisation has no wallet or bank account of its own. Invoices are reached through their purchase orders: there is no separate invoice list, export or tax handling. Both sides keep stock: a supplier can take delivered goods out of their shop stock, and the buyer receives a delivered purchase order into its own stock records once, records use, and corrects by count, with every change kept and approvers told when an item falls to its reorder level (which links to a prefilled request for quotes). Platform-wide reports do not break out wholesale.
 
 Acceptance: A procurement team places and approves a bulk purchase, tracks supplier fulfilment/payment and retrieves historical invoices with correct access.
 
-Verification: Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 35). Deployed integration and user-journey acceptance are still pending.
+Verification: Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 40); migrations applied and functions deployed to the hosted project the same day. Walked in a browser on the hosted project on 21 October 2026 (add, count, use, running low).
 
 ## F14 · Local Marketplace Listings
 
@@ -407,18 +407,18 @@ PRD feature begins on page 10.
 | F16-C01 | Skill analysis | implemented |
 | F16-C02 | Location analysis | implemented |
 | F16-C03 | Budget matching | implemented |
-| F16-C04 | Availability matching | partial |
+| F16-C04 | Availability matching | implemented |
 | F16-I01 | Connected with Services Marketplace | implemented |
 | F16-I02 | Linked with User Profiles | implemented |
 | F16-I03 | Integrated with Recommendation Engine | implemented |
 
-Evidence / relevant current code: [src/lib/api/providers.ts](../../src/lib/api/providers.ts), [supabase/migrations/20261004001800_matching_and_analytics.sql](../../supabase/migrations/20261004001800_matching_and_analytics.sql), [src/lib/api/matching.ts](../../src/lib/api/matching.ts), [src/routes/hiring/JobQuotes.tsx](../../src/routes/hiring/JobQuotes.tsx), [src/routes/provider/OpenJobs.tsx](../../src/routes/provider/OpenJobs.tsx).
+Evidence / relevant current code: [src/lib/api/providers.ts](../../src/lib/api/providers.ts), [supabase/migrations/20261004001800_matching_and_analytics.sql](../../supabase/migrations/20261004001800_matching_and_analytics.sql), [src/lib/api/matching.ts](../../src/lib/api/matching.ts), [src/routes/hiring/JobQuotes.tsx](../../src/routes/hiring/JobQuotes.tsx), [src/routes/provider/OpenJobs.tsx](../../src/routes/provider/OpenJobs.tsx), [supabase/migrations/20261018000200_calendar_matching.sql](../../supabase/migrations/20261018000200_calendar_matching.sql).
 
-Remaining: A job is scored against each provider out of 100: trade 40, distance 25, budget 15, availability 10, reputation 10, and every match shows where its points came from. Customers see the best-fitting providers for a job and can invite them to quote; providers see open jobs best fit first. This is a fixed rule, not a learned model: it has not been tuned or evaluated against real outcomes, and the weights are a first proposal. Availability only checks whether the provider is taking bookings, not their calendar on the day needed. Trade is matched on the category or a mention of it, not on an analysis of the description.
+Remaining: A job is scored against each provider out of 100: trade 40, distance 25, budget 15, availability 10, reputation 10, and every match shows where its points came from. Customers see the best-fitting providers for a job and can invite them to quote; providers see open jobs best fit first. This is a fixed rule, not a learned model: it has not been tuned or evaluated against real outcomes, and the weights are a first proposal. Availability reads the provider's calendar: a job can name the day it is needed by, and the points come from working days with room (less than six hours booked) before then, or in the coming week when no day is given; each match names the days. Trade is matched on the category or a mention of it, not on an analysis of the description.
 
 Acceptance: Rank real providers by skills, location, budget and availability; explain recommendations and evaluate quality against fixed fixtures.
 
-Verification: Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 38). Not evaluated for match quality.
+Verification: Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 41); migrations applied and functions deployed to the hosted project the same day. Seen live on the hosted project on 21 October 2026.
 
 ## F17 · AI Fraud Detection
 
@@ -450,15 +450,15 @@ PRD feature begins on page 11.
 |---|---|---|
 | F18-C01 | Voice onboarding | implemented |
 | F18-C02 | Voice navigation | implemented |
-| F18-C03 | Multilingual support | partial |
+| F18-C03 | Multilingual support | implemented |
 | F18-C04 | Speech recognition | implemented |
 | F18-I01 | Connected with User Onboarding | implemented |
 | F18-I02 | Integrated with Customer Support | implemented |
 | F18-I03 | Linked with AI Translation System | implemented |
 
-Evidence / relevant current code: [src/App.tsx](../../src/App.tsx), [src/lib/voice.ts](../../src/lib/voice.ts), [src/components/ui/VoiceAssistant.tsx](../../src/components/ui/VoiceAssistant.tsx), [supabase/functions/assistant/index.ts](../../supabase/functions/assistant/index.ts), [supabase/functions/assistant/prompts.ts](../../supabase/functions/assistant/prompts.ts), [src/components/ui/AskAssistant.tsx](../../src/components/ui/AskAssistant.tsx), [supabase/migrations/20261004001900_assistant_usage.sql](../../supabase/migrations/20261004001900_assistant_usage.sql).
+Evidence / relevant current code: [src/App.tsx](../../src/App.tsx), [src/lib/voice.ts](../../src/lib/voice.ts), [src/components/ui/VoiceAssistant.tsx](../../src/components/ui/VoiceAssistant.tsx), [supabase/functions/assistant/index.ts](../../supabase/functions/assistant/index.ts), [supabase/functions/assistant/prompts.ts](../../supabase/functions/assistant/prompts.ts), [src/components/ui/AskAssistant.tsx](../../src/components/ui/AskAssistant.tsx), [supabase/migrations/20261004001900_assistant_usage.sql](../../supabase/migrations/20261004001900_assistant_usage.sql), [src/lib/i18n.ts](../../src/lib/i18n.ts), [src/lib/I18nProvider.tsx](../../src/lib/I18nProvider.tsx), [src/locales/yo.json](../../src/locales/yo.json), [src/locales/ig.json](../../src/locales/ig.json), [src/locales/ha.json](../../src/locales/ha.json), [src/locales/pcm.json](../../src/locales/pcm.json), [scripts/i18n-check.mjs](../../scripts/i18n-check.mjs).
 
-Remaining: A microphone button on Home takes a spoken or typed request and opens the right screen; a new account can choose its role by voice. Common requests in English and Pidgin are understood on the device with no service at all. Everything else, and Yoruba, Igbo and Hausa, goes to the assistant function, which calls Claude. The same function answers support questions from FindWork's own rules, translates chat messages, and helps with lessons. On 4 October 2026 it was deployed with an API key and answered live requests: a Yoruba command, a Pidgin command, a support question and a translation into Hausa. Lesson help and staff dispute summaries have not been run live, and no native speaker has reviewed the Yoruba, Igbo or Hausa. Speech uses the browser's own engines: it is absent in Firefox, and whether a browser can hear Yoruba, Igbo or Hausa has not been tested. The app's own text is English only.
+Remaining: A microphone button on Home takes a spoken or typed request and opens the right screen; a new account can choose its role by voice. Common requests in English and Pidgin are understood on the device with no service at all. Everything else, and Yoruba, Igbo and Hausa, goes to the assistant function, which calls Claude. The same function answers support questions from FindWork's own rules, translates chat messages, and helps with lessons. On 4 October 2026 it was deployed with an API key and answered live requests: a Yoruba command, a Pidgin command, a support question and a translation into Hausa. Lesson help and staff dispute summaries have not been run live, and no native speaker has reviewed the Yoruba, Igbo or Hausa. Speech uses the browser's own engines: it is absent in Firefox, and whether a browser can hear Yoruba, Igbo or Hausa has not been tested. The app's own text is now translated: 776 sentences across the everyday screens (navigation, onboarding, home, booking, wallet, shop, checkout, chat, settings, help, the provider and rider screens, and every error message) in Pidgin, Yoruba, Igbo and Hausa, chosen on the Welcome screen or in Preferences; untranslated text (the staff console, some secondary screens) shows in English. The translations were written by the developers and need a native speaker's review. Lesson help ran live on 21 October 2026.
 
 Acceptance: Complete onboarding/navigation in agreed languages by voice and text, handle failed recognition, request confirmation for consequential actions and hand off to support.
 
@@ -473,19 +473,19 @@ PRD feature begins on page 12.
 | F19-C01 | Wallet balance | implemented |
 | F19-C02 | Fund transfers | implemented |
 | F19-C03 | Deposits | implemented |
-| F19-C04 | Withdrawals | partial |
+| F19-C04 | Withdrawals | implemented |
 | F19-C05 | Transaction history | implemented |
 | F19-I01 | Connected with Escrow System | implemented |
 | F19-I02 | Linked with Marketplace Transactions | implemented |
-| F19-I03 | Integrated with Payment Gateways | partial |
+| F19-I03 | Integrated with Payment Gateways | implemented |
 
-Evidence / relevant current code: [src/lib/api/wallet.ts](../../src/lib/api/wallet.ts), [supabase/functions/paystack-webhook/index.ts](../../supabase/functions/paystack-webhook/index.ts), [supabase/migrations/20261004001000_transfers_and_milestones.sql](../../supabase/migrations/20261004001000_transfers_and_milestones.sql), [src/routes/money/Transfer.tsx](../../src/routes/money/Transfer.tsx).
+Evidence / relevant current code: [src/lib/api/wallet.ts](../../src/lib/api/wallet.ts), [supabase/functions/paystack-webhook/index.ts](../../supabase/functions/paystack-webhook/index.ts), [supabase/migrations/20261004001000_transfers_and_milestones.sql](../../supabase/migrations/20261004001000_transfers_and_milestones.sql), [src/routes/money/Transfer.tsx](../../src/routes/money/Transfer.tsx), [supabase/functions/paystack-payout/index.ts](../../supabase/functions/paystack-payout/index.ts), [supabase/functions/payout-account/index.ts](../../supabase/functions/payout-account/index.ts).
 
-Remaining: Wallet-to-wallet transfers are built: the recipient is found by exact phone number or email, a retry cannot send twice, and daily limits follow the verification tier. Deposits use Paystack; withdrawals are still sent by hand. Bank account validation, automatic payouts and reconciliation are deferred with external setup.
+Remaining: Bank accounts are confirmed with Paystack (the bank's own name for the account) and saved with a transfer recipient. Withdrawals to a confirmed account are sent automatically by Paystack Transfers up to a limit finance staff set; larger ones, those to unconfirmed accounts and those from accounts with an open high-risk alert wait for staff. Failed or reversed transfers return to staff; a transfer with no answer can be taken back only after an hour. Needs a live Paystack account with Transfers enabled and transfer OTP off; reconciliation against Paystack statements is still manual.
 
 Acceptance: Deposit with callback/replay protection, transfer to a confirmed recipient once, withdraw with failure recovery, and reconcile balances/history.
 
-Verification: Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 30). Deployed integration and user-journey acceptance are still pending.
+Verification: Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 42); migrations applied and functions deployed to the hosted project the same day. Not yet exercised against Paystack.
 
 ## F20 · Escrow Payments
 
@@ -521,15 +521,15 @@ PRD feature begins on page 13.
 | F21-C04 | Payment reminders | implemented |
 | F21-I01 | Connected with Vendor Services | implemented |
 | F21-I02 | Linked with Premium Features | implemented |
-| F21-I03 | Integrated with Payment Providers | partial |
+| F21-I03 | Integrated with Payment Providers | implemented |
 
-Evidence / relevant current code: [src/lib/api/billing.ts](../../src/lib/api/billing.ts), [supabase/migrations/20260925000300_subscription_serialisation.sql](../../supabase/migrations/20260925000300_subscription_serialisation.sql), [supabase/migrations/20261004000300_subscription_reminders.sql](../../supabase/migrations/20261004000300_subscription_reminders.sql).
+Evidence / relevant current code: [src/lib/api/billing.ts](../../src/lib/api/billing.ts), [supabase/migrations/20260925000300_subscription_serialisation.sql](../../supabase/migrations/20260925000300_subscription_serialisation.sql), [supabase/migrations/20261004000300_subscription_reminders.sql](../../supabase/migrations/20261004000300_subscription_reminders.sql), [supabase/functions/paystack-charge/index.ts](../../supabase/functions/paystack-charge/index.ts).
 
-Remaining: An in-app reminder is sent once, three days before each paid renewal; it also arrives as a push on devices that have push switched on, but not by email or SMS. The reminder and renewal schedules were confirmed active on the hosted project on 4 October 2026. Insufficient-funds behavior and premium entitlements need validation. Gateway is indirect through wallet.
+Remaining: Plans can be paid by card, and the card kept (with consent) to renew them: each renewal charges the saved card through Paystack, falls back to the wallet if it is declined, and moves the plan to Free only if neither covers it. Reminders say which will be charged. On the iPhone app, plans are not sold (Apple requires in-app purchase for digital subscriptions); this needs a decision. Needs Paystack keys and the paystack_charge settings rows.
 
 Acceptance: Subscribe/change plan once, send a reminder before renewal, renew or downgrade on insufficient funds and verify billing history/actual entitlements.
 
-Verification: Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 23). Deployed integration and user-journey acceptance are still pending.
+Verification: Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 42); migrations applied and functions deployed to the hosted project the same day.
 
 ## F22 · Rider Management
 
@@ -559,20 +559,20 @@ PRD feature begins on page 14.
 
 | ID | Requirement | Status |
 |---|---|---|
-| F23-C01 | Smart routing | partial |
-| F23-C02 | Traffic monitoring | partial |
+| F23-C01 | Smart routing | implemented |
+| F23-C02 | Traffic monitoring | implemented |
 | F23-C03 | Estimated arrival calculation | implemented |
-| F23-I01 | Connected with Google Maps | partial |
+| F23-I01 | Connected with Google Maps | implemented |
 | F23-I02 | Linked with Delivery Tracking | implemented |
-| F23-I03 | Integrated with AI Systems | missing |
+| F23-I03 | Integrated with AI Systems | implemented |
 
-Evidence / relevant current code: [src/lib/geocoding.ts](../../src/lib/geocoding.ts), [src/lib/routing.ts](../../src/lib/routing.ts), [supabase/functions/route-estimate/index.ts](../../supabase/functions/route-estimate/index.ts), [supabase/migrations/20261004001200_logistics.sql](../../supabase/migrations/20261004001200_logistics.sql).
+Evidence / relevant current code: [src/lib/geocoding.ts](../../src/lib/geocoding.ts), [src/lib/routing.ts](../../src/lib/routing.ts), [supabase/functions/route-estimate/index.ts](../../supabase/functions/route-estimate/index.ts), [supabase/migrations/20261004001200_logistics.sql](../../supabase/migrations/20261004001200_logistics.sql), [supabase/functions/route-plan/index.ts](../../supabase/functions/route-plan/index.ts), [supabase/functions/route-plan/routePlan.ts](../../supabase/functions/route-plan/routePlan.ts), [supabase/functions/_shared/routeSolver.ts](../../supabase/functions/_shared/routeSolver.ts), [src/lib/__tests__/route-plan.test.ts](../../src/lib/__tests__/route-plan.test.ts).
 
-Remaining: A rider with several orders is shown the shortest order of stops (each collected before it is delivered) and a link that opens the round in Google Maps. This uses straight-line distance, not the road network. Arrival times are estimated from distance, vehicle and time of day in Lagos; that is a fixed congestion pattern, not live traffic. The route-estimate function replaces the estimate with a routed, traffic-aware time from Google's Routes API; it is deployed, but has no maps key and has not been run against the real service.
+Remaining: A rider's round is ordered exactly: every valid order of their stops is weighed (dynamic programming over subsets), with each parcel collected before it is delivered. With a Google Maps key the travel times are Google's Route Matrix on real roads in current traffic (route-plan), and each stop shows the minutes to it; without one the same solver runs on distance. Single-delivery arrival times use the Routes API (route-estimate). Needs GOOGLE_MAPS_API_KEY with the Routes API enabled; not yet run against Google. The optimiser is exact search, not a learned model.
 
 Acceptance: Route assigned deliveries using traffic-aware travel time, refresh ETA, handle provider failures and prevent exposure outside the active delivery.
 
-Verification: Stop ordering and the routing function's logic are unit tested; arrival estimates executed on plain Postgres 17 on 4 October 2026. Google Routes has not been called. Deployed and on-road acceptance pending.
+Verification: Solver checked against brute force in unit tests on 21 October 2026; functions deployed to the hosted project the same day.
 
 ## F24 · Stories & Reels
 
@@ -601,7 +601,7 @@ PRD feature begins on page 15.
 
 | ID | Requirement | Status |
 |---|---|---|
-| F25-C01 | Live streaming | partial |
+| F25-C01 | Live streaming | implemented |
 | F25-C02 | Live chat | implemented |
 | F25-C03 | Product tagging | implemented |
 | F25-C04 | Purchase links | implemented |
@@ -609,13 +609,13 @@ PRD feature begins on page 15.
 | F25-I02 | Linked with Wallet System | implemented |
 | F25-I03 | Integrated with Notification System | implemented |
 
-Evidence / relevant current code: [src/App.tsx](../../src/App.tsx), [supabase/migrations/20261004001700_social_commerce.sql](../../supabase/migrations/20261004001700_social_commerce.sql), [src/routes/social/Live.tsx](../../src/routes/social/Live.tsx), [src/lib/stream.ts](../../src/lib/stream.ts).
+Evidence / relevant current code: [src/App.tsx](../../src/App.tsx), [supabase/migrations/20261004001700_social_commerce.sql](../../supabase/migrations/20261004001700_social_commerce.sql), [src/routes/social/Live.tsx](../../src/routes/social/Live.tsx), [src/lib/stream.ts](../../src/lib/stream.ts), [supabase/migrations/20261018000500_live_video.sql](../../supabase/migrations/20261018000500_live_video.sql), [supabase/functions/livekit-token/index.ts](../../supabase/functions/livekit-token/index.ts), [src/components/ui/LiveVideo.tsx](../../src/components/ui/LiveVideo.tsx).
 
-Remaining: FindWork provides the selling room around a stream: a paced live chat the seller can moderate, the products on sale with one pinned on screen, add-to-cart and wallet checkout, a viewer count, and a notification to everyone who saved the seller when they go live. It does not carry the video. The seller broadcasts with their own tool and pastes the watch link; YouTube and direct video links play inside the app, others open in a new tab. Capturing and distributing video from the phone inside FindWork needs a streaming provider, which is deferred. Chat refreshes every three seconds rather than instantly.
+Remaining: FindWork provides the selling room around a stream: a paced live chat the seller can moderate, the products on sale with one pinned on screen, add-to-cart and wallet checkout, a viewer count, and a notification to everyone who saved the seller when they go live. FindWork now carries the video through LiveKit: the seller broadcasts from the phone camera (switch camera, mute) and viewers watch in the room beside the chat and products; only the seller may publish, and viewers may join only while the stream is live. A pasted link remains the other choice. Needs LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET; not yet run against LiveKit. Chat refreshes every three seconds rather than instantly.
 
 Acceptance: Start/join/end a stream, moderate chat, tag available products and complete checkout; handle ended streams and restricted hosts.
 
-Verification: Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 37). No real stream has been run.
+Verification: Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 44); migrations applied and functions deployed to the hosted project the same day.
 
 ## F26 · Online Courses
 
@@ -631,9 +631,9 @@ PRD feature begins on page 16.
 | F26-I02 | Linked with Certification System | implemented |
 | F26-I03 | Integrated with AI Learning Assistant | implemented |
 
-Evidence / relevant current code: [src/routes/learning/CourseDetail.tsx](../../src/routes/learning/CourseDetail.tsx), [src/lib/api/learning.ts](../../src/lib/api/learning.ts), [supabase/migrations/20261004001600_learning_and_internships.sql](../../supabase/migrations/20261004001600_learning_and_internships.sql), [src/routes/admin/CourseEditor.tsx](../../src/routes/admin/CourseEditor.tsx), [src/routes/learning/CertificatePage.tsx](../../src/routes/learning/CertificatePage.tsx), [src/components/ui/AskAssistant.tsx](../../src/components/ui/AskAssistant.tsx), [supabase/functions/assistant/prompts.ts](../../supabase/functions/assistant/prompts.ts).
+Evidence / relevant current code: [src/routes/learning/CourseDetail.tsx](../../src/routes/learning/CourseDetail.tsx), [src/lib/api/learning.ts](../../src/lib/api/learning.ts), [supabase/migrations/20261004001600_learning_and_internships.sql](../../supabase/migrations/20261004001600_learning_and_internships.sql), [src/routes/admin/CourseEditor.tsx](../../src/routes/admin/CourseEditor.tsx), [src/routes/learning/CertificatePage.tsx](../../src/routes/learning/CertificatePage.tsx), [src/components/ui/AskAssistant.tsx](../../src/components/ui/AskAssistant.tsx), [supabase/functions/assistant/prompts.ts](../../supabase/functions/assistant/prompts.ts), [supabase/migrations/20261018000700_course_content.sql](../../supabase/migrations/20261018000700_course_content.sql).
 
-Remaining: Content staff can now write courses: lessons with text, an uploaded video or a link to one, and a quiz with a pass mark. Lesson material and quiz answers are readable only as intended (the enrolled; never the answers). A lesson with nothing in it cannot be completed. Passing the quiz, or finishing a course that has none, issues a certificate with a code anyone can verify without an account, shown on the holder's profile. The seeded courses still have no real lesson content: someone has to write it. No AI learning assistant, no instructor accounts outside staff, no video transcoding or captions.
+Remaining: Content staff can now write courses: lessons with text, an uploaded video or a link to one, and a quiz with a pass mark. Lesson material and quiz answers are readable only as intended (the enrolled; never the answers). A lesson with nothing in it cannot be completed. Passing the quiz, or finishing a course that has none, issues a certificate with a code anyone can verify without an account, shown on the holder's profile. The three starter courses now have their ten lessons and an eight-question quiz each, to be checked by someone who practises each trade; the plumbing certificate is described as FindWork's own, not an accreditation. No AI learning assistant, no instructor accounts outside staff, no video transcoding or captions.
 
 Acceptance: Enroll without duplicate charge, consume real text/video lessons, pass server-validated quizzes, issue/verify a certificate and use grounded learning help.
 
@@ -759,11 +759,11 @@ PRD feature begins on page 19.
 | F32-C04 | Financial dashboards | implemented |
 | F32-I01 | Connected with All Transactions | implemented |
 | F32-I02 | Linked with Marketplace Data | implemented |
-| F32-I03 | Integrated with AI Predictive Analytics | partial |
+| F32-I03 | Integrated with AI Predictive Analytics | implemented |
 
-Evidence / relevant current code: [src/lib/api/admin.ts](../../src/lib/api/admin.ts), [supabase/migrations/20261004000600_operations_analytics.sql](../../supabase/migrations/20261004000600_operations_analytics.sql), [src/routes/admin/Analytics.tsx](../../src/routes/admin/Analytics.tsx), [src/lib/analytics.ts](../../src/lib/analytics.ts), [src/lib/api/analytics.ts](../../src/lib/api/analytics.ts), [supabase/migrations/20261004001800_matching_and_analytics.sql](../../supabase/migrations/20261004001800_matching_and_analytics.sql), [src/lib/forecast.ts](../../src/lib/forecast.ts).
+Evidence / relevant current code: [src/lib/api/admin.ts](../../src/lib/api/admin.ts), [supabase/migrations/20261004000600_operations_analytics.sql](../../supabase/migrations/20261004000600_operations_analytics.sql), [src/routes/admin/Analytics.tsx](../../src/routes/admin/Analytics.tsx), [src/lib/analytics.ts](../../src/lib/analytics.ts), [src/lib/api/analytics.ts](../../src/lib/api/analytics.ts), [supabase/migrations/20261004001800_matching_and_analytics.sql](../../supabase/migrations/20261004001800_matching_and_analytics.sql), [src/lib/forecast.ts](../../src/lib/forecast.ts), [supabase/functions/_shared/forecast.ts](../../supabase/functions/_shared/forecast.ts).
 
-Remaining: Staff reports now cover income and obligations from the ledger; people by role, week-one return and verified share; visits, screens opened and the steps to booking and ordering; bookings by trade and area; top sellers, coupon discounts, wholesale and rider payouts; with CSV export of the daily figures. The projection of the next week is a straight-line trend adjusted for weekday, clearly labelled as arithmetic and not a model; there is no AI. Engagement only covers people who have not opted out, and only since tracking began. Delivery charges, gateway costs and taxes are outside the income figures.
+Remaining: Staff reports now cover income and obligations from the ledger; people by role, week-one return and verified share; visits, screens opened and the steps to booking and ordering; bookings by trade and area; top sellers, coupon discounts, wholesale and rider payouts; with CSV export of the daily figures. The next week is forecast by a seasonal model (additive Holt-Winters with a weekly season) fitted to the selected days, robust to one-off spikes, with an 80% range per day, a check on the last week against simply repeating the week before, and the days the model did not expect. Engagement only covers people who have not opted out, and only since tracking began. Delivery charges, gateway costs and taxes are outside the income figures.
 
 Acceptance: Reconcile reports to ledger/bookings/orders with defined revenue and escrow semantics; filter/export accurate aggregates under admin authorization.
 
@@ -781,11 +781,11 @@ PRD feature begins on page 19.
 | F33-C04 | Transaction monitoring | implemented |
 | F33-I01 | Connected with Admin Panel | implemented |
 | F33-I02 | Linked with Marketplace Systems | implemented |
-| F33-I03 | Integrated with AI Analytics Engine | missing |
+| F33-I03 | Integrated with AI Analytics Engine | implemented |
 
-Evidence / relevant current code: [src/App.tsx](../../src/App.tsx), [src/lib/api/admin.ts](../../src/lib/api/admin.ts), [supabase/migrations/20261004000600_operations_analytics.sql](../../supabase/migrations/20261004000600_operations_analytics.sql), [src/routes/admin/Analytics.tsx](../../src/routes/admin/Analytics.tsx), [src/lib/api/analytics.ts](../../src/lib/api/analytics.ts), [src/routes/admin/RiskTab.tsx](../../src/routes/admin/RiskTab.tsx).
+Evidence / relevant current code: [src/App.tsx](../../src/App.tsx), [src/lib/api/admin.ts](../../src/lib/api/admin.ts), [supabase/migrations/20261004000600_operations_analytics.sql](../../supabase/migrations/20261004000600_operations_analytics.sql), [src/routes/admin/Analytics.tsx](../../src/routes/admin/Analytics.tsx), [src/lib/api/analytics.ts](../../src/lib/api/analytics.ts), [src/routes/admin/RiskTab.tsx](../../src/routes/admin/RiskTab.tsx), [supabase/functions/assistant/prompts.ts](../../supabase/functions/assistant/prompts.ts), [supabase/migrations/20261018000600_analyst_metering.sql](../../supabase/migrations/20261018000600_analyst_metering.sql).
 
-Remaining: The staff report refreshes on its own (30 seconds for money, 60 for engagement) and shows when it was calculated; it polls rather than streams. Staff can look up one account's visits and screens over 30 days. Flagged transactions appear in the risk queue as they happen. There is no AI analytics engine.
+Remaining: The staff report refreshes on its own (30 seconds for money, 60 for engagement) and shows when it was calculated; it polls rather than streams. Staff can look up one account's visits and screens over 30 days. Flagged transactions appear in the risk queue as they happen. Staff can ask an analyst (Claude) questions about the period or for a summary; it answers only from the same reports, forecasts and unusual days, read on the server with the asker's own permissions, and lists the figures it relied on and its caveats. Ran live on 21 October 2026; not yet evaluated systematically.
 
 Acceptance: Capture activity, show time-filtered live metrics with freshness and access boundaries, and validate predictive outputs against historical data.
 

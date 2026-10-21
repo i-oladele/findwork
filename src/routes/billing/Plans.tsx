@@ -8,6 +8,7 @@ import { usePaystackAvailable, usePlans, useStartPayment, useSubscribe, useSubsc
 import { friendlyError } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
 import { goToPaystack } from '../../lib/payRedirect'
+import { digitalPurchasesAllowed } from '../../lib/native'
 
 export function Plans() {
   const plans = usePlans()
@@ -93,7 +94,11 @@ export function Plans() {
                       </div>
                     ))}
                   </div>
-                  {isCurrent ? (
+                  {!digitalPurchasesAllowed && !isCurrent ? (
+                    <div className="flex items-center justify-center w-full h-12 mt-4 rounded-lg bg-cream text-[14px] text-muted">
+                      Plans cannot be changed in the iPhone app
+                    </div>
+                  ) : isCurrent ? (
                     <div className="flex items-center justify-center w-full h-12 mt-4 rounded-lg bg-cream text-[15px] font-semibold text-muted">
                       Current plan
                     </div>

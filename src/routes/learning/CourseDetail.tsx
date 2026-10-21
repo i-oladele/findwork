@@ -28,6 +28,7 @@ import { usePrivateMedia } from '../../lib/api/storage'
 import { friendlyError } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
 import type { QuizQuestion } from '../../lib/database.types'
+import { digitalPurchasesAllowed } from '../../lib/native'
 
 export function CourseDetail() {
   const { id } = useParams<{ id: string }>()
@@ -159,7 +160,7 @@ export function CourseDetail() {
         {error && <Alert className="mt-4">{error}</Alert>}
       </div>
 
-      {!isEnrolled && (
+      {!isEnrolled && (course.price === 0 || digitalPurchasesAllowed) && (
         <div className="sticky bottom-0 left-0 right-0 bg-cream border-t border-line px-[22px] pt-3.5 pb-[max(22px,env(safe-area-inset-bottom))] mt-5">
           {shortfall > 0 ? (
             <Button to={`/wallet/add?amount=${shortfall}&return=/courses/${course.id}`} className="w-full">

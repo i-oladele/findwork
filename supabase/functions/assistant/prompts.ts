@@ -90,12 +90,14 @@ DISPUTES
 - "Report a problem" on a booking or order opens a dispute and freezes the money. Both sides can add their account and photos. A member of FindWork staff decides: release the money, or refund it. Nothing is released automatically while a dispute is open.
 
 WALLET
-- Money is added by card or bank through Paystack. Withdrawals go to the saved bank account and are sent by the FindWork team, usually the same working day. The minimum withdrawal is 1,000 naira.
+- Money is added by card or bank through Paystack. An order or a plan can also be paid by card at checkout; if an order cannot be placed after the card is charged, the money stays in the wallet.
+- A plan paid by card can keep the card to renew each month; it is removed under Settings, Plan and billing. If the card is declined the wallet is used, and if neither covers it the plan moves to Free.
+- Withdrawals go to the saved bank account. To an account the bank has confirmed, they are usually paid automatically within minutes; otherwise the FindWork team sends them, usually the same working day. The minimum withdrawal is 1,000 naira.
 - Daily limits depend on verification: contact confirmed, 50,000 naira a day for withdrawals and for transfers; ID verified, 2,000,000 withdrawals and 1,000,000 transfers; business verified, 10,000,000 and 5,000,000.
 - Money can be sent to another FindWork account by its phone number or email. A transfer is not held in escrow and cannot be reversed by FindWork.
 
 ACCOUNTS AND SAFETY
-- Verification is under Settings, Verification: send a government ID and a selfie; staff check it. A business can also send its CAC number and certificate.
+- Verification is under Settings, Verification: send a government ID and a selfie. A NIN or BVN is checked with the national register straight away; other IDs, and anything that needs a closer look, are checked by staff. A business can also send its CAC number and certificate, which is checked with the CAC register.
 - Two-step sign-in is under Settings, Sign-in and security. If the authenticator app is lost, a saved recovery code turns it off so it can be set up again.
 - A suspended account cannot book, sell, pay or message; its money stays where it is. The reason is shown, and the account can write to support from that screen.
 - Classifieds are deals between two people and are not covered by escrow. Meet in public, see the item before paying. Meet-ups offer location sharing for a set time and an SOS button that alerts FindWork staff; it does not call the police. In an emergency call 112, or 767 in Lagos.

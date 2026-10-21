@@ -129,10 +129,11 @@ checkout offers it as the delivery address.
 - Delete an account from Settings while money is in escrow, or as a
   provider with an accepted job — it should refuse and say why.
 
-### 14. Built in October, not yet walked by anyone
+### 14. Built in early October
 
-Everything below passed its database checks and unit tests, and has never been
-opened in a browser. Expect rough edges; these are the journeys to try first.
+Everything below passed its database checks and unit tests. A first browser
+walk on 21 October covered sign-in, Home and the staff console; the rest has
+not been walked by a person yet.
 
 - **Staff roles.** In `/admin` → Users, give a second account the moderator,
   finance or support role. Each should see only its own tabs. Suspend an
@@ -162,18 +163,57 @@ opened in a browser. Expect rough edges; these are the journeys to try first.
 - **Push.** With the keys set, switch push on in Preferences and trigger a
   notification from another account with the app closed.
 
+### 15. Built 18–21 October
+
+Each needs its provider's test keys set first (README, "Setting up the
+backend"); without them the app hides the feature or says it is off.
+
+- **Card at checkout** (Paystack test keys). Choose "Card or bank transfer",
+  pay with the test card below, and you should land on "Order placed". Change
+  the cart in another tab while paying: the money should be kept in your
+  wallet with the reason.
+- **Plans by card.** Upgrade to Pro by card with "keep the card" ticked; Plan
+  and billing should show the card. Set `renews_at` to the past in the SQL
+  editor and run `select private.renew_subscriptions()`: the card is charged.
+  Remove the card and repeat: the wallet is charged.
+- **Bank accounts and automatic payouts.** Withdraw shows a bank list; the
+  bank's name for the account appears before saving. In `/admin` → Payouts
+  switch automatic payouts on, then withdraw: it should go to "Sending" and
+  then "Sent" (Paystack test transfers). Withdraw above the limit: it waits
+  for staff.
+- **Identity checks** (Dojah sandbox). Get verified with NIN `70123456789` or
+  BVN `22222222222` and any clear selfie; with a matching name the account is
+  verified at once. Use a different name: it waits in `/admin` → Verification
+  with the register's answers and a risk alert. Business: RC `1261103`.
+- **Live video** (LiveKit keys). Schedule a stream "From this phone's camera",
+  start the camera, go live, and watch from a second account.
+- **Stock records.** As a business buyer, receive a delivered purchase order
+  into stock, record use until an item runs low, and follow "Request quotes".
+- **Calendar matching.** Post a job with a "Needed by" date; providers whose
+  calendars are full before then score lower, and each says why.
+- **Rider rounds** (Google Maps key). With two deliveries, the suggested order
+  shows minutes to each stop by road.
+- **Languages.** Choose Yoruba, Igbo, Hausa or Pidgin on Welcome or in
+  Preferences and walk the main screens. Note anything that reads wrongly.
+- **The analyst.** `/admin/analytics` → "Summarise this period".
+- **The phone apps.** `npm run cap:sync`, then run from Xcode or Android
+  Studio on a phone: camera, microphone, location, a Paystack payment and the
+  return to the app.
+
+Paystack test card: `4084 0840 8408 4081`, any future expiry, CVV `408`,
+PIN `0000`, OTP `123456`. Dojah sandbox values:
+https://docs.dojah.io/api-reference/get-started/sandbox-test-data
+
 ## Things that are meant to look unfinished
 
 Not bugs; they are listed in the README under "Before real money":
 
-- Identity verification is done by an admin, not an automated NIN check.
-- Withdrawals are sent by hand from `/admin`.
-- Delivery arrival times are estimates, not routed, until a maps key is set.
-- Live streams play from a link the seller supplies; FindWork carries no video.
-- The assistant answers only once its API key is set; before that, voice
-  understands a short list of English and Pidgin commands.
-- Course lessons have no written material yet.
-- Terms and privacy pages are placeholders.
+- Without each provider's keys: IDs are checked by an admin, withdrawals are
+  sent by hand, cards are not offered, live video comes from a pasted link,
+  and arrival times are estimates.
+- The staff console is in English whatever language is chosen.
+- Terms and privacy pages are marked as drafts for legal review.
+- The iPhone app does not sell plans or paid courses.
 
 ## Before each round
 

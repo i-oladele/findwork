@@ -1,0 +1,33 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "TEAMID.africa.findwork.app"
+        ],
+        "components": [
+          {
+            "/": "/wallet/topup*"
+          },
+          {
+            "/": "/verify*"
+          },
+          {
+            "/": "/reset-password*"
+          },
+          {
+            "/": "/courses/*"
+          },
+          {
+            "/": "/certificates/*"
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "TEAMID.africa.findwork.app"
+    ]
+  }
+}

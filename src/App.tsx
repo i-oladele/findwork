@@ -1,7 +1,8 @@
 import { track } from './lib/tracking'
 import { useAuth } from './lib/authContext'
 import { Suspense, lazy, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigationType } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
+import { startNativeShell } from './lib/native'
 
 import { ProtectedLayout, PublicOnlyLayout } from './components/system/RouteLayouts'
 import { NotFound } from './components/system/NotFound'
@@ -129,6 +130,9 @@ function ScrollToTop() {
   useEffect(() => {
     if (navigation !== 'POP') window.scrollTo(0, 0)
   }, [pathname, navigation])
+  // The phone apps: status bar, splash screen, links that open the app, back button.
+  const navigate = useNavigate()
+  useEffect(() => { void startNativeShell((path) => navigate(path)) }, [navigate])
   // Which kinds of screen are opened, for signed-in people who have not opted out.
   useEffect(() => {
     if (signedIn) track('page_view', pathname)

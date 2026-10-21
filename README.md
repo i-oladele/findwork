@@ -3,11 +3,13 @@
 A mobile marketplace for Nigeria: hire trusted local providers, buy and sell
 goods, move money through escrow, and settle disputes — in one app.
 
-> **Status: ready for testing, not for real money.** Every screen reads and
-> writes real data, escrow works end to end, and top-ups run through Paystack.
-> Before taking real payments it still needs a licensed payments partner, KYC,
-> written legal documents and a native build. See
-> [Before real money](#before-real-money).
+> **Status: every PRD requirement is built; ready for testing, not for real
+> money.** Every screen reads and writes real data and escrow works end to end.
+> Card payments, automatic payouts, identity checks, live video and road
+> routing are built against Paystack, Dojah, LiveKit and Google and switch on
+> when their keys are set. Before taking real payments it still needs a
+> licensed payments partner, approved legal documents, store releases and the
+> steps in [Before real money](#before-real-money).
 
 ## Stack
 
@@ -38,25 +40,48 @@ console warns you why.
 supabase login
 supabase link --project-ref <your-project-ref>
 supabase db push --include-seed         # migrations + demo catalog and accounts
-supabase functions deploy delete-account paystack-initialize paystack-verify
-supabase functions deploy mfa-recover route-estimate assistant
-supabase functions deploy paystack-webhook send-sms send-push --no-verify-jwt
-supabase secrets set PAYSTACK_SECRET_KEY=sk_test_... APP_URL=https://your-app-url
+supabase functions deploy delete-account paystack-initialize paystack-verify payout-account
+supabase functions deploy mfa-recover route-estimate route-plan assistant identity-check livekit-token
+supabase functions deploy paystack-webhook paystack-charge paystack-payout send-sms send-push --no-verify-jwt
 ```
 
-In the Paystack dashboard, set the webhook URL to
-`https://<project-ref>.supabase.co/functions/v1/paystack-webhook`.
-
-Four things work without any further setup and get better with a key. Each is
-optional, and the app says so on screen rather than failing when one is
-missing:
+Every outside service is optional. Without its keys the app says so on screen
+and carries on without it; with them, the feature switches on:
 
 | What | Without it | To switch it on |
 | --- | --- | --- |
-| Assistant: voice commands beyond the built-in phrases, support answers, chat translation, lesson help, dispute summaries | Common English and Pidgin commands still work on the device; everything else shows a hint | `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...` (`ASSISTANT_MODEL` optionally picks the model; a key that is not scoped to a workspace also needs `ANTHROPIC_WORKSPACE_ID=wrkspc_...`) |
-| Routed arrival times for deliveries | A straight-line estimate, labelled as an estimate | `supabase secrets set GOOGLE_MAPS_API_KEY=...` with the Routes API enabled |
+| Card payments: top-ups, paying for an order or a plan by card, saved cards for renewals | The card option is hidden; people pay from the wallet, topped up by staff | Paystack, below |
+| Confirmed bank accounts and automatic payouts | People type their bank details; staff send every withdrawal | Paystack, below |
+| Identity checks: NIN or BVN with face match, phone (SIM), CAC | Staff review every ID and business by hand | `supabase secrets set DOJAH_APP_ID=... DOJAH_SECRET_KEY=... DOJAH_BASE_URL=https://sandbox.dojah.io` (drop the base URL for live) |
+| Live video for selling, from the phone camera | Sellers paste a link from another streaming app | `supabase secrets set LIVEKIT_URL=wss://<project>.livekit.cloud LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=...` |
+| Road routing in traffic: rider rounds and arrival times | Rounds are planned on distance; arrival times are estimates, labelled as such | `supabase secrets set GOOGLE_MAPS_API_KEY=...` with the Routes API enabled |
+| Assistant: voice commands beyond the built-in phrases, support answers, chat translation, lesson help, dispute summaries, the staff analyst | Common English and Pidgin commands still work on the device; everything else shows a hint | `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...` (`ASSISTANT_MODEL` optionally picks the model; a key that is not scoped to a workspace also needs `ANTHROPIC_WORKSPACE_ID=wrkspc_...`) |
 | Push notifications | The in-app inbox only; the push switch is hidden | See below |
 | Second sign-in step (authenticator app) | Not offered | Authentication → Multi-Factor: enable TOTP |
+| Text-message sign-up codes | Phone sign-up moves people to the email form | Termii, under the auth settings below |
+
+**Paystack.** With test keys first (`sk_test_…`):
+
+```bash
+supabase secrets set PAYSTACK_SECRET_KEY=sk_test_... APP_URL=https://your-app-url \
+  PAYSTACK_HOOK_SECRET=<a long random string>
+```
+
+In the Paystack dashboard set the webhook URL to
+`https://<project-ref>.supabase.co/functions/v1/paystack-webhook`. For
+automatic payouts, enable Transfers and turn off OTP for transfers
+(Settings → Preferences), and keep money in the Paystack balance. Then tell the
+database where the charge and payout functions are (SQL editor, once):
+
+```sql
+insert into private.settings values
+  ('paystack_charge_url', 'https://<project-ref>.supabase.co/functions/v1/paystack-charge'),
+  ('paystack_payout_url', 'https://<project-ref>.supabase.co/functions/v1/paystack-payout'),
+  ('paystack_hook_secret', '<the same PAYSTACK_HOOK_SECRET>');
+```
+
+Finance staff then switch automatic payouts on, and set their limit, in
+`/admin` → Payouts. Until they do, every withdrawal waits for staff.
 
 Push takes three steps. Make a key pair with `npx web-push generate-vapid-keys`,
 then:
@@ -213,6 +238,49 @@ risk alerts and analytics · the assistant.
 tracks each PRD requirement against the code, and says plainly which ones stop
 at an account that has not been opened yet.
 
+## Translations
+
+The app's own text is in English, Nigerian Pidgin, Yoruba, Igbo and Hausa,
+chosen on the Welcome screen or in Settings → Preferences. The English
+sentence is the key: wrap new text in `t('...')` from `useT()`
+(`src/lib/i18n.ts`), or mark a label defined in a list with `msg('...')`, and
+add the translation to each file in `src/locales/`. Anything untranslated shows
+in English. `npm run i18n:check` (run by CI) fails if a wrapped sentence is
+missing from a catalog or its placeholders differ. The translations were
+written by the developers and need a native speaker's review.
+
+## Phone apps
+
+The iPhone and Android apps are the same web app in a Capacitor shell
+(`capacitor.config.ts`, `ios/`, `android/`). Inside them,
+`src/lib/native.ts` handles the status bar and splash screen, links to the
+website that open the app (payment returns, sign-up and password emails),
+Android's back button, and payment pages in an in-app browser.
+
+```bash
+npm run cap:sync      # build the web app and copy it into both projects
+npx cap open ios      # Xcode
+npx cap open android  # Android Studio
+```
+
+Before a store build:
+
+- **iPhone:** Xcode must be the selected developer tool
+  (`sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`). Set the
+  signing team, add the Associated Domains capability with
+  `applinks:findwork.africa` and `webcredentials:findwork.africa`, and put the
+  team ID in place of `TEAMID` in `public/.well-known/apple-app-site-association`.
+- **Android:** install Android Studio; put the Play app-signing key's SHA-256
+  in `public/.well-known/assetlinks.json`. The app-link host is in
+  `android/app/src/main/AndroidManifest.xml`.
+- **Digital purchases on iPhone:** Apple requires its in-app purchase for
+  digital goods, so the iPhone app does not sell plans or paid courses
+  (`digitalPurchasesAllowed` in `src/lib/native.ts`). Bookings, goods and
+  top-ups are not affected. Decide whether to add in-app purchase.
+- **Push in the apps** needs native push (APNs and Firebase Cloud Messaging);
+  web push does not reach an app. Passkeys in the apps need the
+  `webcredentials` association above.
+
 ## Commands
 
 ```bash
@@ -225,6 +293,8 @@ npm run test:watch
 
 npm run prd:report  # rebuild the PRD checklist from prd-status.json
 npm run prd:check   # fail if the checklist is out of date (CI runs this)
+npm run i18n:check  # fail if a translation is missing (CI runs this)
+npm run cap:sync    # build and copy into the iPhone and Android projects
 
 # Business rules, against any seeded database (never production):
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/checks/business_rules.sql
@@ -235,17 +305,17 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/checks/business_rules.sql
 Honest list of what stands between this and taking real payments.
 
 **Compliance.** Holding customer funds in Nigeria means partnering with a
-licensed PSP rather than touching float directly, plus KYC/AML tiers and NDPR
-registration. Identity verification is a human step today: a provider asks,
-an admin checks them and switches on the badge. Wiring up a KYC vendor
-(Smile ID, Dojah, Prembly) replaces that.
+licensed PSP rather than touching float directly, plus KYC/AML rules for each
+verification tier and NDPC registration. Identity checks against the national
+registers are built through Dojah and need its keys; until then an admin
+checks every ID by hand.
 
-**Payouts.** Withdrawals leave the provider's balance immediately and queue in
-`/admin` for the team to send by bank transfer. Automating them through
-Paystack Transfers is the next step, and needs a live Paystack account. A
-top-up that Paystack confirms after its account was deleted is never
-credited; it waits in the same queue to be refunded from the Paystack
-dashboard.
+**Payouts.** Withdrawals leave the balance immediately. To bank accounts
+confirmed with Paystack they are sent automatically by Paystack Transfers, up
+to a limit finance sets in `/admin` → Payouts; everything else is sent by
+hand. Reconciliation against Paystack statements is manual. A top-up that
+Paystack confirms after its account was deleted is never credited; it waits in
+the Payouts queue to be refunded from the Paystack dashboard.
 
 **Fulfilment.** The shop sells FindWork's own catalog, which an admin marks
 dispatched and delivered in `/admin`, and goods listed by providers, who send
@@ -253,8 +323,8 @@ their own orders from the provider dashboard. A provider's money is held in
 escrow until the customer confirms the order arrived, or for a week after
 dispatch. Riders apply in the app, are approved by staff, and take deliveries
 from a queue; the customer follows the rider on a map and hands over a code on
-arrival. Arrival times are straight-line estimates until a Google Maps key is
-set, and nothing reads live traffic.
+arrival. With a Google Maps key, rider rounds and arrival times use road times
+in current traffic; without one, they are estimates.
 
 **Maps.** Address search and the map on "Add your area" use free
 OpenStreetMap services (Photon for search, openstreetmap.org for map tiles),
@@ -262,29 +332,25 @@ which ask for fair use and have no uptime promise. Past early traffic, move to
 a paid provider: search lives in `src/lib/geocoding.ts`, tiles in
 `src/components/ui/LocationMap.tsx`.
 
-**Native.** There is no mobile app yet — this is a mobile-shaped web app that
-handles phone safe areas, so it behaves correctly in a phone browser, and can
-be added to a phone's Home Screen. A store build needs Capacitor, native push,
-camera access for KYC, biometric sign-in, an app icon and splash screens.
+**Store review.** The terms of service and privacy policy
+(`src/legal/documents.ts`) are drafts written from how the app works, shown as
+drafts in the app; a lawyer must review them and fill in the bracketed
+details. The iPhone in-app purchase decision above must be made before
+submission.
 
-**Store review.** Privacy policy and terms are still placeholders and must be
-written before submission. Selling subscription plans on iOS outside Apple's
-in-app purchase is the most common cause of marketplace-app rejection and
-needs a decision before an iOS build.
-
-**Rules, not models.** Job matching, recommendations, the trust score and the
+**Rules and models.** Job matching, recommendations, the trust score and the
 fraud alerts are fixed rules with weights and thresholds chosen while
 building. They explain themselves on screen, and none of them has seen real
-activity, so expect to tune them. The assistant is the only part that calls a
-model, and it has not yet been run against the live API.
+activity, so expect to tune them. Forecasts use a seasonal model with a
+backtest, and rider rounds are optimised exactly. The assistant, translation,
+lesson help, dispute summaries and the staff analyst call Claude.
 
-**Live selling.** A seller can schedule a stream, pin products, chat and take
-orders, but FindWork does not carry video: the stream plays from a link the
-seller pastes in. Hosting video means choosing a streaming provider.
+**Operations.** Staff procedures for every console queue are in
+`docs/operations/support-procedures.md`. There is no on-call rota for SOS
+alerts yet; do not promote the SOS button until there is.
 
-**Product gaps.** Course lessons have no written content yet; staff can now
-write lessons and quizzes in `/admin/courses`. Every plan now advertises only
-what it actually does — if you add a
-feature to the pricing, add it to `subscription_plans.features` and make it
-real, because the fee test checks the advertised percentage against the
-commission actually charged.
+**Content.** The three starter courses have lessons and quizzes written by
+the developers; have someone who practises each trade check them. Every plan
+advertises only what it actually does: if you add a feature to the pricing,
+add it to `subscription_plans.features` and make it real, because the fee test
+checks the advertised percentage against the commission actually charged.

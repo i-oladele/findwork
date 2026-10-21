@@ -1,6 +1,6 @@
 {
-  "reviewed_at": "2026-10-04",
-  "baseline_commit": "8c5fe9f",
+  "reviewed_at": "2026-10-21",
+  "baseline_commit": "7c37b51",
   "source": "docs/requirements/functionality.md",
   "features": [
     {
@@ -48,7 +48,7 @@
         },
         {
           "requirement": "Integrates with Notification System for OTP delivery",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "Connects with Fraud Detection System for suspicious login monitoring",
@@ -65,7 +65,7 @@
         "src/components/system/MfaChallenge.tsx",
         "supabase/functions/mfa-recover/index.ts"
       ],
-      "remaining": "Two-step sign-in with an authenticator app and single-use recovery codes is built, and an account that has it cannot use the API or spend on a password-only session. A sign-in from a new device notifies the owner and unusual patterns raise a risk alert. On 4 October 2026 the mfa-recover function was deployed and the API pre-request hook was confirmed installed on the hosted project; neither has been exercised there yet with a real second step or a suspended account. Phone codes cannot be sent until the Termii secrets are set. Email, SMS, OAuth and passkeys need hosted/device verification.",
+      "remaining": "Two-step sign-in with an authenticator app and single-use recovery codes is built, and an account that has it cannot use the API or spend on a password-only session. A sign-in from a new device notifies the owner and unusual patterns raise a risk alert. On 4 October 2026 the mfa-recover function was deployed and the API pre-request hook was confirmed installed on the hosted project; neither has been exercised there yet with a real second step or a suspended account. Phone codes go through Termii by the send-sms hook; the code is complete and deployed, and starts working once the Termii secrets and the Supabase SMS hook are set. Email, SMS, OAuth and passkeys need hosted/device verification.",
       "acceptance": "Register with email and phone, verify/resend/expire a code, recover a password, sign in socially and with a passkey, challenge MFA, revoke a session, and review a suspicious-login event.",
       "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql sections 27 and 28). Deployed integration and user-journey acceptance are still pending."
     },
@@ -125,29 +125,29 @@
       "components": [
         {
           "requirement": "BVN verification",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "NIN verification",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "CAC verification",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "Face verification",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "SIM verification",
-          "status": "partial"
+          "status": "implemented"
         }
       ],
       "integrations": [
         {
           "requirement": "Connected to Fraud Detection Engine",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "Linked with Wallet & Payments Module",
@@ -161,11 +161,16 @@
       "evidence": [
         "src/routes/onboarding/GetVerified.tsx",
         "supabase/migrations/20260925000900_identity_verification.sql",
-        "supabase/migrations/20261004000900_risk_and_trust.sql"
+        "supabase/migrations/20261004000900_risk_and_trust.sql",
+        "supabase/migrations/20261018000400_identity_checks.sql",
+        "supabase/functions/identity-check/index.ts",
+        "supabase/functions/identity-check/identityCheck.ts",
+        "supabase/functions/_shared/dojah.ts",
+        "src/lib/__tests__/identity-check.test.ts"
       ],
-      "remaining": "NIN/BVN documents, selfies and CAC certificates are reviewed by staff; there is still no authoritative BVN, NIN, CAC registry, face-match or NIN-SIM check (phone OTP only proves possession of the SIM). Verification now has four tiers that set daily withdrawal limits and feed the trust score. The fraud rules do not yet use vendor or document signals. External setup deferred.",
+      "remaining": "Built against Dojah: a NIN or BVN is looked up on the national register with the person's name, the selfie is matched to the register's photo, the account's phone number is checked against the register's owner of that ID (SIM), and a business is checked on the CAC register by RC number, name and status. When every required check matches the account is verified at once; anything else stays with staff beside the register's answers, and mismatches, missing records and duplicate IDs raise risk alerts (the fraud link). Nothing is rejected automatically. Needs DOJAH_APP_ID and DOJAH_SECRET_KEY (sandbox first); until then review stays by hand. Not yet run against Dojah's sandbox.",
       "acceptance": "Exercise each verification method, rejection and retry; validate signed vendor callbacks and evidence access/retention; apply verified tiers to trust and payments.",
-      "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 29). Deployed integration and user-journey acceptance are still pending."
+      "verification": "Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 43); migrations applied and functions deployed to the hosted project the same day. Matching rules unit tested; not yet exercised against Dojah."
     },
     {
       "id": "F04",
@@ -458,7 +463,7 @@
       "integrations": [
         {
           "requirement": "Integrated with Payment Gateway",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "Connected with Logistics Module",
@@ -475,11 +480,14 @@
         "supabase/migrations/20261004000100_saved_addresses.sql",
         "supabase/migrations/20261004001100_variants_and_coupons.sql",
         "src/routes/provider/Coupons.tsx",
-        "src/store/cart.ts"
+        "src/store/cart.ts",
+        "supabase/migrations/20261018000300_paystack_direct.sql",
+        "supabase/functions/_shared/payments.ts",
+        "src/lib/__tests__/payments.test.ts"
       ],
-      "remaining": "Coupons are built: percentage or fixed amount, minimum spend, cap, end date, total and per-customer limits. A seller's coupon comes out of that seller's proceeds; a FindWork coupon applies only to FindWork's own catalog. One code per checkout. The quote the customer sees and the amount charged come from the same pricing function. A dispatched order creates a delivery for riders. The payment gateway funds the wallet rather than paying at checkout; delivery is a flat fee per seller, not priced by distance.",
+      "remaining": "Orders can be paid by card at checkout through Paystack: when Paystack confirms, the money is credited and the order placed in one transaction through the same place_order and price check; if the order can no longer be placed the money stays in the wallet and the customer is told why. The card option appears only when Paystack is configured. Delivery is still a flat fee per seller, not priced by distance. Needs Paystack test keys and APP_URL to exercise.",
       "acceptance": "Change cart quantities, apply valid/expired/limited coupons, manage/select private saved addresses, obtain a server quote and place multi-seller orders without overspending.",
-      "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 31). Deployed integration and user-journey acceptance are still pending."
+      "verification": "Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 42); migrations applied and functions deployed to the hosted project the same day. Not yet exercised against Paystack test mode."
     },
     {
       "id": "F10",
@@ -653,7 +661,7 @@
         },
         {
           "requirement": "Linked with Inventory System",
-          "status": "partial"
+          "status": "implemented"
         }
       ],
       "evidence": [
@@ -661,11 +669,13 @@
         "supabase/migrations/20261004001500_wholesale_procurement.sql",
         "src/routes/procurement/Procurement.tsx",
         "src/routes/procurement/InvoicePage.tsx",
-        "src/lib/api/procurement.ts"
+        "src/lib/api/procurement.ts",
+        "supabase/migrations/20261018000100_buyer_stock.sql",
+        "src/routes/procurement/Stock.tsx"
       ],
-      "remaining": "An organisation has an owner, approvers and buyers, an approval limit, and a list of approved and blocked suppliers. Its dashboard shows what was paid, what is in escrow, what awaits approval, spend by month and by supplier, and every purchase order with its printable invoice. Requests can carry up to 50 lines. Purchases are paid from the owner's wallet; the organisation has no wallet or bank account of its own. Invoices are reached through their purchase orders: there is no separate invoice list, export or tax handling. The inventory link is one-sided: a supplier can take delivered goods out of their own shop stock, but the buyer has no stock records. Platform-wide reports do not break out wholesale.",
+      "remaining": "An organisation has an owner, approvers and buyers, an approval limit, and a list of approved and blocked suppliers. Its dashboard shows what was paid, what is in escrow, what awaits approval, spend by month and by supplier, and every purchase order with its printable invoice. Requests can carry up to 50 lines. Purchases are paid from the owner's wallet; the organisation has no wallet or bank account of its own. Invoices are reached through their purchase orders: there is no separate invoice list, export or tax handling. Both sides keep stock: a supplier can take delivered goods out of their shop stock, and the buyer receives a delivered purchase order into its own stock records once, records use, and corrects by count, with every change kept and approvers told when an item falls to its reorder level (which links to a prefilled request for quotes). Platform-wide reports do not break out wholesale.",
       "acceptance": "A procurement team places and approves a bulk purchase, tracks supplier fulfilment/payment and retrieves historical invoices with correct access.",
-      "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 35). Deployed integration and user-journey acceptance are still pending."
+      "verification": "Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 40); migrations applied and functions deployed to the hosted project the same day. Walked in a browser on the hosted project on 21 October 2026 (add, count, use, running low)."
     },
     {
       "id": "F14",
@@ -781,7 +791,7 @@
         },
         {
           "requirement": "Availability matching",
-          "status": "partial"
+          "status": "implemented"
         }
       ],
       "integrations": [
@@ -803,11 +813,12 @@
         "supabase/migrations/20261004001800_matching_and_analytics.sql",
         "src/lib/api/matching.ts",
         "src/routes/hiring/JobQuotes.tsx",
-        "src/routes/provider/OpenJobs.tsx"
+        "src/routes/provider/OpenJobs.tsx",
+        "supabase/migrations/20261018000200_calendar_matching.sql"
       ],
-      "remaining": "A job is scored against each provider out of 100: trade 40, distance 25, budget 15, availability 10, reputation 10, and every match shows where its points came from. Customers see the best-fitting providers for a job and can invite them to quote; providers see open jobs best fit first. This is a fixed rule, not a learned model: it has not been tuned or evaluated against real outcomes, and the weights are a first proposal. Availability only checks whether the provider is taking bookings, not their calendar on the day needed. Trade is matched on the category or a mention of it, not on an analysis of the description.",
+      "remaining": "A job is scored against each provider out of 100: trade 40, distance 25, budget 15, availability 10, reputation 10, and every match shows where its points came from. Customers see the best-fitting providers for a job and can invite them to quote; providers see open jobs best fit first. This is a fixed rule, not a learned model: it has not been tuned or evaluated against real outcomes, and the weights are a first proposal. Availability reads the provider's calendar: a job can name the day it is needed by, and the points come from working days with room (less than six hours booked) before then, or in the coming week when no day is given; each match names the days. Trade is matched on the category or a mention of it, not on an analysis of the description.",
       "acceptance": "Rank real providers by skills, location, budget and availability; explain recommendations and evaluate quality against fixed fixtures.",
-      "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 38). Not evaluated for match quality."
+      "verification": "Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 41); migrations applied and functions deployed to the hosted project the same day. Seen live on the hosted project on 21 October 2026."
     },
     {
       "id": "F17",
@@ -870,7 +881,7 @@
         },
         {
           "requirement": "Multilingual support",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "Speech recognition",
@@ -898,9 +909,16 @@
         "supabase/functions/assistant/index.ts",
         "supabase/functions/assistant/prompts.ts",
         "src/components/ui/AskAssistant.tsx",
-        "supabase/migrations/20261004001900_assistant_usage.sql"
+        "supabase/migrations/20261004001900_assistant_usage.sql",
+        "src/lib/i18n.ts",
+        "src/lib/I18nProvider.tsx",
+        "src/locales/yo.json",
+        "src/locales/ig.json",
+        "src/locales/ha.json",
+        "src/locales/pcm.json",
+        "scripts/i18n-check.mjs"
       ],
-      "remaining": "A microphone button on Home takes a spoken or typed request and opens the right screen; a new account can choose its role by voice. Common requests in English and Pidgin are understood on the device with no service at all. Everything else, and Yoruba, Igbo and Hausa, goes to the assistant function, which calls Claude. The same function answers support questions from FindWork's own rules, translates chat messages, and helps with lessons. On 4 October 2026 it was deployed with an API key and answered live requests: a Yoruba command, a Pidgin command, a support question and a translation into Hausa. Lesson help and staff dispute summaries have not been run live, and no native speaker has reviewed the Yoruba, Igbo or Hausa. Speech uses the browser's own engines: it is absent in Firefox, and whether a browser can hear Yoruba, Igbo or Hausa has not been tested. The app's own text is English only.",
+      "remaining": "A microphone button on Home takes a spoken or typed request and opens the right screen; a new account can choose its role by voice. Common requests in English and Pidgin are understood on the device with no service at all. Everything else, and Yoruba, Igbo and Hausa, goes to the assistant function, which calls Claude. The same function answers support questions from FindWork's own rules, translates chat messages, and helps with lessons. On 4 October 2026 it was deployed with an API key and answered live requests: a Yoruba command, a Pidgin command, a support question and a translation into Hausa. Lesson help and staff dispute summaries have not been run live, and no native speaker has reviewed the Yoruba, Igbo or Hausa. Speech uses the browser's own engines: it is absent in Firefox, and whether a browser can hear Yoruba, Igbo or Hausa has not been tested. The app's own text is now translated: 776 sentences across the everyday screens (navigation, onboarding, home, booking, wallet, shop, checkout, chat, settings, help, the provider and rider screens, and every error message) in Pidgin, Yoruba, Igbo and Hausa, chosen on the Welcome screen or in Preferences; untranslated text (the staff console, some secondary screens) shows in English. The translations were written by the developers and need a native speaker's review. Lesson help ran live on 21 October 2026.",
       "acceptance": "Complete onboarding/navigation in agreed languages by voice and text, handle failed recognition, request confirmation for consequential actions and hand off to support.",
       "verification": "Command parsing, prompts and answer handling are unit tested; metering executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 39). Four live requests succeeded on the hosted project the same day. Speech has not been tried on devices."
     },
@@ -923,7 +941,7 @@
         },
         {
           "requirement": "Withdrawals",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "Transaction history",
@@ -941,18 +959,20 @@
         },
         {
           "requirement": "Integrated with Payment Gateways",
-          "status": "partial"
+          "status": "implemented"
         }
       ],
       "evidence": [
         "src/lib/api/wallet.ts",
         "supabase/functions/paystack-webhook/index.ts",
         "supabase/migrations/20261004001000_transfers_and_milestones.sql",
-        "src/routes/money/Transfer.tsx"
+        "src/routes/money/Transfer.tsx",
+        "supabase/functions/paystack-payout/index.ts",
+        "supabase/functions/payout-account/index.ts"
       ],
-      "remaining": "Wallet-to-wallet transfers are built: the recipient is found by exact phone number or email, a retry cannot send twice, and daily limits follow the verification tier. Deposits use Paystack; withdrawals are still sent by hand. Bank account validation, automatic payouts and reconciliation are deferred with external setup.",
+      "remaining": "Bank accounts are confirmed with Paystack (the bank's own name for the account) and saved with a transfer recipient. Withdrawals to a confirmed account are sent automatically by Paystack Transfers up to a limit finance staff set; larger ones, those to unconfirmed accounts and those from accounts with an open high-risk alert wait for staff. Failed or reversed transfers return to staff; a transfer with no answer can be taken back only after an hour. Needs a live Paystack account with Transfers enabled and transfer OTP off; reconciliation against Paystack statements is still manual.",
       "acceptance": "Deposit with callback/replay protection, transfer to a confirmed recipient once, withdraw with failure recovery, and reconcile balances/history.",
-      "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 30). Deployed integration and user-journey acceptance are still pending."
+      "verification": "Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 42); migrations applied and functions deployed to the hosted project the same day. Not yet exercised against Paystack."
     },
     {
       "id": "F20",
@@ -1034,17 +1054,18 @@
         },
         {
           "requirement": "Integrated with Payment Providers",
-          "status": "partial"
+          "status": "implemented"
         }
       ],
       "evidence": [
         "src/lib/api/billing.ts",
         "supabase/migrations/20260925000300_subscription_serialisation.sql",
-        "supabase/migrations/20261004000300_subscription_reminders.sql"
+        "supabase/migrations/20261004000300_subscription_reminders.sql",
+        "supabase/functions/paystack-charge/index.ts"
       ],
-      "remaining": "An in-app reminder is sent once, three days before each paid renewal; it also arrives as a push on devices that have push switched on, but not by email or SMS. The reminder and renewal schedules were confirmed active on the hosted project on 4 October 2026. Insufficient-funds behavior and premium entitlements need validation. Gateway is indirect through wallet.",
+      "remaining": "Plans can be paid by card, and the card kept (with consent) to renew them: each renewal charges the saved card through Paystack, falls back to the wallet if it is declined, and moves the plan to Free only if neither covers it. Reminders say which will be charged. On the iPhone app, plans are not sold (Apple requires in-app purchase for digital subscriptions); this needs a decision. Needs Paystack keys and the paystack_charge settings rows.",
       "acceptance": "Subscribe/change plan once, send a reminder before renewal, renew or downgrade on insufficient funds and verify billing history/actual entitlements.",
-      "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 23). Deployed integration and user-journey acceptance are still pending."
+      "verification": "Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 42); migrations applied and functions deployed to the hosted project the same day."
     },
     {
       "id": "F22",
@@ -1100,11 +1121,11 @@
       "components": [
         {
           "requirement": "Smart routing",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "Traffic monitoring",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "Estimated arrival calculation",
@@ -1114,7 +1135,7 @@
       "integrations": [
         {
           "requirement": "Connected with Google Maps",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "Linked with Delivery Tracking",
@@ -1122,18 +1143,22 @@
         },
         {
           "requirement": "Integrated with AI Systems",
-          "status": "missing"
+          "status": "implemented"
         }
       ],
       "evidence": [
         "src/lib/geocoding.ts",
         "src/lib/routing.ts",
         "supabase/functions/route-estimate/index.ts",
-        "supabase/migrations/20261004001200_logistics.sql"
+        "supabase/migrations/20261004001200_logistics.sql",
+        "supabase/functions/route-plan/index.ts",
+        "supabase/functions/route-plan/routePlan.ts",
+        "supabase/functions/_shared/routeSolver.ts",
+        "src/lib/__tests__/route-plan.test.ts"
       ],
-      "remaining": "A rider with several orders is shown the shortest order of stops (each collected before it is delivered) and a link that opens the round in Google Maps. This uses straight-line distance, not the road network. Arrival times are estimated from distance, vehicle and time of day in Lagos; that is a fixed congestion pattern, not live traffic. The route-estimate function replaces the estimate with a routed, traffic-aware time from Google's Routes API; it is deployed, but has no maps key and has not been run against the real service.",
+      "remaining": "A rider's round is ordered exactly: every valid order of their stops is weighed (dynamic programming over subsets), with each parcel collected before it is delivered. With a Google Maps key the travel times are Google's Route Matrix on real roads in current traffic (route-plan), and each stop shows the minutes to it; without one the same solver runs on distance. Single-delivery arrival times use the Routes API (route-estimate). Needs GOOGLE_MAPS_API_KEY with the Routes API enabled; not yet run against Google. The optimiser is exact search, not a learned model.",
       "acceptance": "Route assigned deliveries using traffic-aware travel time, refresh ETA, handle provider failures and prevent exposure outside the active delivery.",
-      "verification": "Stop ordering and the routing function's logic are unit tested; arrival estimates executed on plain Postgres 17 on 4 October 2026. Google Routes has not been called. Deployed and on-road acceptance pending."
+      "verification": "Solver checked against brute force in unit tests on 21 October 2026; functions deployed to the hosted project the same day."
     },
     {
       "id": "F24",
@@ -1184,7 +1209,7 @@
       "components": [
         {
           "requirement": "Live streaming",
-          "status": "partial"
+          "status": "implemented"
         },
         {
           "requirement": "Live chat",
@@ -1217,11 +1242,14 @@
         "src/App.tsx",
         "supabase/migrations/20261004001700_social_commerce.sql",
         "src/routes/social/Live.tsx",
-        "src/lib/stream.ts"
+        "src/lib/stream.ts",
+        "supabase/migrations/20261018000500_live_video.sql",
+        "supabase/functions/livekit-token/index.ts",
+        "src/components/ui/LiveVideo.tsx"
       ],
-      "remaining": "FindWork provides the selling room around a stream: a paced live chat the seller can moderate, the products on sale with one pinned on screen, add-to-cart and wallet checkout, a viewer count, and a notification to everyone who saved the seller when they go live. It does not carry the video. The seller broadcasts with their own tool and pastes the watch link; YouTube and direct video links play inside the app, others open in a new tab. Capturing and distributing video from the phone inside FindWork needs a streaming provider, which is deferred. Chat refreshes every three seconds rather than instantly.",
+      "remaining": "FindWork provides the selling room around a stream: a paced live chat the seller can moderate, the products on sale with one pinned on screen, add-to-cart and wallet checkout, a viewer count, and a notification to everyone who saved the seller when they go live. FindWork now carries the video through LiveKit: the seller broadcasts from the phone camera (switch camera, mute) and viewers watch in the room beside the chat and products; only the seller may publish, and viewers may join only while the stream is live. A pasted link remains the other choice. Needs LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET; not yet run against LiveKit. Chat refreshes every three seconds rather than instantly.",
       "acceptance": "Start/join/end a stream, moderate chat, tag available products and complete checkout; handle ended streams and restricted hosts.",
-      "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 37). No real stream has been run."
+      "verification": "Database rules executed on plain Postgres 17 on 21 October 2026 (supabase/checks/business_rules.sql section 44); migrations applied and functions deployed to the hosted project the same day."
     },
     {
       "id": "F26",
@@ -1266,9 +1294,10 @@
         "src/routes/admin/CourseEditor.tsx",
         "src/routes/learning/CertificatePage.tsx",
         "src/components/ui/AskAssistant.tsx",
-        "supabase/functions/assistant/prompts.ts"
+        "supabase/functions/assistant/prompts.ts",
+        "supabase/migrations/20261018000700_course_content.sql"
       ],
-      "remaining": "Content staff can now write courses: lessons with text, an uploaded video or a link to one, and a quiz with a pass mark. Lesson material and quiz answers are readable only as intended (the enrolled; never the answers). A lesson with nothing in it cannot be completed. Passing the quiz, or finishing a course that has none, issues a certificate with a code anyone can verify without an account, shown on the holder's profile. The seeded courses still have no real lesson content: someone has to write it. No AI learning assistant, no instructor accounts outside staff, no video transcoding or captions.",
+      "remaining": "Content staff can now write courses: lessons with text, an uploaded video or a link to one, and a quiz with a pass mark. Lesson material and quiz answers are readable only as intended (the enrolled; never the answers). A lesson with nothing in it cannot be completed. Passing the quiz, or finishing a course that has none, issues a certificate with a code anyone can verify without an account, shown on the holder's profile. The three starter courses now have their ten lessons and an eight-question quiz each, to be checked by someone who practises each trade; the plumbing certificate is described as FindWork's own, not an accreditation. No AI learning assistant, no instructor accounts outside staff, no video transcoding or captions.",
       "acceptance": "Enroll without duplicate charge, consume real text/video lessons, pass server-validated quizzes, issue/verify a certificate and use grounded learning help.",
       "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql sections 7 and 36). Video upload and playback have not been tried against hosted storage."
     },
@@ -1531,7 +1560,7 @@
         },
         {
           "requirement": "Integrated with AI Predictive Analytics",
-          "status": "partial"
+          "status": "implemented"
         }
       ],
       "evidence": [
@@ -1541,9 +1570,10 @@
         "src/lib/analytics.ts",
         "src/lib/api/analytics.ts",
         "supabase/migrations/20261004001800_matching_and_analytics.sql",
-        "src/lib/forecast.ts"
+        "src/lib/forecast.ts",
+        "supabase/functions/_shared/forecast.ts"
       ],
-      "remaining": "Staff reports now cover income and obligations from the ledger; people by role, week-one return and verified share; visits, screens opened and the steps to booking and ordering; bookings by trade and area; top sellers, coupon discounts, wholesale and rider payouts; with CSV export of the daily figures. The projection of the next week is a straight-line trend adjusted for weekday, clearly labelled as arithmetic and not a model; there is no AI. Engagement only covers people who have not opted out, and only since tracking began. Delivery charges, gateway costs and taxes are outside the income figures.",
+      "remaining": "Staff reports now cover income and obligations from the ledger; people by role, week-one return and verified share; visits, screens opened and the steps to booking and ordering; bookings by trade and area; top sellers, coupon discounts, wholesale and rider payouts; with CSV export of the daily figures. The next week is forecast by a seasonal model (additive Holt-Winters with a weekly season) fitted to the selected days, robust to one-off spikes, with an 80% range per day, a check on the last week against simply repeating the week before, and the days the model did not expect. Engagement only covers people who have not opted out, and only since tracking began. Delivery charges, gateway costs and taxes are outside the income figures.",
       "acceptance": "Reconcile reports to ledger/bookings/orders with defined revenue and escrow semantics; filter/export accurate aggregates under admin authorization.",
       "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql sections 26, 30, 35 and 38). Deployed integration and user-journey acceptance are still pending."
     },
@@ -1580,7 +1610,7 @@
         },
         {
           "requirement": "Integrated with AI Analytics Engine",
-          "status": "missing"
+          "status": "implemented"
         }
       ],
       "evidence": [
@@ -1589,9 +1619,11 @@
         "supabase/migrations/20261004000600_operations_analytics.sql",
         "src/routes/admin/Analytics.tsx",
         "src/lib/api/analytics.ts",
-        "src/routes/admin/RiskTab.tsx"
+        "src/routes/admin/RiskTab.tsx",
+        "supabase/functions/assistant/prompts.ts",
+        "supabase/migrations/20261018000600_analyst_metering.sql"
       ],
-      "remaining": "The staff report refreshes on its own (30 seconds for money, 60 for engagement) and shows when it was calculated; it polls rather than streams. Staff can look up one account's visits and screens over 30 days. Flagged transactions appear in the risk queue as they happen. There is no AI analytics engine.",
+      "remaining": "The staff report refreshes on its own (30 seconds for money, 60 for engagement) and shows when it was calculated; it polls rather than streams. Staff can look up one account's visits and screens over 30 days. Flagged transactions appear in the risk queue as they happen. Staff can ask an analyst (Claude) questions about the period or for a summary; it answers only from the same reports, forecasts and unusual days, read on the server with the asker's own permissions, and lists the figures it relied on and its caveats. Ran live on 21 October 2026; not yet evaluated systematically.",
       "acceptance": "Capture activity, show time-filtered live metrics with freshness and access boundaries, and validate predictive outputs against historical data.",
       "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 26). Deployed integration and user-journey acceptance are still pending."
     }

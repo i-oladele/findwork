@@ -57,20 +57,20 @@ Each feature lists source evidence, remaining work and an acceptance scenario. T
 ## Current constraints and decisions
 
 - Keep React/Vite and Supabase, as previously approved; the roadmap's Next.js/DigitalOcean stack is superseded, not its functional requirements.
-- No local Supabase stack. SQL checks run on plain Postgres 17, as CI does, and were last run on 4 October 2026. They have not been run against the hosted project, which holds demo data only.
-- On 4 October 2026 the user asked for every PRD item to be built first, with testing and refinement to follow. Everything marked implemented below is source code that has passed unit tests and database checks on plain Postgres. The same day the migrations were applied to the hosted FindWork project and all nine Edge Functions were deployed; the new screens have not yet been used in a browser by a person.
-- External accounts remain deferred. Features that depend on one are built up to that boundary and say so: identity registries, automatic bank payouts, a maps key for routed arrival times, and a streaming provider for live video. Push keys and the assistant's API key are set on the hosted project; the Paystack and Termii secrets are not, so card top-ups and SMS codes do not work there yet.
-- Policy numbers chosen while building are first proposals to confirm: the trust score weights, the daily limits per verification tier, the rider's 80% share of the delivery fee, the risk-rule thresholds, and coupons being funded by whoever issues them.
+- No local Supabase stack. SQL checks run on plain Postgres 17, as CI does, and were last run on 21 October 2026 (558 checks). They have not been run against the hosted project, which holds demo data only.
+- Every requirement now has a source-code path. On 21 October 2026 the new migrations were applied to the hosted project, all fifteen Edge Functions were deployed, and the app was walked in a browser against it as a customer, a provider and an admin; what that walk found was fixed the same day.
+- Outside services are built to their test or sandbox APIs and stay switched off until their keys are set, saying so on screen: Paystack (card checkout, saved-card renewals, confirmed bank accounts and automatic payouts), Dojah (BVN, NIN, CAC, face and SIM checks), LiveKit (live video), Google Maps (road routing and traffic), Termii (SMS codes). None has been exercised against its provider yet. Push keys and the assistant's API key are set on the hosted project.
+- Policy numbers chosen while building are first proposals to confirm: the trust score weights, the daily limits per verification tier, the rider's 80% share of the delivery fee, the risk-rule thresholds, the automatic-payout limit, and coupons being funded by whoever issues them.
 - Preserve the historical September audits. Several of their missing-feature findings were completed by later commits; this checklist is the current status source.
-- Legal documents and lesson content still need real approved material. Do not treat invented policies, empty lessons or fabricated verification as completion.
+- Lesson content, the terms of service and the privacy policy are written as drafts for review by practitioners and a lawyer; the app shows the legal pages as drafts. The Yoruba, Igbo, Hausa and Pidgin translations need a native speaker's review.
 
 ## What happens next
 
-1. Done on 4 October 2026: migrations applied to the hosted project, Edge Functions deployed, API pre-request hook and scheduled jobs confirmed, push and assistant secrets set.
-2. Set the Paystack and Termii secrets, and run the business-rule checks against the hosted database.
-3. Walk each journey in a browser and on phones, as each kind of user: customer, provider, seller, rider, business buyer, staff role.
-4. Confirm or change the policy numbers above, then tune the risk rules and matching against real activity.
-5. Decide the deferred integrations, write the legal pages and the course content, and plan the native apps.
+1. Set the outside services' test keys (Paystack, Dojah, LiveKit, Google Maps, Termii) and walk each flow end to end.
+2. Have the translations, lessons and legal drafts reviewed; decide in-app purchase on iPhone for plans and paid courses.
+3. Walk every journey on real phones, including push, the second sign-in step and a suspended account; run the business-rule checks against a staging copy of the hosted database.
+4. Confirm or change the policy numbers above, then tune the risk rules, matching and payout limit against real activity.
+5. Harden for launch: security review and penetration test, load test, monitoring, backups and restore drill, store listings for the iPhone and Android apps, and the compliance steps before real money.
 
 ## Introduction and roadmap requirements beyond the component tables
 
@@ -78,8 +78,8 @@ The PRD introduction and conclusion also describe the following expectations. Ro
 
 | Requirement / roadmap phase | Current status and acceptance still required |
 |---|---|
-| Mobile app (PRD p.2), native delivery | Still a web app. It can now be added to a phone's Home Screen (web manifest) and can receive push once keys are set, but there are no native packages or store builds. Validate camera, biometrics, deep links, push, store assets and release pipelines. |
-| Certifications and service packages (PRD introduction) | Packages and provider-supplied credential uploads implemented. Course certificates are issued on passing and can be verified by code without an account; the courses themselves still need writing. |
+| Mobile app (PRD p.2), native delivery | iPhone and Android projects (Capacitor) wrap the web app with FindWork's icon and splash, camera, microphone and location permissions, links that open the app, and payments in an in-app browser. The iPhone build compiles and runs in the simulator. Native push (APNs/FCM), passkeys in the app, store listings and signing remain; plans and paid courses are not sold in the iPhone app pending an in-app purchase decision. |
+| Certifications and service packages (PRD introduction) | Packages and provider-supplied credential uploads implemented. Course certificates are issued on passing and can be verified by code without an account; the three starter courses have lessons and quizzes awaiting practitioner review. |
 | Scale to millions (PRD conclusion) | Unverified aspiration. Define traffic/data targets, then load-test and document capacity, availability and recovery limits. |
 | Phase 1: brand and UI/UX | UI system exists. Brand positioning/messaging/assets, prototype/design handoff, navigation, responsive/device and accessibility acceptance remain unverified. |
 | Phase 2: infrastructure | Supabase migrations and GitHub CI exist. Environment isolation, app hosting/SSL, deployment pipelines, monitoring/logging, backups and restore drills remain unverified. |
@@ -91,12 +91,12 @@ The PRD introduction and conclusion also describe the following expectations. Ro
 | Phase 8: logistics and MVP QA | F22–F23 are built in source. Functional, regression, security, performance and launch testing have not started. |
 | Phase 9: classifieds and safety | F14–F15. |
 | Phase 10: wholesale and procurement | F12–F13. |
-| Phase 11: learning | F26–F27, with certificate issuance, public verification, completion rules and profile badges built. Lesson content is still to be authored. |
-| Phase 12: AI and automation | F16–F17 are fixed, explainable rules rather than models. F18 and the support, lesson and dispute helpers call Claude through one metered function, grounded in FindWork's own material with a hand-off to staff; commands, support answers and translation have answered live, lesson help and dispute summaries have not, and none has been evaluated. Predictive insight is a labelled trend line only. |
+| Phase 11: learning | F26–F27, with certificate issuance, public verification, completion rules and profile badges built. Starter lesson content written; review pending. |
+| Phase 12: AI and automation | F16–F17 are fixed, explainable rules rather than models. F18, the support, lesson and dispute helpers and the staff analyst call Claude through one metered function, grounded in FindWork's own material; commands, support answers, translation, lesson help and the analyst have answered live, dispute summaries have not, and none has been evaluated systematically. Forecasts use a seasonal Holt-Winters model with a backtest; rider routes are optimised exactly on road times. |
 | Phase 13: security/disputes | F28–F30 plus audit history and security review. |
 | Phase 14: admin/reporting | F31–F33 plus role-protected exports, complete revenue definitions and marketplace insights. |
 | Phase 15: hardening and scale | Functional/regression/UX/security/performance QA, penetration testing, cache/database tuning, queues/retries, media processing, load tests, backup automation and disaster recovery remain unverified. |
-| Launch content and policies | Privacy/terms still placeholders; authored learning content and operational support procedures still required. |
+| Launch content and policies | Terms of service and privacy policy (NDPA) drafted from how the app works, shown as drafts pending legal review; support procedures in docs/operations/support-procedures.md (the SOS on-call rota is still missing). |
 
 ${rows.join('\n\n')}
 `
