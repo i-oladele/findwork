@@ -27,7 +27,8 @@ export function Input({
   autoCapitalize,
 }: InputProps) {
   return (
-    <div>
+    // A <label> around the field names it for screen readers and makes the label tappable.
+    <label className="block">
       {label && (
         <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mb-2">{label}</div>
       )}
@@ -45,7 +46,7 @@ export function Input({
         />
         {trailing}
       </div>
-      {hint && <p className="mt-2 text-[13px] leading-[1.45] text-muted-2">{hint}</p>}
-    </div>
+      {hint && <span className="block mt-2 text-[13px] leading-[1.45] text-muted-2">{hint}</span>}
+    </label>
   )
 }

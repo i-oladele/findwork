@@ -151,7 +151,7 @@ export function CourseDetail() {
 
         {isEnrolled && (lessons ?? []).some((l) => l.body) && (
           <div className="mt-5">
-            <AskAssistant task="lesson" input={{ course_id: course.id }} title="Ask about this course" placeholder="What does grain line mean?"
+            <AskAssistant task="lesson" input={{ course_id: course.id }} title="Ask about this course" placeholder="Ask about anything in the lessons"
               note="Answered by an AI assistant from this course's lessons only. It will not give you the quiz answers." />
           </div>
         )}

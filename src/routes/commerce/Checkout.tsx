@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
 import { SectionLabel } from '../../components/ui/SectionLabel'
 import { ErrorState, FullScreenLoader } from '../../components/system/States'
-import { COUPON_ERRORS, DELIVERY_FEE, useAddresses, usePlaceOrder, useCheckoutQuote, useProfile, useStartPayment, useUpdateProfile, useWalletSummary } from '../../lib/api'
+import { COUPON_ERRORS, DELIVERY_FEE, useAddresses, usePlaceOrder, useCheckoutQuote, usePaystackAvailable, useProfile, useStartPayment, useUpdateProfile, useWalletSummary } from '../../lib/api'
 import { cartItems, useCart } from '../../store/cart'
 import { friendlyError } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
@@ -35,6 +35,7 @@ function CheckoutForm({ profile, initialAddresses }: { profile: Profile; initial
   const { data: wallet, isFetching: walletLoading } = useWalletSummary()
   const place = usePlaceOrder()
   const startCard = useStartPayment()
+  const { data: cardsOn } = usePaystackAvailable()
   const updateProfile = useUpdateProfile()
   const addresses = useAddresses()
   const defaultAddress = initialAddresses.find((a) => a.is_default)
@@ -64,7 +65,7 @@ function CheckoutForm({ profile, initialAddresses }: { profile: Profile; initial
   const deliveryPhone = fromInternational(phone) ?? { country: DEFAULT_COUNTRY, number: phone }
   const phoneValid = isPhoneNumber(deliveryPhone)
   const couponError = priced?.coupon?.error ? COUPON_ERRORS[priced.coupon.error] : null
-  const payWith = method ?? (walletReady && shortfall === 0 ? 'wallet' : 'card')
+  const payWith = cardsOn ? method ?? (walletReady && shortfall === 0 ? 'wallet' : 'card') : 'wallet'
   const detailsReady = recipient.trim().length > 0 && phoneValid && address.trim().length > 5 && priced !== null && !couponError
   const canPay = detailsReady && (payWith === 'card' || (shortfall === 0 && walletReady))
   const busy = place.isPending || startCard.isPending
@@ -218,8 +219,8 @@ function CheckoutForm({ profile, initialAddresses }: { profile: Profile; initial
         <SectionLabel className="mt-5 mb-2.5">{t('Pay with')}</SectionLabel>
         <MethodOption active={payWith === 'wallet'} onClick={() => setMethod('wallet')} icon="ph-fill ph-wallet" label={t('Wallet')}
           detail={`Balance ${formatNaira(balance)}${priced && shortfall > 0 ? ` · ${formatNaira(shortfall)} short` : ''}`} />
-        <MethodOption active={payWith === 'card'} onClick={() => setMethod('card')} icon="ph-fill ph-credit-card" label={t('Card or bank transfer')}
-          detail="Paid securely through Paystack" />
+        {cardsOn && <MethodOption active={payWith === 'card'} onClick={() => setMethod('card')} icon="ph-fill ph-credit-card" label={t('Card or bank transfer')}
+          detail="Paid securely through Paystack" />}
         {quote.isError && (
           <Alert className="mt-4">
             {friendlyError(quote.error)}{' '}

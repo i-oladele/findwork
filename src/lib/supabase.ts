@@ -230,6 +230,7 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   'invalid payout policy': msg('Set a limit between ₦1,000 and ₦10,000,000.'),
   'card not found': msg('We could not find that card. It may already have been removed.'),
   already_on_plan: msg('You are already on this plan.'),
+  payments_not_configured: msg('Card payments are not switched on yet. Pay from your wallet, or try again later.'),
   invalid_checkout: msg('Check your cart and delivery details, then try again.'),
   account_not_found: msg('That bank has no account with that number. Check both and try again.'),
   'minimum withdrawal': msg('The minimum withdrawal is ₦1,000.'),

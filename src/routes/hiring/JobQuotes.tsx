@@ -60,7 +60,7 @@ export function JobQuotes() {
           <span className="font-display font-bold text-[26px] text-ink">
             {j.quote_count} quote{j.quote_count === 1 ? '' : 's'}
           </span>
-          <span className="text-sm text-muted">Budget {formatNaira(j.budget)}</span>
+          <span className="text-sm text-muted">Budget {formatNaira(j.budget)}{j.needed_by ? ` · by ${j.needed_by}` : ''}</span>
         </div>
         <p className="mt-2 text-[14.5px] leading-[1.5] text-text-soft">{j.description}</p>
 
@@ -77,7 +77,9 @@ export function JobQuotes() {
           empty={{
             icon: 'ph-hourglass',
             title: 'No quotes yet',
-            body: 'Providers see your job now. You will get a notification when the first quote arrives.',
+            body: j.status === 'open'
+              ? 'Providers see your job now. You will get a notification when the first quote arrives.'
+              : 'The job closed before any provider quoted.',
           }}
         >
           {(list) =>

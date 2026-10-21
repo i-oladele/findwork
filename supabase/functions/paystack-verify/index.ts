@@ -39,7 +39,8 @@ Deno.serve(async (req: Request) => {
   try {
     tx = await verifyTransaction(reference)
   } catch (err) {
-    return json({ error: 'paystack_unavailable', message: (err as Error).message }, 502)
+    console.error('verify failed', reference, (err as Error).message)
+    return json({ error: 'paystack_unavailable', message: 'We could not reach Paystack to check this payment. Try again in a moment.' }, 502)
   }
 
   if (tx.status === 'success' && tx.currency === 'NGN') {

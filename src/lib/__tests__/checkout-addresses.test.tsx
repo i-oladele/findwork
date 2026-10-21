@@ -17,6 +17,7 @@ vi.mock('../api', () => ({
   useCheckoutQuote: () => ({ data: { items_total: 10000, delivery_fee: 1200, seller_count: 1, total: 11200 }, isFetching: false, isError: false, refetch: mocks.refetch }),
   usePlaceOrder: () => ({ mutateAsync: mocks.place, isPending: false }),
   useStartPayment: () => ({ mutateAsync: mocks.start, isPending: false }),
+  usePaystackAvailable: () => ({ data: true }),
   useUpdateProfile: () => ({ mutate: mocks.update }),
 }))
 vi.mock('../payRedirect', () => ({ goToPaystack: mocks.go }))

@@ -1,5 +1,7 @@
 // Starts a Paystack payment: a wallet top-up, an order paid by card at
-// checkout, or a plan paid by card. Records a pending payment_intent, then
+// checkout, or a plan paid by card. { action: 'status' } answers whether card
+// payments are switched on, so the app can offer them only when they are.
+// Records a pending payment_intent, then
 // asks Paystack for a checkout URL the app sends the user to. Nothing is
 // credited, ordered or subscribed here — that happens in settle_payment once
 // paystack-verify or paystack-webhook hears from Paystack that the money
@@ -19,7 +21,15 @@ Deno.serve(async (req: Request) => {
   const user = await callerFrom(req)
   if (!user) return json({ error: 'invalid session' }, 401)
 
-  const request = parseStart(await req.json().catch(() => null))
+  const body = await req.json().catch(() => null)
+  // Checked before anything is recorded, and never shown as a setup message.
+  const configured = Boolean(Deno.env.get('PAYSTACK_SECRET_KEY') && Deno.env.get('APP_URL'))
+  if ((body as { action?: unknown } | null)?.action === 'status') return json({ configured })
+  if (!configured) {
+    return json({ error: 'payments_not_configured', message: 'Card payments are not switched on yet. Pay from your wallet, or try again later.' }, 503)
+  }
+
+  const request = parseStart(body)
   if ('error' in request) return json(request, 400)
 
   const reference = `fw_${crypto.randomUUID()}`

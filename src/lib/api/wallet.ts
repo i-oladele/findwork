@@ -83,6 +83,20 @@ export function useStartPayment() {
   })
 }
 
+/** Whether card payments through Paystack are switched on; false when they are not, or cannot be checked. */
+export function usePaystackAvailable() {
+  return useQuery({
+    queryKey: [...keys.wallet.all, 'paystack-available'],
+    staleTime: 10 * 60_000,
+    retry: false,
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await supabase.functions.invoke('paystack-initialize', { body: { action: 'status' } })
+      if (error) return false
+      return Boolean((data as { configured?: boolean }).configured)
+    },
+  })
+}
+
 /** A wallet top-up by card or transfer. */
 export function useStartTopUp() {
   const start = useStartPayment()

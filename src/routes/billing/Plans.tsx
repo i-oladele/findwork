@@ -4,7 +4,7 @@ import { PageHeader } from '../../components/chrome/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
 import { QueryState } from '../../components/system/QueryState'
-import { usePlans, useStartPayment, useSubscribe, useSubscription, useWalletSummary } from '../../lib/api'
+import { usePaystackAvailable, usePlans, useStartPayment, useSubscribe, useSubscription, useWalletSummary } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
 import { goToPaystack } from '../../lib/payRedirect'
@@ -15,6 +15,7 @@ export function Plans() {
   const { data: wallet } = useWalletSummary()
   const subscribe = useSubscribe()
   const startCard = useStartPayment()
+  const { data: cardsOn } = usePaystackAvailable()
   const [keepCard, setKeepCard] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
@@ -98,12 +99,12 @@ export function Plans() {
                     </div>
                   ) : p.price > 0 ? (
                     <div className="mt-4 space-y-2">
-                      <Button onClick={() => payByCard(p.id)} loading={startCard.isPending} disabled={startCard.isPending || subscribe.isPending} className="w-full h-12">
+                      {cardsOn && <Button onClick={() => payByCard(p.id)} loading={startCard.isPending} disabled={startCard.isPending || subscribe.isPending} className="w-full h-12">
                         Pay {formatNaira(p.price)} by card
-                      </Button>
+                      </Button>}
                       {short > 0 ? (
                         <Button to={`/wallet/add?amount=${short}&return=/plans`} variant="secondary" className="w-full text-ink h-12">
-                          Or add {formatNaira(short)} to your wallet
+                          {cardsOn ? 'Or add' : 'Add'} {formatNaira(short)} to your wallet
                         </Button>
                       ) : (
                         <button onClick={() => choose(p.id, p.price)} disabled={subscribe.isPending || startCard.isPending}
@@ -129,10 +130,10 @@ export function Plans() {
           }
         </QueryState>
 
-        <label className="flex items-start gap-3 mt-5 text-[14px] leading-[1.45] text-text-soft">
+        {cardsOn && <label className="flex items-start gap-3 mt-5 text-[14px] leading-[1.45] text-text-soft">
           <input type="checkbox" checked={keepCard} onChange={(e) => setKeepCard(e.target.checked)} className="mt-1 w-4 h-4 accent-brand" />
           <span>When I pay by card, keep the card to renew the plan each month. You can remove it at any time in Plan and billing.</span>
-        </label>
+        </label>}
         <p className="mt-4 text-[13px] leading-[1.5] text-muted-2">
           A plan renews monthly from your saved card, or from your wallet if there is no card or it is declined. If
           neither can cover a renewal, the account moves back to Free and nothing else happens.

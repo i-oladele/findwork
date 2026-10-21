@@ -4,7 +4,7 @@ import { Screen } from '../../components/chrome/Screen'
 import { PageHeader } from '../../components/chrome/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
-import { useStartTopUp, useWalletSummary } from '../../lib/api'
+import { usePaystackAvailable, useStartTopUp, useWalletSummary } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatNaira, parseNaira } from '../../lib/format'
 import { goToPaystack } from '../../lib/payRedirect'
@@ -22,6 +22,7 @@ export function AddMoney() {
   const returnTo = params.get('return')
   const { data: wallet } = useWalletSummary()
   const start = useStartTopUp()
+  const { data: cardsOn } = usePaystackAvailable()
   // Round a shortfall up to the next ₦100 so it clears the gap with change to spare.
   const [raw, setRaw] = useState(suggested > 0 ? String(Math.ceil(suggested / 100) * 100) : '25000')
   const [error, setError] = useState<string | null>(null)
@@ -82,6 +83,9 @@ export function AddMoney() {
           </div>
         </div>
 
+        {cardsOn === false && (
+          <Alert tone="info" className="mt-4">{t('Adding money by card or transfer is not switched on yet. Until it is, the FindWork team can add test funds to your wallet.')}</Alert>
+        )}
         {!valid && raw && (
           <Alert className="mt-4">
             Enter an amount between {formatNaira(MIN)} and {formatNaira(MAX)}.
@@ -91,7 +95,7 @@ export function AddMoney() {
       </div>
 
       <div className="sticky bottom-0 left-0 right-0 bg-cream border-t border-line px-[22px] pt-3.5 pb-[max(22px,env(safe-area-inset-bottom))] mt-5">
-        <Button onClick={pay} disabled={!valid} loading={start.isPending} className="w-full">
+        <Button onClick={pay} disabled={!valid || cardsOn === false} loading={start.isPending} className="w-full">
           Pay {formatNaira(amount)}
         </Button>
       </div>
