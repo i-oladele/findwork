@@ -16,6 +16,7 @@ import {
   useMarkPurchaseOrderDelivered,
   useMyOrganizations,
   useMyProducts,
+  useReceivePurchaseOrderStock,
   useReviewPurchaseOrder,
   useRfqItems,
   type PurchaseOrderWithParties,
@@ -23,7 +24,7 @@ import {
 import { usePurchaseOrder } from '../../lib/api/procurement'
 import { friendlyError } from '../../lib/supabase'
 import { formatDateTime, formatNaira } from '../../lib/format'
-import type { Invoice } from '../../lib/database.types'
+import type { Invoice, RfqItem } from '../../lib/database.types'
 
 export function PurchaseOrderDetail() {
   const { id } = useParams<{ id: string }>()
@@ -117,12 +118,55 @@ function Detail({ po, invoice }: { po: PurchaseOrderWithParties; invoice: Invoic
         {buyingSide && po.status === 'delivered' && (
           <Button variant="secondary" className="text-ink" disabled={pending || note.trim().length < 10} onClick={() => run(hold.mutateAsync({ id: po.id, reason: note }))}>Hold the payment and get help</Button>
         )}
+        {buyingSide && ['delivered', 'on_hold', 'completed'].includes(po.status) && (
+          po.stock_received_at
+            ? <p className="text-[13.5px] text-muted-2"><i className="ph ph-package" /> Added to stock {formatDateTime(po.stock_received_at)}. <Link to="/procurement" className="font-semibold text-brand-hover">See stock</Link></p>
+            : <ReceiveForm poId={po.id} items={items.data ?? []} />
+        )}
         {(buyingSide || supplier) && (po.status === 'funded' || po.status === 'pending_approval') && (
           <button disabled={pending} className="w-full min-h-11 text-[14.5px] font-semibold text-muted" onClick={() => { if (window.confirm(po.status === 'funded' ? 'Cancel this purchase order? The money goes back to the buyer.' : 'Cancel this purchase order?')) run(cancel.mutateAsync(po.id)) }}>Cancel this purchase order</button>
         )}
       </div>
       <Link to={`/chat/with/${supplier ? po.buyer_id : po.supplier_id}`} className="inline-block min-h-11 pt-4 text-[14.5px] font-semibold text-brand-hover">Message the {supplier ? 'buyer' : 'supplier'}</Link>
     </>
+  )
+}
+
+/**
+ * The buying side records what actually arrived, once. Lines start from what
+ * was ordered and can be changed to match the delivery; 0 leaves a line out.
+ */
+function ReceiveForm({ poId, items }: { poId: string; items: RfqItem[] }) {
+  const receive = useReceivePurchaseOrderStock()
+  type Line = { name: string; unit: string; quantity: string }
+  const [lines, setLines] = useState<Line[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const shown: Line[] = lines ?? (items.length ? items.map((it) => ({ name: it.description, unit: it.unit, quantity: String(it.quantity) })) : [{ name: '', unit: '', quantity: '' }])
+  const update = (i: number, patch: Partial<Line>) => setLines(shown.map((l, j) => (j === i ? { ...l, ...patch } : l)))
+  const parsed = shown.map((l) => ({ name: l.name.trim(), unit: l.unit.trim() || 'units', quantity: Number(l.quantity.replace(/\D/g, '') || '0') }))
+  const valid = parsed.some((l) => l.quantity > 0) && parsed.every((l) => l.quantity === 0 || l.name.length >= 2)
+  const field = 'bg-cream rounded-lg h-10 px-3 text-[14px] text-ink outline-none min-w-0'
+
+  return (
+    <div className="bg-white border border-line rounded-2xl p-4">
+      <div className="font-display font-semibold text-[15px] text-ink">Add what arrived to your stock</div>
+      <p className="text-[12.5px] text-muted-2 mt-0.5">Change a quantity if the delivery was short; 0 leaves a line out.</p>
+      <div className="space-y-2 mt-3">
+        {shown.map((l, i) => (
+          <div key={i} className="flex gap-2">
+            <input value={l.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="Item" aria-label="Item" className={`${field} flex-1`} />
+            <input value={l.quantity} onChange={(e) => update(i, { quantity: e.target.value })} inputMode="numeric" placeholder="0" aria-label={`Quantity of ${l.name || 'item'}`} className={`${field} w-16`} />
+            <input value={l.unit} onChange={(e) => update(i, { unit: e.target.value })} placeholder="units" aria-label="Unit" className={`${field} w-20`} />
+          </div>
+        ))}
+      </div>
+      {shown.length < 50 && <button className="min-h-11 text-[13.5px] font-semibold text-brand-hover" onClick={() => setLines([...shown, { name: '', unit: '', quantity: '' }])}>Add a line</button>}
+      {error && <Alert className="mt-2">{error}</Alert>}
+      <Button className="mt-2" disabled={!valid} loading={receive.isPending} onClick={() => {
+        setError(null)
+        receive.mutate({ id: poId, lines: parsed.filter((l) => l.quantity > 0) }, { onError: (err) => setError(friendlyError(err)) })
+      }}>Add to stock</Button>
+    </div>
   )
 }
 

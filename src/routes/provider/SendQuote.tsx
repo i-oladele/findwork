@@ -14,12 +14,14 @@ import { useJob, useMySentQuotes, usePlans, useSendQuote, useReviseQuote, useWit
 import { friendlyError } from '../../lib/supabase'
 import { formatNaira, parseNaira } from '../../lib/format'
 import type { ProviderProfile, QuoteMilestone } from '../../lib/database.types'
+import { useT } from '../../lib/i18n'
 
 export function SendQuote() {
   return <RequireProvider>{(p) => <QuoteForm provider={p} />}</RequireProvider>
 }
 
 function QuoteForm({ provider }: { provider: ProviderProfile }) {
+  const t = useT()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const jobQuery = useJob(id)
@@ -43,12 +45,12 @@ function QuoteForm({ provider }: { provider: ProviderProfile }) {
   const [error, setError] = useState<string | null>(null)
 
   if (jobQuery.isLoading || sentQuery.isLoading) return <FullScreenLoader />
-  if (jobQuery.isError || sentQuery.isError) return <Screen><PageHeader title="Your quote" back="/provider/jobs" /><ErrorState message="We could not load this job and your quote." onRetry={() => { void jobQuery.refetch(); void sentQuery.refetch() }} /></Screen>
+  if (jobQuery.isError || sentQuery.isError) return <Screen><PageHeader title={t('Your quote')} back="/provider/jobs" /><ErrorState message="We could not load this job and your quote." onRetry={() => { void jobQuery.refetch(); void sentQuery.refetch() }} /></Screen>
   if (!job) {
     return (
       <Screen>
-        <PageHeader title="Your quote" back="/provider/jobs" />
-        <EmptyState icon="ph-briefcase" title="Job not found" body="It may have been removed." />
+        <PageHeader title={t('Your quote')} back="/provider/jobs" />
+        <EmptyState icon="ph-briefcase" title={t('Job not found')} body={t('It may have been removed.')} />
       </Screen>
     )
   }
@@ -90,7 +92,7 @@ function QuoteForm({ provider }: { provider: ProviderProfile }) {
 
   return (
     <Screen>
-      <PageHeader title="Your quote" back="/provider/jobs" />
+      <PageHeader title={t('Your quote')} back="/provider/jobs" />
       <div className="px-[22px] pb-6">
         <div className="bg-ink rounded-2xl p-[18px] mt-4">
           <div className="font-display font-semibold text-[16.5px] text-cream">{job.title}</div>
@@ -123,28 +125,28 @@ function QuoteForm({ provider }: { provider: ProviderProfile }) {
           </Alert>
           {job.status === 'open' && (existing.status === 'sent' || existing.status === 'withdrawn') && <div className="flex gap-4 mt-4 text-sm font-semibold">
             <button disabled={pending} className="min-h-11" onClick={startEditing}>{existing.status === 'withdrawn' ? 'Revise and resend' : 'Edit quote'}</button>
-            {existing.status === 'sent' && <button disabled={pending} className="min-h-11 text-brand" onClick={() => setConfirmWithdraw(true)}>Withdraw quote</button>}
+            {existing.status === 'sent' && <button disabled={pending} className="min-h-11 text-brand" onClick={() => setConfirmWithdraw(true)}>{t('Withdraw quote')}</button>}
           </div>}
           {confirmWithdraw && <div className="mt-3 border border-line rounded-xl p-4 text-sm">
-            <p>Withdraw this quote? The customer will be notified and will no longer be able to accept it.</p>
+            <p>{t('Withdraw this quote? The customer will be notified and will no longer be able to accept it.')}</p>
             <div className="flex gap-4 mt-2">
               <button disabled={pending} className="min-h-11 text-brand font-semibold" onClick={async () => {
                 setError(null)
                 try { await withdrawQuote.mutateAsync({ id: existing.id, revision: existing.revision }); setConfirmWithdraw(false) }
                 catch (err) { setError(friendlyError(err)) }
-              }}>Confirm withdrawal</button>
-              <button disabled={pending} onClick={() => setConfirmWithdraw(false)}>Keep quote</button>
+              }}>{t('Confirm withdrawal')}</button>
+              <button disabled={pending} onClick={() => setConfirmWithdraw(false)}>{t('Keep quote')}</button>
             </div>
           </div>}
           <QuoteHistory quoteId={existing.id} />
           </>
         ) : job.status !== 'open' ? (
           <Alert tone="info" className="mt-5">
-            This job is closed.
+            {t('This job is closed.')}
           </Alert>
         ) : (
           <>
-            <SectionLabel className="mt-5 mb-2">Your price</SectionLabel>
+            <SectionLabel className="mt-5 mb-2">{t('Your price')}</SectionLabel>
             <div className="flex items-center bg-white border-[1.5px] border-ink rounded-lg h-[58px] px-4">
               <span className="font-display font-bold text-2xl text-ink">₦</span>
               <input
@@ -152,53 +154,53 @@ function QuoteForm({ provider }: { provider: ProviderProfile }) {
                 onChange={(e) => setPrice(e.target.value)}
                 inputMode="numeric"
                 placeholder={String(job.budget)}
-                aria-label="Your price"
+                aria-label={t('Your price')}
                 className="flex-1 min-w-0 bg-transparent outline-none font-display font-bold text-2xl text-ink placeholder:text-muted-4"
               />
             </div>
 
             <div className="flex gap-3 mt-4">
               <div className="flex-1">
-                <SectionLabel className="mb-2">Days needed</SectionLabel>
+                <SectionLabel className="mb-2">{t('Days needed')}</SectionLabel>
                 <input
                   value={days}
                   onChange={(e) => setDays(e.target.value)}
                   inputMode="numeric"
-                  aria-label="Days needed"
+                  aria-label={t('Days needed')}
                   placeholder="3"
                   className="w-full bg-white border-[1.5px] border-line rounded-lg h-[52px] px-3.5 text-[16px] text-ink outline-none placeholder:text-muted-4"
                 />
               </div>
               <div className="flex-1">
-                <SectionLabel className="mb-2">Can start</SectionLabel>
+                <SectionLabel className="mb-2">{t('Can start')}</SectionLabel>
                 <input
                   value={startDay}
                   onChange={(e) => setStartDay(e.target.value)}
-                  placeholder="Friday"
-                  aria-label="Can start"
+                  placeholder={t('Friday')}
+                  aria-label={t('Can start')}
                   maxLength={100}
                   className="w-full bg-white border-[1.5px] border-line rounded-lg h-[52px] px-3.5 text-[16px] text-ink outline-none placeholder:text-muted-4"
                 />
               </div>
             </div>
 
-            <SectionLabel className="mt-4 mb-2">Your message</SectionLabel>
+            <SectionLabel className="mt-4 mb-2">{t('Your message')}</SectionLabel>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={4}
-              aria-label="Your message"
+              aria-label={t('Your message')}
               maxLength={2000}
-              placeholder="Why you are right for this job, and anything you need to know"
+              placeholder={t('Why you are right for this job, and anything you need to know')}
               className="w-full bg-white border-[1.5px] border-line rounded-lg p-3.5 text-[15.5px] leading-[1.55] text-ink outline-none resize-none placeholder:text-muted-2"
             />
             <div className="mt-4 bg-white border border-line rounded-2xl p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[15px] font-semibold text-ink">Get paid in stages</div>
-                  <p className="text-[13px] leading-[1.45] text-muted-2 mt-0.5">The customer still pays the full price into escrow, then releases each stage as you finish it.</p>
+                  <div className="text-[15px] font-semibold text-ink">{t('Get paid in stages')}</div>
+                  <p className="text-[13px] leading-[1.45] text-muted-2 mt-0.5">{t('The customer still pays the full price into escrow, then releases each stage as you finish it.')}</p>
                 </div>
-                <Toggle label="Get paid in stages" on={stages.length > 0} onChange={(on) => setStages(on ? [{ title: '', amount: '' }, { title: '', amount: '' }] : [])} />
+                <Toggle label={t('Get paid in stages')} on={stages.length > 0} onChange={(on) => setStages(on ? [{ title: '', amount: '' }, { title: '', amount: '' }] : [])} />
               </div>
               {stages.map((stage, i) => (
                 <div key={i} className="flex gap-2 mt-3">
@@ -218,16 +220,16 @@ function QuoteForm({ provider }: { provider: ProviderProfile }) {
               {stages.length > 0 && (
                 <div className="flex items-center justify-between mt-3 text-[13.5px]">
                   <span className={stageTotal === amount ? 'text-success-text' : 'text-danger'}>Stages total {formatNaira(stageTotal)} of {formatNaira(amount)}</span>
-                  {stages.length < 6 && <button type="button" className="min-h-11 font-semibold text-brand" onClick={() => setStages((all) => [...all, { title: '', amount: '' }])}>Add a stage</button>}
+                  {stages.length < 6 && <button type="button" className="min-h-11 font-semibold text-brand" onClick={() => setStages((all) => [...all, { title: '', amount: '' }])}>{t('Add a stage')}</button>}
                 </div>
               )}
             </div>
-            {editing && <button disabled={pending} className="min-h-11 mt-3 text-sm underline" onClick={() => setEditing(false)}>Cancel changes</button>}
+            {editing && <button disabled={pending} className="min-h-11 mt-3 text-sm underline" onClick={() => setEditing(false)}>{t('Cancel changes')}</button>}
           </>
         )}
         {error && <Alert className="mt-4">{error}</Alert>}
 
-        <ReportButton targetType="job" targetId={job.id} label="Report this job" className="mt-6" />
+        <ReportButton targetType="job" targetId={job.id} label={t('Report this job')} className="mt-6" />
       </div>
 
       {(!existing || editing) && job.status === 'open' && (

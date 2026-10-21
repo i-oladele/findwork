@@ -79,6 +79,29 @@ export async function reportRiderLocation(lat: number, lng: number) {
   if (error) throw error
 }
 
+export type RoutePlan = { stops: { id: string; minutes: number }[]; total_minutes: number; total_km: number | null; source: 'routed' }
+
+/**
+ * The quickest order of the rider's stops on real roads in current traffic,
+ * from the route-plan Edge Function. null when no maps key is set or the
+ * maps service cannot be reached: the screen then plans on straight lines.
+ * `stopKey` changes whenever the stops do, so the plan follows them.
+ */
+export function useRoutePlan(enabled: boolean, stopKey: string) {
+  return useQuery({
+    queryKey: [...keys.logistics.mine(), 'route-plan', stopKey],
+    enabled,
+    retry: false,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    queryFn: async (): Promise<RoutePlan | null> => {
+      const { data, error } = await supabase.functions.invoke('route-plan', { body: {} })
+      if (error) return null
+      return data as RoutePlan
+    },
+  })
+}
+
 /** Asks for a routed, traffic-aware arrival time. Quietly does nothing when no maps key is configured. */
 export async function requestRoutedEta(orderId: string) {
   await supabase.functions.invoke('route-estimate', { body: { orderId } }).catch(() => null)

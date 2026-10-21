@@ -24,6 +24,11 @@ export function formatDateTime(iso: string): string {
   return `${date.replace(',', '')}, ${time}`
 }
 
+/** "Thu 22 Oct" for a calendar date ("2026-10-22"), which has no time or zone of its own. */
+export function formatDay(date: string): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '')
+}
+
 /** "12 Mar 2026" */
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', {

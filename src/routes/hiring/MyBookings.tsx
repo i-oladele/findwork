@@ -18,8 +18,9 @@ import {
 } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatDateTime, formatNaira } from '../../lib/format'
+import { useT } from '../../lib/i18n'
 
-const tabs = ['Upcoming', 'Past', 'Cancelled'] as const
+const tabs = ['Upcoming', 'Past', 'Cancelled'] as const // i18n
 type Tab = (typeof tabs)[number]
 
 function inTab(b: BookingWithCustomer, tab: Tab) {
@@ -29,6 +30,7 @@ function inTab(b: BookingWithCustomer, tab: Tab) {
 }
 
 export function MyBookings() {
+  const t = useT()
   const [tab, setTab] = useState<Tab>('Upcoming')
   const bookings = useMyBookings()
   const { data: disputes } = useDisputes()
@@ -42,29 +44,29 @@ export function MyBookings() {
     <Screen bottomNav="customer">
       <StatusBar />
       <div className="px-[22px] pt-2.5 pb-6">
-        <h2 className="font-display font-bold text-[30px] tracking-[-0.03em] text-ink">Bookings</h2>
+        <h2 className="font-display font-bold text-[30px] tracking-[-0.03em] text-ink">{t('Bookings')}</h2>
         <div className="flex gap-1.5 bg-line-soft rounded-lg p-1 mt-4">
-          {tabs.map((t) => (
+          {tabs.map((option) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={option}
+              onClick={() => setTab(option)}
               className={`flex-1 h-10 rounded-md text-[14.5px] ${
-                tab === t ? 'bg-white font-semibold text-ink' : 'font-medium text-muted'
+                tab === option ? 'bg-white font-semibold text-ink' : 'font-medium text-muted'
               }`}
             >
-              {t}
+              {t(option)}
             </button>
           ))}
         </div>
 
         <QueryState
           query={{ ...bookings, data: bookings.data?.filter((b) => inTab(b, tab)) }}
-          errorMessage="We could not load your bookings."
+          errorMessage={t('We could not load your bookings.')}
           empty={{
             icon: 'ph-calendar-blank',
             title: `No ${tab.toLowerCase()} bookings`,
             body: tab === 'Upcoming' ? 'Find a pro and book them — your money is held safely until the job is done.' : undefined,
-            action: tab === 'Upcoming' ? <Link to="/search" className="text-[15px] font-semibold text-brand-hover">Find a pro</Link> : undefined,
+            action: tab === 'Upcoming' ? <Link to="/search" className="text-[15px] font-semibold text-brand-hover">{t('Find a pro')}</Link> : undefined,
           }}
         >
           {(list) =>
@@ -79,6 +81,7 @@ export function MyBookings() {
 }
 
 function BookingCard({ booking, disputed, reviewed }: { booking: BookingWithCustomer; disputed: boolean; reviewed: boolean }) {
+  const t = useT()
   const complete = useCompleteBooking()
   const cancel = useCancelBooking()
   const [error, setError] = useState<string | null>(null)
@@ -145,12 +148,12 @@ function BookingCard({ booking, disputed, reviewed }: { booking: BookingWithCust
             to={`/bookings/${booking.id}/review`}
             className="flex-1 flex items-center justify-center h-11 bg-ink text-cream rounded-lg text-[14.5px] font-semibold"
           >
-            Leave a review
+            {t('Leave a review')}
           </Link>
         )}
         <Link
           to={`/chat/with/${booking.provider_id}`}
-          aria-label="Message"
+          aria-label={t('Message')}
           className="flex-none flex items-center justify-center w-11 h-11 border border-line rounded-lg text-ink"
         >
           <i className="ph ph-chat-circle-dots text-[19px]" />
@@ -172,18 +175,18 @@ function BookingCard({ booking, disputed, reviewed }: { booking: BookingWithCust
               disabled={cancel.isPending}
               className="text-[14px] font-semibold text-muted"
             >
-              Cancel booking
+              {t('Cancel booking')}
             </button>
           ) : (
             <span />
           )}
           {disputed ? (
             <Link to="/disputes" className="text-[14px] font-semibold text-brand-hover">
-              View dispute
+              {t('View dispute')}
             </Link>
           ) : (
             <Link to={`/disputes/new/booking/${booking.id}`} className="text-[14px] font-semibold text-brand-hover">
-              Report a problem
+              {t('Report a problem')}
             </Link>
           )}
         </div>
@@ -193,15 +196,16 @@ function BookingCard({ booking, disputed, reviewed }: { booking: BookingWithCust
 }
 
 function StatusBadge({ booking, disputed }: { booking: BookingWithCustomer; disputed: boolean }) {
-  if (disputed) return <Badge tone="danger" icon="scales">On hold</Badge>
+  const t = useT()
+  if (disputed) return <Badge tone="danger" icon="scales">{t('On hold')}</Badge>
   switch (booking.status) {
     case 'done':
-      return <Badge tone="success" icon="check-circle">Done</Badge>
+      return <Badge tone="success" icon="check-circle">{t('Done')}</Badge>
     case 'active':
-      return <Badge tone="danger" icon="lock-simple">In escrow</Badge>
+      return <Badge tone="danger" icon="lock-simple">{t('In escrow')}</Badge>
     case 'pending':
-      return <Badge tone="warning" icon="clock">Pending</Badge>
+      return <Badge tone="warning" icon="clock">{t('Pending')}</Badge>
     default:
-      return <Badge tone="neutral">Cancelled</Badge>
+      return <Badge tone="neutral">{t('Cancelled')}</Badge>
   }
 }

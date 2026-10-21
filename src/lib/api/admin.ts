@@ -218,6 +218,48 @@ export function useAdminProcessWithdrawal() {
   })
 }
 
+/** Paystack could not send it: try again, under a new reference. */
+export function useAdminRetryPayout() {
+  return useAdminMutation(async (id: string) => {
+    const { error } = await supabase.rpc('admin_retry_payout', { p_withdrawal_id: id })
+    if (error) throw error
+  })
+}
+
+/** An automatic payout with no answer for an hour: take it back to settle by hand, after checking Paystack. */
+export function useAdminRequeuePayout() {
+  return useAdminMutation(async ({ id, note }: { id: string; note: string }) => {
+    const { error } = await supabase.rpc('admin_requeue_payout', { p_withdrawal_id: id, p_note: note })
+    if (error) throw error
+  })
+}
+
+export type PayoutPolicy = { enabled: boolean; max: number; configured: boolean }
+
+export function usePayoutPolicy() {
+  const allowed = useStaffCan('finance')
+  return useQuery({
+    queryKey: keys.admin.payoutPolicy(),
+    enabled: allowed,
+    queryFn: async (): Promise<PayoutPolicy> => {
+      const { data, error } = await supabase.rpc('payout_policy')
+      if (error) throw error
+      return data as unknown as PayoutPolicy
+    },
+  })
+}
+
+export function useSetPayoutPolicy() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ enabled, max }: { enabled: boolean; max: number }) => {
+      const { error } = await supabase.rpc('admin_set_payout_policy', { p_enabled: enabled, p_max: max })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.admin.payoutPolicy() }),
+  })
+}
+
 export function useAdminReviewVerification() {
   return useAdminMutation(async ({ id, approve, note }: { id: string; approve: boolean; note: string }) => {
     const { error } = await supabase.rpc('admin_review_verification', {

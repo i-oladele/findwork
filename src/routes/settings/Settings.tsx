@@ -10,8 +10,10 @@ import { useAuth } from '../../lib/authContext'
 import { useProfile, useUpdateProfile, useDeleteAccount, useWalletSummary } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatPhone } from '../../lib/phone'
+import { useT } from '../../lib/i18n'
 
 export function Settings() {
+  const t = useT()
   const navigate = useNavigate()
   const { signOut } = useAuth()
   const { data: profile, isLoading, isError, refetch } = useProfile()
@@ -82,7 +84,7 @@ export function Settings() {
           <Link to="/home" className="inline-flex items-center justify-center w-10 h-11 -ml-2.5 text-cream">
             <i className="ph-bold ph-arrow-left text-[22px]" />
           </Link>
-          <div className="font-display font-bold text-[22px] text-cream">Settings</div>
+          <div className="font-display font-bold text-[22px] text-cream">{t('Settings')}</div>
         </div>
       </div>
 
@@ -96,20 +98,20 @@ export function Settings() {
               {editing ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
-                    <Input label="First name" value={firstName} onChange={setFirstName} autoComplete="given-name" autoCapitalize="words" />
-                    <Input label="Last name" value={lastName} onChange={setLastName} autoComplete="family-name" autoCapitalize="words" />
+                    <Input label={t('First name')} value={firstName} onChange={setFirstName} autoComplete="given-name" autoCapitalize="words" />
+                    <Input label={t('Last name')} value={lastName} onChange={setLastName} autoComplete="family-name" autoCapitalize="words" />
                   </div>
                   <AreaPicker
                     value={area}
                     onChange={setArea}
-                    hint="Used to show you providers nearby, and to sort by who is closest."
+                    hint={t('Used to show you providers nearby, and to sort by who is closest.')}
                   />
                   <Link to="/location" className="inline-flex items-center gap-1.5 -mt-1 text-[14px] font-semibold text-brand-hover">
                     <i className="ph-bold ph-map-pin" />
                     Pin your exact location on a map instead
                   </Link>
-                  <Input label="Neighbourhood (optional)" value={location} onChange={setLocation} placeholder="Off Herbert Macaulay Way" />
-                  <Input label="Delivery address" value={address} onChange={setAddress} placeholder="14 Herbert Macaulay Way, Yaba" />
+                  <Input label={t('Neighbourhood (optional)')} value={location} onChange={setLocation} placeholder={t('Off Herbert Macaulay Way')} />
+                  <Input label={t('Delivery address')} value={address} onChange={setAddress} placeholder={t('14 Herbert Macaulay Way, Yaba')} />
                   <div className="flex gap-2.5">
                     <button
                       onClick={save}
@@ -122,7 +124,7 @@ export function Settings() {
                       onClick={() => setEditing(false)}
                       className="flex-1 h-12 border-[1.5px] border-line rounded-xl text-[15px] font-semibold text-muted"
                     >
-                      Cancel
+                      {t('Cancel')}
                     </button>
                   </div>
                 </div>
@@ -149,38 +151,38 @@ export function Settings() {
                     onClick={startEditing}
                     className="shrink-0 h-10 px-4 border-[1.5px] border-line rounded-lg text-[14px] font-semibold text-ink"
                   >
-                    Edit
+                    {t('Edit')}
                   </button>
                 </div>
               )}
             </div>
 
             <div className="mt-5 bg-white border border-line rounded-2xl overflow-hidden">
-              <SettingsLink to="/get-verified" icon="ph-seal-check" label="Verification" />
-              <SettingsLink to="/security" icon="ph-lock-key" label="Sign-in and security" />
-              <SettingsLink to="/notifications" icon="ph-bell" label="Notifications" />
-              <SettingsLink to="/preferences" icon="ph-sliders-horizontal" label="Preferences and push" />
-              <SettingsLink to="/orders" icon="ph-package" label="My orders" />
-              <SettingsLink to="/addresses" icon="ph-map-pin" label="Delivery addresses" />
-              <SettingsLink to="/rider" icon="ph-moped" label="Deliver with FindWork" />
-              <SettingsLink to="/quotes" icon="ph-note-pencil" label="My posted jobs" />
-              <SettingsLink to="/procurement" icon="ph-buildings" label="Procurement and purchase orders" />
-              <SettingsLink to="/billing" icon="ph-credit-card" label="Plan and billing" />
-              <SettingsLink to="/disputes" icon="ph-scales" label="Disputes" />
-              <SettingsLink to="/trust" icon="ph-shield-check" label="Safety and trust" />
-              <SettingsLink to="/meetups" icon="ph-handshake" label="Meet-ups and SOS" />
-              <SettingsLink to="/help" icon="ph-lifebuoy" label="Help and support" last />
+              <SettingsLink to="/get-verified" icon="ph-seal-check" label={t('Verification')} />
+              <SettingsLink to="/security" icon="ph-lock-key" label={t('Sign-in and security')} />
+              <SettingsLink to="/notifications" icon="ph-bell" label={t('Notifications')} />
+              <SettingsLink to="/preferences" icon="ph-sliders-horizontal" label={t('Preferences and push')} />
+              <SettingsLink to="/orders" icon="ph-package" label={t('My orders')} />
+              <SettingsLink to="/addresses" icon="ph-map-pin" label={t('Delivery addresses')} />
+              <SettingsLink to="/rider" icon="ph-moped" label={t('Deliver with FindWork')} />
+              <SettingsLink to="/quotes" icon="ph-note-pencil" label={t('My posted jobs')} />
+              <SettingsLink to="/procurement" icon="ph-buildings" label={t('Procurement and purchase orders')} />
+              <SettingsLink to="/billing" icon="ph-credit-card" label={t('Plan and billing')} />
+              <SettingsLink to="/disputes" icon="ph-scales" label={t('Disputes')} />
+              <SettingsLink to="/trust" icon="ph-shield-check" label={t('Safety and trust')} />
+              <SettingsLink to="/meetups" icon="ph-handshake" label={t('Meet-ups and SOS')} />
+              <SettingsLink to="/help" icon="ph-lifebuoy" label={t('Help and support')} last />
             </div>
 
             {profile.staff_role && (
               <div className="mt-5 bg-white border border-line rounded-2xl overflow-hidden">
-                <SettingsLink to="/admin" icon="ph-user-circle-gear" label="Operations console" last />
+                <SettingsLink to="/admin" icon="ph-user-circle-gear" label={t('Operations console')} last />
               </div>
             )}
 
             <div className="mt-5 bg-white border border-line rounded-2xl overflow-hidden">
-              <SettingsLink to="/legal/terms" icon="ph-file-text" label="Terms of service" />
-              <SettingsLink to="/legal/privacy" icon="ph-lock-simple" label="Privacy policy" last />
+              <SettingsLink to="/legal/terms" icon="ph-file-text" label={t('Terms of service')} />
+              <SettingsLink to="/legal/privacy" icon="ph-lock-simple" label={t('Privacy policy')} last />
             </div>
 
             {error && (
@@ -194,11 +196,11 @@ export function Settings() {
               onClick={doSignOut}
               className="w-full h-13 mt-5 py-3.5 border-[1.5px] border-line rounded-xl text-[15.5px] font-semibold text-ink"
             >
-              Sign out
+              {t('Sign out')}
             </button>
 
             <div className="mt-8 pt-6 border-t border-line">
-              <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2">Danger zone</div>
+              <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2">{t('Danger zone')}</div>
 
               {!confirmDelete ? (
                 <>
@@ -211,15 +213,14 @@ export function Settings() {
                     onClick={() => setConfirmDelete(true)}
                     className="mt-3.5 text-[15px] font-semibold text-brand"
                   >
-                    Delete my account
+                    {t('Delete my account')}
                   </button>
                 </>
               ) : (
                 <div className="mt-3 bg-brand/6 border border-brand/25 rounded-2xl p-4">
                   {hasFunds ? (
                     <p className="text-[14px] leading-[1.5] text-brand-deep">
-                      You still have money in your wallet or held in escrow. Withdraw your balance
-                      and finish any open jobs before deleting your account.
+                      {t('You still have money in your wallet or held in escrow. Withdraw your balance and finish any open jobs before deleting your account.')}
                     </p>
                   ) : (
                     <>
@@ -249,7 +250,7 @@ export function Settings() {
                       }}
                       className="flex-1 h-12 border-[1.5px] border-line rounded-xl text-[15px] font-semibold text-muted"
                     >
-                      Keep my account
+                      {t('Keep my account')}
                     </button>
                   </div>
                 </div>

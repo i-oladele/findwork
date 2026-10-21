@@ -8,6 +8,7 @@ import { Alert } from '../../components/ui/Alert'
 import { FullScreenLoader } from '../../components/system/States'
 import { useAuth } from '../../lib/authContext'
 import { friendlyError } from '../../lib/supabase'
+import { useT } from '../../lib/i18n'
 
 /**
  * Reached from the email reset link (Supabase signs the user in from the
@@ -15,6 +16,7 @@ import { friendlyError } from '../../lib/supabase'
  * the only thing left is to set the new password.
  */
 export function ResetPassword() {
+  const t = useT()
   const navigate = useNavigate()
   const { session, loading, updatePassword } = useAuth()
   const [password, setPassword] = useState('')
@@ -42,19 +44,19 @@ export function ResetPassword() {
 
   return (
     <Screen>
-      <PageHeader title="Choose a new password" back="/home" />
+      <PageHeader title={t('Choose a new password')} back="/home" />
       <div className="px-6 pt-4">
         <Input
-          label="New password"
+          label={t('New password')}
           type="password"
           value={password}
           onChange={setPassword}
-          placeholder="At least 8 characters"
-          hint="At least 8 characters, including a number."
+          placeholder={t('At least 8 characters')}
+          hint={t('At least 8 characters, including a number.')}
         />
         {error && <Alert className="mt-4">{error}</Alert>}
         <Button onClick={submit} disabled={!valid} loading={busy} className="mt-6 w-full">
-          Save password
+          {t('Save password')}
         </Button>
       </div>
     </Screen>

@@ -10,8 +10,10 @@ import { productImage, useProduct, useProductVariants, useRecommendedProducts } 
 import { useAuth } from '../../lib/authContext'
 import { useCart } from '../../store/cart'
 import { formatNaira } from '../../lib/format'
+import { useT } from '../../lib/i18n'
 
 export function ProductDetail() {
+  const t = useT()
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const { data: product, isLoading } = useProduct(id)
@@ -33,7 +35,7 @@ export function ProductDetail() {
         <StatusBar />
         <div className="px-[22px]">
           <BackButton fallback="/shop" />
-          <EmptyState icon="ph-package" title="Product not found" body="It may no longer be sold." />
+          <EmptyState icon="ph-package" title={t('Product not found')} body={t('It may no longer be sold.')} />
         </div>
       </Screen>
     )
@@ -98,7 +100,7 @@ export function ProductDetail() {
             <div className="flex-1">
               <div className="text-[15px] font-semibold text-ink">{product.vendor}</div>
               <div className="text-[12.5px] text-muted-2 mt-0.5">
-                Visit the store · your money is held until you confirm it arrived
+                {t('Visit the store · your money is held until you confirm it arrived')}
               </div>
             </div>
             <i className="ph ph-caret-right text-muted-2" />
@@ -108,15 +110,15 @@ export function ProductDetail() {
             <i className="ph-fill ph-storefront text-2xl text-brand" />
             <div className="flex-1">
               <div className="text-[15px] font-semibold text-ink">{product.vendor}</div>
-              <div className="text-[12.5px] text-muted-2 mt-0.5">Sold and delivered through FindWork</div>
+              <div className="text-[12.5px] text-muted-2 mt-0.5">{t('Sold and delivered through FindWork')}</div>
             </div>
           </div>
         )}
 
         {hasOptions && (
           <>
-            <SectionLabel className="mt-5 mb-2.5">Choose an option</SectionLabel>
-            <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Options">
+            <SectionLabel className="mt-5 mb-2.5">{t('Choose an option')}</SectionLabel>
+            <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label={t('Options')}>
               {variants!.map((v) => {
                 const none = v.stock !== null && v.stock <= 0
                 return (
@@ -136,10 +138,10 @@ export function ProductDetail() {
           <div className="text-[13.5px] font-semibold text-warning-text mt-3">Only {stock} left</div>
         )}
 
-        <SectionLabel className="mt-5 mb-2.5">Quantity</SectionLabel>
+        <SectionLabel className="mt-5 mb-2.5">{t('Quantity')}</SectionLabel>
         <div className="flex items-center gap-4">
           <button
-            aria-label="Fewer"
+            aria-label={t('Fewer')}
             onClick={() => setQty((q) => Math.max(1, q - 1))}
             className="inline-flex items-center justify-center w-11 h-11 bg-white border border-line rounded-lg text-ink"
           >
@@ -147,7 +149,7 @@ export function ProductDetail() {
           </button>
           <span className="font-display font-bold text-[19px] text-ink w-6 text-center">{qty}</span>
           <button
-            aria-label="More"
+            aria-label={t('More')}
             onClick={() => setQty((q) => Math.min(Math.max(available, 1), q + 1))}
             className="inline-flex items-center justify-center w-11 h-11 bg-white border border-line rounded-lg text-ink"
           >
@@ -157,7 +159,7 @@ export function ProductDetail() {
 
         {(suggestions?.length ?? 0) > 0 && (
           <>
-            <SectionLabel className="mt-6 mb-2.5">You may also like</SectionLabel>
+            <SectionLabel className="mt-6 mb-2.5">{t('You may also like')}</SectionLabel>
             <div className="flex gap-3 overflow-x-auto -mx-[22px] px-[22px] pb-1">
               {suggestions!.map((s) => (
                 <Link key={s.id} to={`/product/${s.id}`} className="flex-none w-[132px] bg-white border border-line rounded-2xl overflow-hidden">
@@ -177,7 +179,7 @@ export function ProductDetail() {
           <i className="ph ph-truck text-xl text-success" />
           <div>
             <div className="text-[14.5px] font-semibold text-ink">Delivery from {formatNaira(1200)}</div>
-            <div className="text-[12.5px] text-muted-2 mt-0.5">Choose standard or same-day at checkout</div>
+            <div className="text-[12.5px] text-muted-2 mt-0.5">{t('Choose standard or same-day at checkout')}</div>
           </div>
         </div>
       </div>

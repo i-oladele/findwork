@@ -166,9 +166,9 @@ export function useStreamViewers(streamId: string | undefined, live: boolean) {
 export function useScheduleStream() {
   const invalidate = useInvalidateSocial()
   return useMutation({
-    mutationFn: async (input: { title: string; playbackUrl: string; scheduledFor: string | null; productIds: string[] }): Promise<string> => {
+    mutationFn: async (input: { title: string; video: 'link' | 'livekit'; playbackUrl: string | null; scheduledFor: string | null; productIds: string[] }): Promise<string> => {
       const { data, error } = await supabase.rpc('schedule_stream', {
-        p_title: input.title, p_playback_url: input.playbackUrl, p_scheduled_for: input.scheduledFor, p_product_ids: input.productIds,
+        p_title: input.title, p_playback_url: input.playbackUrl, p_scheduled_for: input.scheduledFor, p_product_ids: input.productIds, p_video: input.video,
       })
       if (error) throw error
       return data
@@ -208,4 +208,35 @@ export function useRemoveStreamMessage() {
     },
     onSuccess: invalidate,
   })
+}
+
+/** Whether FindWork Live (video carried through LiveKit) is set up on the server. */
+export function useLiveVideoAvailable() {
+  return useQuery({
+    queryKey: keys.social.liveVideo(),
+    staleTime: 10 * 60_000,
+    retry: false,
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await supabase.functions.invoke('livekit-token', { body: { action: 'status' } })
+      if (error) return false
+      return Boolean((data as { configured?: boolean }).configured)
+    },
+  })
+}
+
+export type StreamRoomAccess = { url: string; token: string; publish: boolean }
+
+/** A short-lived pass into a stream's video room; the server decides whether it may broadcast. */
+export async function joinStreamRoom(streamId: string): Promise<StreamRoomAccess> {
+  const { data, error } = await supabase.functions.invoke('livekit-token', { body: { action: 'join', stream_id: streamId } })
+  if (error) {
+    const status = (error as { context?: Response }).context?.status
+    throw new Error(status === 403 ? 'This stream is not open to watch.' : 'We could not connect to the video. Try again.')
+  }
+  return data as StreamRoomAccess
+}
+
+/** After ending a stream, the seller closes its room so nobody is left watching an empty one. */
+export async function closeStreamRoom(streamId: string): Promise<void> {
+  await supabase.functions.invoke('livekit-token', { body: { action: 'close', stream_id: streamId } })
 }

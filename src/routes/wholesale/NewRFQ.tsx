@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { PageHeader } from '../../components/chrome/PageHeader'
 import { Button } from '../../components/ui/Button'
@@ -25,10 +25,13 @@ export function NewRFQ() {
   const post = usePostBulkRfq()
   const orgs = useMyOrganizations()
 
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
-  const [title, setTitle] = useState('')
+  // A reorder from the stock records arrives as ?item=&qty=&unit=&org=.
+  const [params] = useSearchParams()
+  const reorder = params.get('item')
+  const [organizationId, setOrganizationId] = useState<string | null>(params.get('org'))
+  const [title, setTitle] = useState(reorder ? `Restock: ${reorder}` : '')
   const [description, setDescription] = useState('')
-  const [lines, setLines] = useState<Line[]>([{ description: '', quantity: '', unit: '' }])
+  const [lines, setLines] = useState<Line[]>([{ description: reorder ?? '', quantity: params.get('qty') ?? '', unit: params.get('unit') ?? '' }])
   const [budgetMax, setBudgetMax] = useState('')
   const [deadline, setDeadline] = useState('')
   const [tier, setTier] = useState<0 | 2 | 3>(0)

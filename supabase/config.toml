@@ -429,3 +429,10 @@ verify_jwt = false
 # Called by the database through pg_net with a shared secret, not a user's JWT.
 [functions.send-push]
 verify_jwt = false
+
+# Called by the database through pg_net with a shared secret, not by a user.
+[functions.paystack-charge]
+verify_jwt = false
+
+[functions.paystack-payout]
+verify_jwt = false

@@ -11,6 +11,7 @@ import { nearestArea, type Point } from '../../lib/distance'
 import { placeAt, searchPlaces, type Place } from '../../lib/geocoding'
 import { friendlyError } from '../../lib/supabase'
 import type { Profile } from '../../lib/database.types'
+import { useT } from '../../lib/i18n'
 
 const GEOLOCATION_ERRORS: Record<number, string> = {
   1: 'Location access is blocked for FindWork. Allow it in your browser settings, or search for your address below.',
@@ -31,6 +32,7 @@ export function Location() {
 }
 
 function LocationForm({ profile }: { profile: Profile }) {
+  const t = useT()
   const navigate = useNavigate()
   const save = useSetMyLocation()
   const { data: areas } = useServiceAreas()
@@ -123,10 +125,10 @@ function LocationForm({ profile }: { profile: Profile }) {
 
   return (
     <Screen>
-      <PageHeader title="Your location" back="/home" />
+      <PageHeader title={t('Your location')} back="/home" />
       <div className="px-[22px] pb-8">
         <p className="text-[15px] leading-[1.55] text-muted">
-          We use it to show you providers near you. Only you can see your exact location.
+          {t('We use it to show you providers near you. Only you can see your exact location.')}
         </p>
 
         <div className="relative mt-4">
@@ -138,15 +140,15 @@ function LocationForm({ profile }: { profile: Profile }) {
                 setQuery(e.target.value)
                 if (e.target.value.trim().length < 3) setSuggestions([])
               }}
-              placeholder="Search for your street, area or a landmark"
-              aria-label="Search for your address"
+              placeholder={t('Search for your street, area or a landmark')}
+              aria-label={t('Search for your address')}
               autoComplete="street-address"
               className="flex-1 min-w-0 text-[16px] text-ink bg-transparent outline-none placeholder:text-muted-2"
             />
-            {searching && <span className="text-[12px] text-muted-2">Searching…</span>}
+            {searching && <span className="text-[12px] text-muted-2">{t('Searching…')}</span>}
           </div>
           {!shortQuery && suggestions.length > 0 && (
-            <ul role="listbox" aria-label="Addresses" className="absolute z-10 left-0 right-0 mt-1.5 bg-white border border-line rounded-xl shadow-lg overflow-hidden">
+            <ul role="listbox" aria-label={t('Addresses')} className="absolute z-10 left-0 right-0 mt-1.5 bg-white border border-line rounded-xl shadow-lg overflow-hidden">
               {suggestions.map((s) => (
                 <li key={`${s.lat},${s.lng},${s.label}`} role="option" aria-selected={false}>
                   <button
@@ -165,7 +167,7 @@ function LocationForm({ profile }: { profile: Profile }) {
             </ul>
           )}
           {!shortQuery && !searching && suggestions.length === 0 && (
-            <p className="mt-2 text-[13px] text-muted-2">No matches yet. Try a street name, a landmark or your area.</p>
+            <p className="mt-2 text-[13px] text-muted-2">{t('No matches yet. Try a street name, a landmark or your area.')}</p>
           )}
         </div>
 
@@ -181,12 +183,12 @@ function LocationForm({ profile }: { profile: Profile }) {
           </button>
         ) : (
           <p className="mt-3 text-[13px] leading-[1.45] text-muted-2">
-            Your phone's location can only be used on the secure (https) FindWork site. Search for your address instead.
+            {t('Your phone\'s location can only be used on the secure (https) FindWork site. Search for your address instead.')}
           </p>
         )}
 
         <LocationMap point={place} onMove={pinAt} className="h-[280px] mt-4" />
-        <p className="mt-2 text-[13px] text-muted-2">Drag the pin or tap the map to put it exactly where you are.</p>
+        <p className="mt-2 text-[13px] text-muted-2">{t('Drag the pin or tap the map to put it exactly where you are.')}</p>
 
         {place && (
           <div className="flex items-start gap-3 mt-4 bg-white border border-line rounded-2xl p-4">
@@ -207,7 +209,7 @@ function LocationForm({ profile }: { profile: Profile }) {
         {error && <Alert className="mt-4">{error}</Alert>}
 
         <Button onClick={submit} disabled={!place || resolving} loading={save.isPending} className="mt-5 w-full">
-          Save my location
+          {t('Save my location')}
         </Button>
       </div>
     </Screen>

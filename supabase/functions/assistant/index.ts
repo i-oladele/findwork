@@ -1,5 +1,6 @@
 // The FindWork assistant: voice and typed commands, support answers,
-// message translation, lesson help and dispute case summaries. Each is one
+// message translation, lesson help, dispute case summaries, and the staff
+// analyst that answers questions about the platform's figures. Each is one
 // request to Claude; the API key must never reach the browser, so the call
 // happens here.
 //
@@ -16,7 +17,8 @@
 import Anthropic from 'npm:@anthropic-ai/sdk'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { adminClient, cors, json, requireEnv } from '../_shared/http.ts'
-import { buildRequest, InputError, readResult, TASKS, type Task } from './prompts.ts'
+import { analyticsRange, buildRequest, InputError, readResult, TASKS, type Task } from './prompts.ts'
+import { anomalies, forecast } from '../_shared/forecast.ts'
 
 const MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5']
 
@@ -55,6 +57,25 @@ Deno.serve(async (req: Request) => {
     const file = await caller.rpc('dispute_case_file', { p_dispute_id: String(input.dispute_id ?? '') })
     if (file.error || !file.data) return json({ error: 'Only dispute staff can summarise a case.' }, 403)
     input.case_file = JSON.stringify(file.data, null, 2)
+  }
+
+  // The analyst reads the same reports the staff screen shows, as the
+  // caller: admin_analytics refuses anyone without access to analytics. Only
+  // aggregates leave the database: no person's details are in them.
+  if (task === 'analytics') {
+    const range = analyticsRange(input.from, input.through)
+    if (!range) return json({ error: 'Choose a date range of up to 366 days.' }, 400)
+    const [report, engagement] = await Promise.all([
+      caller.rpc('admin_analytics', { p_from: range.from, p_to: range.to }),
+      caller.rpc('admin_engagement', { p_from: range.from, p_to: range.to }),
+    ])
+    if (report.error || !report.data) return json({ error: 'Only analytics staff can ask the analyst.' }, 403)
+    const daily = ((report.data as { daily?: Record<string, number | string>[] }).daily ?? [])
+    const model = Object.fromEntries(['marketplace_fees', 'bookings', 'orders', 'signups'].map((key) => {
+      const history = daily.map((d) => ({ date: String(d.date), value: Number(d[key]) || 0 }))
+      return [key, { forecast: forecast(history), unusual_days: anomalies(history) }]
+    }))
+    input.figures = JSON.stringify({ report: report.data, engagement: engagement.error ? null : engagement.data, model })
   }
 
   let request

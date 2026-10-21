@@ -6,23 +6,25 @@ import { QueryState } from '../../components/system/QueryState'
 import { useOrders } from '../../lib/api'
 import { formatDateTime, formatNaira, shortId } from '../../lib/format'
 import { OrderStatusBadge } from './OrderReturn'
+import { useT } from '../../lib/i18n'
 
 export function Orders() {
+  const t = useT()
   const orders = useOrders()
 
   return (
     <Screen>
-      <PageHeader title="My orders" back="/shop" />
+      <PageHeader title={t('My orders')} back="/shop" />
       <div className="px-[22px] pb-6">
         <QueryState
           query={orders}
-          errorMessage="We could not load your orders."
+          errorMessage={t('We could not load your orders.')}
           empty={{
             icon: 'ph-package',
             title: 'No orders yet',
             action: (
               <Link to="/shop" className="text-[15px] font-semibold text-brand-hover">
-                Browse the shop
+                {t('Browse the shop')}
               </Link>
             ),
           }}

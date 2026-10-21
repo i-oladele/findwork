@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
+import { shrinkImage } from '../shrinkImage'
 
 /** Largest photo accepted. Phone cameras produce 3-5 MB; this leaves room. */
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
@@ -27,8 +28,9 @@ export function useUpload(bucket: UploadBucket) {
   const { user } = useAuth()
 
   return useMutation({
-    mutationFn: async (file: File): Promise<string> => {
-      if (!file.type.startsWith('image/')) throw new Error('Choose a photo.')
+    mutationFn: async (picked: File): Promise<string> => {
+      if (!picked.type.startsWith('image/')) throw new Error('Choose a photo.')
+      const file = await shrinkImage(picked)
       if (file.size > MAX_UPLOAD_BYTES) throw new Error('That photo is too large (8 MB max).')
 
       const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'

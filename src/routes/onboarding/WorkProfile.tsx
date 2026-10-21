@@ -16,6 +16,7 @@ import { useBecomeProvider, useMyProviderProfile, useProfile, useUpdateProviderP
 import { friendlyError } from '../../lib/supabase'
 import { parseNaira } from '../../lib/format'
 import { CATEGORIES } from '../../lib/categories'
+import { useT } from '../../lib/i18n'
 
 const UNITS = ['job', 'visit', 'hour', 'day'] as const
 
@@ -72,6 +73,7 @@ function WorkProfileForm({
   }
   isEdit: boolean
 }) {
+  const t = useT()
   const navigate = useNavigate()
   const become = useBecomeProvider()
   const update = useUpdateProviderProfile()
@@ -124,14 +126,14 @@ function WorkProfileForm({
           {isEdit ? 'Your business' : 'What do you do?'}
         </h2>
         <p className="mt-2.5 text-[15.5px] leading-[1.55] text-muted">
-          This is what customers see when they search. You can change it any time.
+          {t('This is what customers see when they search. You can change it any time.')}
         </p>
 
         <div className="mt-6">
-          <Input label="Business name" value={businessName} onChange={setBusinessName} placeholder="Ada's Tailoring" />
+          <Input label={t('Business name')} value={businessName} onChange={setBusinessName} placeholder={t('Ada\'s Tailoring')} />
         </div>
 
-        <SectionLabel className="mt-5 mb-2.5">Category</SectionLabel>
+        <SectionLabel className="mt-5 mb-2.5">{t('Category')}</SectionLabel>
         <div className="flex flex-wrap gap-2.5">
           {CATEGORIES.map((c) => (
             <Chip
@@ -140,7 +142,7 @@ function WorkProfileForm({
               icon={category === c.name ? 'check' : undefined}
               onClick={() => setCategory(c.name)}
             >
-              {c.name}
+              {t(c.name)}
             </Chip>
           ))}
         </div>
@@ -149,16 +151,16 @@ function WorkProfileForm({
           <AreaPicker
             value={area}
             onChange={setArea}
-            label="Where you work"
-            hint="Customers search by area, and can sort by who is closest to them."
+            label={t('Where you work')}
+            hint={t('Customers search by area, and can sort by who is closest to them.')}
           />
         </div>
 
         <div className="mt-4">
-          <Input label="Street or landmark (optional)" value={location} onChange={setLocation} placeholder="Off Herbert Macaulay Way" />
+          <Input label={t('Street or landmark (optional)')} value={location} onChange={setLocation} placeholder={t('Off Herbert Macaulay Way')} />
         </div>
 
-        <SectionLabel className="mt-5 mb-2">Starting price</SectionLabel>
+        <SectionLabel className="mt-5 mb-2">{t('Starting price')}</SectionLabel>
         <div className="flex gap-2.5">
           <div className="flex-1 flex items-center gap-2 bg-white border-[1.5px] border-line rounded-lg h-[52px] px-3.5">
             <span className="font-display font-bold text-[16px] text-ink">₦</span>
@@ -173,7 +175,7 @@ function WorkProfileForm({
           <select
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
-            aria-label="Price per"
+            aria-label={t('Price per')}
             className="h-[52px] bg-white border-[1.5px] border-line rounded-lg px-3 text-[15px] text-ink"
           >
             {UNITS.map((u) => (
@@ -184,19 +186,19 @@ function WorkProfileForm({
           </select>
         </div>
 
-        <SectionLabel className="mt-5 mb-2">About your work</SectionLabel>
+        <SectionLabel className="mt-5 mb-2">{t('About your work')}</SectionLabel>
         <textarea
           value={bio}
           onChange={(e) => setBio(e.target.value)}
           rows={4}
-          placeholder="Experience, what you specialise in, the areas you cover"
+          placeholder={t('Experience, what you specialise in, the areas you cover')}
           className="w-full bg-white border-[1.5px] border-line rounded-lg p-3.5 text-[15.5px] leading-[1.55] text-ink outline-none resize-none placeholder:text-muted-2"
         />
 
-        <SectionLabel className="mt-5 mb-2.5">Photos of your work</SectionLabel>
+        <SectionLabel className="mt-5 mb-2.5">{t('Photos of your work')}</SectionLabel>
         <PhotoPicker bucket="provider-portfolios" value={photos} onChange={setPhotos} onError={setError} max={8} />
         <p className="mt-2 text-[13px] text-muted-2">
-          The first photo is what customers see in search results.
+          {t('The first photo is what customers see in search results.')}
         </p>
 
         {error && <Alert className="mt-4">{error}</Alert>}

@@ -7,8 +7,10 @@ import { QueryState } from '../../components/system/QueryState'
 import { Skeleton } from '../../components/system/States'
 import { useDisputes, useMyBookings, useTransactions, useWalletSummary } from '../../lib/api'
 import { formatNaira } from '../../lib/format'
+import { useT } from '../../lib/i18n'
 
 export function Wallet() {
+  const t = useT()
   const { data: wallet, isLoading } = useWalletSummary()
   const transactions = useTransactions()
   const { data: bookings } = useMyBookings()
@@ -24,8 +26,8 @@ export function Wallet() {
   const heldJobs = (bookings ?? []).filter((b) => (b.status === 'pending' || b.status === 'active') && b.escrow_held > 0).length
   const openDisputes = (disputes ?? []).filter((d) => d.status === 'open').length
   const ledger = transactions.data ?? []
-  const inTotal = ledger.filter((t) => t.balance_delta > 0).reduce((s, t) => s + t.balance_delta, 0)
-  const outTotal = ledger.filter((t) => t.balance_delta < 0).reduce((s, t) => s - t.balance_delta, 0)
+  const inTotal = ledger.filter((tx) => tx.balance_delta > 0).reduce((s, tx) => s + tx.balance_delta, 0)
+  const outTotal = ledger.filter((tx) => tx.balance_delta < 0).reduce((s, tx) => s - tx.balance_delta, 0)
 
   function toggleHidden() {
     const next = !hidden
@@ -44,12 +46,12 @@ export function Wallet() {
       <div className="bg-ink px-[22px] pb-6">
         <StatusBar tone="light" />
         <div className="flex items-center justify-between mt-1.5">
-          <span className="font-display font-bold text-[22px] text-cream">Wallet</span>
-          <Link to="/transactions" aria-label="All transactions" className="inline-flex items-center justify-center w-11 h-11 text-cream">
+          <span className="font-display font-bold text-[22px] text-cream">{t('Wallet')}</span>
+          <Link to="/transactions" aria-label={t('All transactions')} className="inline-flex items-center justify-center w-11 h-11 text-cream">
             <i className="ph ph-clock-counter-clockwise text-[22px]" />
           </Link>
         </div>
-        <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mt-3.5">Available balance</div>
+        <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mt-3.5">{t('Available balance')}</div>
         <div className="flex items-baseline gap-2 mt-1.5">
           {isLoading ? (
             <Skeleton className="h-11 w-48 bg-ink-soft" />
@@ -73,7 +75,7 @@ export function Wallet() {
         <Link to="/disputes" className="flex items-center gap-2.5 bg-ink-soft border border-ink-line rounded-xl p-3.5 mt-2.5">
           <i className="ph-fill ph-scales text-xl text-warning" />
           <div className="flex-1">
-            <div className="text-[14.5px] font-semibold text-cream">My disputes</div>
+            <div className="text-[14.5px] font-semibold text-cream">{t('My disputes')}</div>
             {openDisputes > 0 && <div className="text-[12.5px] text-muted-2 mt-0.5">{openDisputes} under review</div>}
           </div>
           <i className="ph-bold ph-caret-right text-base text-muted-2" />
@@ -98,33 +100,33 @@ export function Wallet() {
         <div className="flex gap-3">
           <span className="flex-1 bg-white border border-line rounded-2xl p-3.5">
             <i className="ph-fill ph-arrow-down-left text-xl text-success" />
-            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2 mt-2.5">Money in</div>
+            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2 mt-2.5">{t('Money in')}</div>
             <div className="font-display font-bold text-lg text-ink mt-1">{money(inTotal)}</div>
           </span>
           <span className="flex-1 bg-white border border-line rounded-2xl p-3.5">
             <i className="ph-fill ph-arrow-up-right text-xl text-brand-deep" />
-            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2 mt-2.5">Money out</div>
+            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2 mt-2.5">{t('Money out')}</div>
             <div className="font-display font-bold text-lg text-ink mt-1">{money(outTotal)}</div>
           </span>
         </div>
 
         <div className="flex items-center justify-between mt-[22px]">
-          <div className="font-display font-bold text-[18px] text-ink">Recent</div>
+          <div className="font-display font-bold text-[18px] text-ink">{t('Recent')}</div>
           <Link to="/transactions" className="text-sm font-semibold text-brand-hover">
-            See all
+            {t('See all')}
           </Link>
         </div>
 
         <div className="mt-3">
           <QueryState
             query={{ ...transactions, data: transactions.data?.slice(0, 4) }}
-            errorMessage="We could not load your transactions."
+            errorMessage={t('We could not load your transactions.')}
             empty={{ icon: 'ph-receipt', title: 'No transactions yet', body: 'Add money to book, shop and learn.' }}
           >
             {(recent) => (
               <div className="bg-white border border-line rounded-2xl overflow-hidden">
-                {recent.map((t, i) => (
-                  <TransactionRow key={t.id} t={t} isLast={i === recent.length - 1} />
+                {recent.map((tx, i) => (
+                  <TransactionRow key={tx.id} t={tx} isLast={i === recent.length - 1} />
                 ))}
               </div>
             )}

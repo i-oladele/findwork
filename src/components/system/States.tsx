@@ -1,15 +1,17 @@
 import type { ReactNode } from 'react'
 import { Screen } from '../chrome/Screen'
 import { StatusBar } from '../chrome/StatusBar'
+import { useT } from '../../lib/i18n'
 
 /** Shown while the initial auth session is resolving. */
 export function FullScreenLoader() {
+  const t = useT()
   return (
     <Screen>
       <StatusBar />
       <div className="flex flex-col items-center justify-center min-h-[70vh] gap-3">
         <Spinner />
-        <span className="font-mono text-[11px] tracking-[0.16em] uppercase text-muted-2">Loading</span>
+        <span className="font-mono text-[11px] tracking-[0.16em] uppercase text-muted-2">{t('Loading')}</span>
       </div>
     </Screen>
   )
@@ -68,17 +70,18 @@ export function EmptyState({
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const t = useT()
   return (
     <div className="flex flex-col items-center text-center px-8 py-14">
       <i className="ph ph-warning-circle text-[34px] text-brand" />
-      <div className="mt-3.5 font-display font-semibold text-[17px] text-ink">Something went wrong</div>
+      <div className="mt-3.5 font-display font-semibold text-[17px] text-ink">{t('Something went wrong')}</div>
       <p className="mt-1.5 text-[14.5px] leading-[1.5] text-muted">{message}</p>
       {onRetry && (
         <button
           onClick={onRetry}
           className="mt-5 h-11 px-6 bg-ink rounded-xl text-[15px] font-semibold text-cream"
         >
-          Try again
+          {t('Try again')}
         </button>
       )}
     </div>

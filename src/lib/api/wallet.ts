@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { keys } from './keys'
-import type { PayoutAccount, WalletTransaction, Withdrawal } from '../database.types'
+import type { CartItem } from './commerce'
+import type { DeliverySpeed, PaymentPurpose, PayoutAccount, WalletTransaction, Withdrawal } from '../database.types'
 
 export type WalletSummary = { balance: number; escrow_held: number }
 
@@ -53,22 +54,53 @@ async function functionError(error: unknown): Promise<Error> {
   return new Error(body?.message ?? body?.error ?? (error as Error).message)
 }
 
+/** What a Paystack payment can be for. The server prices a checkout and a plan itself. */
+export type StartPayment =
+  | { purpose: 'topup'; amount: number }
+  | {
+      purpose: 'checkout'
+      items: CartItem[]
+      delivery_speed: DeliverySpeed
+      address: string
+      phone: string
+      coupon_code: string | null
+      /** The total checkout showed; the server refuses if its own price differs. */
+      expected_total: number
+    }
+  | { purpose: 'plan'; plan: string; save_card: boolean }
+
 /**
- * Starts a Paystack checkout for a wallet top-up. Returns the URL to send
- * the user to; the wallet is credited only once Paystack confirms payment.
+ * Starts a Paystack checkout. Returns the URL to send the user to; nothing
+ * is credited, ordered or subscribed until Paystack confirms payment.
  */
-export function useStartTopUp() {
+export function useStartPayment() {
   return useMutation({
-    mutationFn: async (amount: number) => {
-      const { data, error } = await supabase.functions.invoke('paystack-initialize', { body: { amount } })
+    mutationFn: async (body: StartPayment) => {
+      const { data, error } = await supabase.functions.invoke('paystack-initialize', { body })
       if (error) throw await functionError(error)
-      return data as { reference: string; authorization_url: string }
+      return data as { reference: string; amount: number; authorization_url: string }
     },
   })
 }
 
-/** refund_due and refunded: the payment reached an account already deleted. */
-export type TopUpStatus = { status: 'success' | 'failed' | 'pending' | 'refund_due' | 'refunded'; amount: number }
+/** A wallet top-up by card or transfer. */
+export function useStartTopUp() {
+  const start = useStartPayment()
+  return { ...start, mutateAsync: (amount: number) => start.mutateAsync({ purpose: 'topup', amount }) }
+}
+
+/**
+ * refund_due and refunded: the payment reached an account already deleted.
+ * outcome: for a checkout, the orders placed ({ order_ids }) or why they
+ * could not be ({ error }, the money then being in the wallet); for a plan,
+ * { plan } or { error }.
+ */
+export type TopUpStatus = {
+  status: 'success' | 'failed' | 'pending' | 'refund_due' | 'refunded'
+  amount: number
+  purpose?: PaymentPurpose
+  outcome?: { order_ids?: string[]; plan?: string; error?: string } | null
+}
 
 /** Asks the server to confirm a returning Paystack payment and credit it. */
 export function useVerifyTopUp() {
@@ -119,6 +151,48 @@ export function useSavePayoutAccount() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.wallet.payoutAccount() })
     },
+  })
+}
+
+export type PayoutBank = { name: string; code: string }
+
+/**
+ * The banks Paystack can confirm an account with. null when Paystack is not
+ * set up, in which case people type their details in for staff to check.
+ */
+export function usePayoutBanks() {
+  return useQuery({
+    queryKey: keys.wallet.banks(),
+    staleTime: 3_600_000,
+    retry: false,
+    queryFn: async (): Promise<PayoutBank[] | null> => {
+      const { data, error } = await supabase.functions.invoke('payout-account', { body: { action: 'banks' } })
+      if (error) {
+        const status = (error as { context?: Response }).context?.status
+        if (status === 503 || status === 404) return null
+        throw await functionError(error)
+      }
+      return (data as { banks: PayoutBank[] }).banks
+    },
+  })
+}
+
+/** The bank's own name for an account, before saving it. */
+export async function resolvePayoutAccount(bankCode: string, accountNumber: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('payout-account', { body: { action: 'resolve', bank_code: bankCode, account_number: accountNumber } })
+  if (error) throw await functionError(error)
+  return (data as { account_name: string }).account_name
+}
+
+/** Saves an account the bank has confirmed; withdrawals to it can then be paid automatically. */
+export function useConfirmPayoutAccount() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { bankCode: string; accountNumber: string }) => {
+      const { error } = await supabase.functions.invoke('payout-account', { body: { action: 'save', bank_code: input.bankCode, account_number: input.accountNumber } })
+      if (error) throw await functionError(error)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.wallet.payoutAccount() }),
   })
 }
 

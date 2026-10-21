@@ -292,6 +292,11 @@ select pg_temp.balance(auth.uid()) as before_course \gset
 select public.enroll_in_course('pattern-cutting-basics');
 select public.enroll_in_course('pattern-cutting-basics');
 select pg_temp.eq('paid course charged exactly once', pg_temp.balance(auth.uid()), (:before_course - 8000)::bigint);
+-- The starter courses ship with material; empty one lesson to check the rule.
+reset role;
+update public.course_lessons set body = null where course_id = 'pattern-cutting-basics' and position = 1;
+select set_config('request.jwt.claim.sub', :customer, true);
+set local role authenticated;
 select pg_temp.fails('a lesson nobody has written cannot be completed',
   $$ select public.complete_lesson((select id from public.course_lessons where course_id = 'pattern-cutting-basics' and position = 1)) $$,
   'lesson has no content');
@@ -306,6 +311,20 @@ select pg_temp.eq('completing the same lesson again changes nothing',
 select pg_temp.fails('cannot complete lessons without enrolling',
   $$ select public.complete_lesson((select id from public.course_lessons where course_id = 'plumbing-safety-cert' limit 1)) $$,
   'not enrolled');
+
+reset role;
+select pg_temp.eq('every starter course lesson has material',
+  (select count(*) from public.course_lessons l join public.courses c on c.id = l.course_id
+    where c.kind = 'course' and c.id <> 'pattern-cutting-basics' and coalesce(trim(l.body), '') = ''), 0::bigint);
+select pg_temp.eq('and each starter course has a quiz of eight questions',
+  (select string_agg(course_id || ':' || n, ',' order by course_id) from (select course_id, count(*) n from public.quiz_questions
+    where course_id in ('pattern-cutting-basics', 'small-business-bookkeeping', 'plumbing-safety-cert') group by course_id) q),
+  'pattern-cutting-basics:8,plumbing-safety-cert:8,small-business-bookkeeping:8');
+select private.load_course_content();
+select pg_temp.eq('loading the content again never overwrites what staff wrote',
+  (select body from public.course_lessons where course_id = 'pattern-cutting-basics' and position = 2), 'Measure twice. Mark the grain line before you cut.');
+select set_config('request.jwt.claim.sub', :customer, true);
+set local role authenticated;
 
 -- ==== 8. Plans: commission and listing limit =================================
 
@@ -2256,11 +2275,443 @@ insert into public.assistant_usage(profile_id, task) select :customer, 'command'
 set local role service_role;
 select pg_temp.eq('the sixty-first request in a day is refused', public.assistant_allow(:customer, 'translate'), false);
 select pg_temp.eq('staff case summaries are not capped', public.assistant_allow(:customer, 'dispute'), true);
+select pg_temp.eq('nor are staff questions to the analyst', public.assistant_allow(:customer, 'analytics'), true);
 reset role;
 select set_config('request.jwt.claim.sub', :admin, true);
 set local role authenticated;
 select pg_temp.eq('dispute staff get the claim and both sides'' responses',
   jsonb_array_length(public.dispute_case_file(:'response_case_id')->'responses'), 1);
+reset role;
+
+-- ==== 40. The buying side's stock records ====================================
+-- Section 35 left PO 'po' completed for the organisation 'org': customer owns it, tunde buys for it.
+select set_config('request.jwt.claim.sub', :mama, true);
+set local role authenticated;
+select pg_temp.fails('a supplier cannot receive goods into the buyer''s stock',
+  format($$ select public.receive_purchase_order_stock(%L, '[{"name":"50kg rice","unit":"bags","quantity":20}]') $$, (select v from t_ids where k = 'po')),
+  'purchase order not found');
+reset role;
+select set_config('request.jwt.claim.sub', :tunde, true);
+set local role authenticated;
+select pg_temp.fails('a cancelled order has nothing to receive',
+  format($$ select public.receive_purchase_order_stock(%L, '[{"name":"Napkins","unit":"packs","quantity":3}]') $$, (select v from t_ids where k = 'small_po')),
+  'purchase order not delivered yet');
+reset role;
+select set_config('request.jwt.claim.sub', :customer, true);
+set local role authenticated;
+select pg_temp.eq('receiving a delivered order records each line',
+  public.receive_purchase_order_stock((select v from t_ids where k = 'po'),
+    '[{"name":"50kg rice","unit":"bags","quantity":18},{"name":"Vegetable oil 25L","unit":"kegs","quantity":5},{"name":"Torn bags","unit":"bags","quantity":0}]'), 2);
+select pg_temp.eq('what arrived is what is on hand',
+  (select on_hand from public.stock_items where organization_id = (select v from t_ids where k = 'org') and name = '50kg rice'), 18);
+select pg_temp.eq('a line received as nothing creates no item',
+  (select count(*) from public.stock_items where organization_id = (select v from t_ids where k = 'org')), 2::bigint);
+select pg_temp.fails('an order is received into stock once',
+  format($$ select public.receive_purchase_order_stock(%L, '[{"name":"50kg rice","unit":"bags","quantity":18}]') $$, (select v from t_ids where k = 'po')),
+  'already received into stock');
+select id as rice_item from public.stock_items where organization_id = (select v from t_ids where k = 'org') and name = '50kg rice' \gset
+select public.save_stock_item(:'rice_item', (select v from t_ids where k = 'org'), '50kg rice', 'bags', 5);
+reset role;
+select set_config('request.jwt.claim.sub', :tunde, true);
+set local role authenticated;
+select pg_temp.eq('a buyer sees the organisation''s stock',
+  (select count(*) from public.stock_items where organization_id = (select v from t_ids where k = 'org')), 2::bigint);
+select public.record_stock(:'rice_item', 'used', 13, 'Canteen, week 1');
+select pg_temp.eq('using goods takes them off what is on hand',
+  (select on_hand from public.stock_items where id = :'rice_item'), 5);
+select pg_temp.fails('nobody can use more than is there',
+  format($$ select public.record_stock(%L, 'used', 6, null) $$, :'rice_item'), 'not enough on hand');
+select pg_temp.fails('a buyer cannot correct the count',
+  format($$ select public.record_stock(%L, 'counted', 50, 'Found more') $$, :'rice_item'), 'organisation approvers only');
+select pg_temp.fails('or add items by hand',
+  format($$ select public.save_stock_item(null, %L, 'Salt', 'bags', null) $$, (select v from t_ids where k = 'org')), 'organisation approvers only');
+select pg_temp.fails('stock cannot be written directly',
+  format($$ update public.stock_items set on_hand = 1000 where id = %L $$, :'rice_item'), 'permission denied');
+reset role;
+select pg_temp.eq('falling to the reorder level tells the owner',
+  (select count(*) from public.notifications where profile_id = :customer and title = '50kg rice is running low'), 1::bigint);
+select set_config('request.jwt.claim.sub', :customer, true);
+set local role authenticated;
+select pg_temp.fails('a count needs a note',
+  format($$ select public.record_stock(%L, 'counted', 7, '') $$, :'rice_item'), 'count note required');
+select public.record_stock(:'rice_item', 'counted', 7, 'Store count, Friday');
+select pg_temp.eq('a count sets the figure to what is actually there',
+  (select on_hand from public.stock_items where id = :'rice_item'), 7);
+select pg_temp.eq('and every change is kept',
+  (select string_agg(reason || ':' || delta, ',' order by delta desc) from public.stock_movements where item_id = :'rice_item'),
+  'received:18,counted:2,used:-13');
+select pg_temp.eq('the dashboard counts items running low',
+  (public.procurement_summary((select v from t_ids where k = 'org'))->>'low_stock')::integer, 0);
+insert into t_ids select 'own_item', public.save_stock_item(null, null, 'Printer paper', 'reams', 2);
+reset role;
+select set_config('request.jwt.claim.sub', :femi, true);
+set local role authenticated;
+select pg_temp.eq('outsiders see none of an organisation''s stock', (select count(*) from public.stock_items), 0::bigint);
+select pg_temp.eq('or its history', (select count(*) from public.stock_movements), 0::bigint);
+select pg_temp.fails('or someone''s own stock',
+  format($$ select public.record_stock(%L, 'used', 1, null) $$, (select v from t_ids where k = 'own_item')), 'stock item not found');
+reset role;
+
+-- ==== 41. Matching reads the provider's calendar =============================
+-- Mama works one weekday only: the weekday of the day the job is needed.
+select ((now() at time zone 'Africa/Lagos')::date + 4) as cal_needed \gset
+update public.provider_profiles set taking_bookings = true where id = :mama;
+insert into public.provider_availability(provider_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday)
+values (:mama, false, false, false, false, false, false, false)
+on conflict (provider_id) do update set monday = false, tuesday = false, wednesday = false, thursday = false, friday = false, saturday = false, sunday = false;
+select format('update public.provider_availability set %I = true where provider_id = %L',
+  (array['monday','tuesday','wednesday','thursday','friday','saturday','sunday'])[extract(isodow from :'cal_needed'::date)::int], :mama) as open_day_sql \gset
+:open_day_sql;
+select set_config('request.jwt.claim.sub', :customer, true);
+set local role authenticated;
+insert into public.job_posts(customer_id, title, description, budget, category, needed_on)
+values (auth.uid(), 'Needed on a day', 'Calendar fixture', 500000, :'mama_trade', :'cal_needed') returning id \gset cal_job_
+insert into public.job_posts(customer_id, title, description, budget, category)
+values (auth.uid(), 'Needed whenever', 'Calendar fixture', 500000, :'mama_trade') returning id \gset any_job_
+select (row->'match') as cal_match from jsonb_array_elements(public.match_providers_for_job(:'cal_job_id')) row
+  where row->>'id' = '00000000-0000-0000-0000-000000000005' \gset
+select pg_temp.eq('one working day with room before the day needed earns part of the availability points',
+  (:'cal_match'::jsonb->>'availability')::integer, 6);
+select pg_temp.eq('and the match names that day', :'cal_match'::jsonb->>'next_free', :'cal_needed');
+reset role;
+-- Seven hours booked on her only working day leaves no room.
+insert into public.bookings(provider_id, provider_name, customer_id, service, price, start_at, duration_minutes, status)
+values (:mama, 'Mama Nkechi', :chidi, 'Calendar fixture', 1000, (:'cal_needed'::date + time '09:00') at time zone 'Africa/Lagos', 420, 'active');
+select set_config('request.jwt.claim.sub', :customer, true);
+set local role authenticated;
+select pg_temp.eq('a fully booked calendar earns no availability points',
+  (select (row->'match'->>'availability')::integer from jsonb_array_elements(public.match_providers_for_job(:'cal_job_id')) row
+    where row->>'id' = '00000000-0000-0000-0000-000000000005'), 0);
+select pg_temp.eq('with no day given, a week with no room earns a little',
+  (select (row->'match'->>'availability')::integer from jsonb_array_elements(public.match_providers_for_job(:'any_job_id')) row
+    where row->>'id' = '00000000-0000-0000-0000-000000000005'), 4);
+select pg_temp.eq('a provider with an open calendar earns them in full',
+  (select (row->'match'->>'availability')::integer from jsonb_array_elements(public.match_providers_for_job(:'cal_job_id')) row
+    where row->>'id' = '00000000-0000-0000-0000-000000000004'), 10);
+reset role;
+update public.provider_profiles set taking_bookings = false where id = '00000000-0000-0000-0000-000000000004';
+select set_config('request.jwt.claim.sub', :customer, true);
+set local role authenticated;
+select pg_temp.eq('nobody who has stopped taking bookings scores for availability',
+  (select (row->'match'->>'availability')::integer from jsonb_array_elements(public.match_providers_for_job(:'cal_job_id')) row
+    where row->>'id' = '00000000-0000-0000-0000-000000000004'), 0);
+select pg_temp.eq('scores still add up with the calendar in them',
+  (select count(*) from jsonb_array_elements(public.match_providers_for_job(:'cal_job_id')) row
+    where (row->'match'->>'score')::integer <> (row->'match'->>'skill')::integer + (row->'match'->>'location')::integer
+      + (row->'match'->>'budget')::integer + (row->'match'->>'availability')::integer + (row->'match'->>'reputation')::integer), 0::bigint);
+select pg_temp.fails('a job cannot be needed more than a year ahead',
+  $$ insert into public.job_posts(customer_id, title, description, budget, needed_on) values (auth.uid(), 'Far off', 'x', 1000, current_date + 400) $$,
+  'job_posts_needed_on_check');
+reset role;
+
+-- ==== 42. Paying by card: checkout, plans, renewals and automatic payouts ====
+-- Checkout by card: the payment is credited and the order placed together.
+select set_config('request.jwt.claim.sub', :tunde, true);
+set local role authenticated;
+select (public.checkout_quote('[{"product_id":"palm-oil","qty":1}]', 'standard')->>'total')::integer as card_total \gset
+reset role;
+select pg_temp.balance(:tunde) as tunde_pre_card \gset
+insert into public.payment_intents(profile_id, reference, amount, purpose, payload)
+values (:tunde, 'card-checkout-1', :card_total, 'checkout',
+  jsonb_build_object('items', '[{"product_id":"palm-oil","qty":1}]'::jsonb, 'delivery_speed', 'standard', 'address', E'Tunde\n3 Card Close', 'phone', '+2348030000006'));
+set local role service_role;
+select (public.settle_payment('card-checkout-1', :card_total * 100, null)->'outcome'->'order_ids'->>0)::uuid as card_order \gset
+reset role;
+select pg_temp.eq('a card payment at checkout places the order', (select customer_id from public.orders where id = :'card_order'), :tunde::uuid);
+select pg_temp.eq('and leaves the wallet as it was', pg_temp.balance(:tunde), :tunde_pre_card::bigint);
+select pg_temp.eq('the order is the amount Paystack took', (select total from public.orders where id = :'card_order'), :card_total);
+set local role service_role;
+select pg_temp.eq('Paystack confirming twice places nothing more',
+  (public.settle_payment('card-checkout-1', :card_total * 100, null)->>'credited')::boolean, false);
+reset role;
+select pg_temp.eq('one order for one payment', (select count(*) from public.orders where customer_id = :tunde and delivery_address = E'Tunde\n3 Card Close'), 1::bigint);
+-- A cart whose price changed after paying: the money is kept in the wallet.
+insert into public.payment_intents(profile_id, reference, amount, purpose, payload)
+values (:tunde, 'card-checkout-2', :card_total - 1, 'checkout',
+  jsonb_build_object('items', '[{"product_id":"palm-oil","qty":1}]'::jsonb, 'delivery_speed', 'standard', 'address', E'Tunde\n3 Card Close', 'phone', '+2348030000006'));
+set local role service_role;
+select public.settle_payment('card-checkout-2', (:card_total - 1) * 100, null)->'outcome'->>'error' as card_error \gset
+reset role;
+select pg_temp.eq('an order that can no longer be placed says why', position('checkout_total_changed' in :'card_error') > 0, true);
+select pg_temp.eq('and the payment stays in the wallet', pg_temp.balance(:tunde), (:tunde_pre_card + :card_total - 1)::bigint);
+select pg_temp.eq('and the payer is told',
+  (select count(*) from public.notifications where profile_id = :tunde and title = 'Your payment is in your wallet'), 1::bigint);
+
+-- A plan paid by card keeps the card, which nobody can read back.
+select pg_temp.balance(:chidi) as chidi_pre_plan \gset
+insert into public.payment_intents(profile_id, reference, amount, purpose, payload)
+values (:chidi, 'card-plan-1', 4500, 'plan', '{"plan":"pro","save_card":true}');
+set local role service_role;
+select public.settle_payment('card-plan-1', 450000,
+  '{"authorization_code":"AUTH_test_1","signature":"SIG_test_1","reusable":true,"last4":"4081","card_type":"visa","exp_month":"12","exp_year":"2030","bank":"TEST BANK","email":"hello@chidiplumbing.ng"}');
+reset role;
+select pg_temp.eq('a plan paid by card is active', (select plan from public.subscriptions where profile_id = :chidi), 'pro');
+select pg_temp.eq('and the wallet is as it was', pg_temp.balance(:chidi), :chidi_pre_plan::bigint);
+select pg_temp.eq('and the plan renews from that card',
+  (select c.last4 from public.subscriptions s join public.payment_cards c on c.id = s.card_id where s.profile_id = :chidi), '4081');
+select set_config('request.jwt.claim.sub', :chidi, true);
+set local role authenticated;
+select pg_temp.eq('the owner sees the card''s description', (select brand from public.payment_cards), 'visa');
+select pg_temp.fails('but never the code that charges it', $$ select authorization_code from public.payment_cards $$, 'permission denied');
+reset role;
+select set_config('request.jwt.claim.sub', :tunde, true);
+set local role authenticated;
+select pg_temp.eq('nor does anyone else see the card', (select count(*) from public.payment_cards where profile_id = :chidi::uuid), 0::bigint);
+reset role;
+-- A top-up never keeps the card, even if Paystack offers it.
+insert into public.payment_intents(profile_id, reference, amount) values (:chidi, 'card-topup-1', 1000);
+set local role service_role;
+select public.settle_payment('card-topup-1', 100000, '{"authorization_code":"AUTH_test_2","signature":"SIG_test_2","reusable":true,"last4":"1111"}');
+reset role;
+select pg_temp.eq('a top-up does not save the card', (select count(*) from public.payment_cards where profile_id = :chidi), 1::bigint);
+
+-- Renewal by card: Paystack is asked once, and the plan waits for its answer.
+insert into private.settings values ('paystack_charge_url', 'https://example.invalid/charge'), ('paystack_hook_secret', 'test-secret');
+update public.subscriptions set renews_at = now() - interval '1 minute' where profile_id = :chidi;
+select pg_temp.balance(:chidi) as chidi_pre_renew \gset
+select private.renew_subscriptions();
+select private.renew_subscriptions();
+select pg_temp.eq('a due plan with a card asks Paystack once',
+  (select count(*) from public.payment_intents where profile_id = :chidi and purpose = 'renewal'), 1::bigint);
+select pg_temp.eq('and takes nothing from the wallet meanwhile', pg_temp.balance(:chidi), :chidi_pre_renew::bigint);
+select reference as renew_ref from public.payment_intents where profile_id = :chidi and purpose = 'renewal' \gset
+set local role service_role;
+select pg_temp.eq('the charge uses the saved card', public.renewal_charge(:'renew_ref')->>'authorization_code', 'AUTH_test_1');
+select public.settle_payment(:'renew_ref', 450000, null);
+reset role;
+select pg_temp.eq('a paid renewal moves the plan a month on',
+  (select renews_at > now() + interval '27 days' from public.subscriptions where profile_id = :chidi), true);
+select pg_temp.eq('with the wallet untouched', pg_temp.balance(:chidi), :chidi_pre_renew::bigint);
+-- A declined card falls back to the wallet at once.
+select public.admin_adjust_balance(:chidi, 10000, 'Renewal fixture') from (select set_config('request.jwt.claim.sub', :admin, true)) s;
+select set_config('request.jwt.claim.sub', '', true);
+update public.subscriptions set renews_at = now() - interval '2 minutes' where profile_id = :chidi;
+select private.renew_subscriptions();
+select reference as declined_ref from public.payment_intents where profile_id = :chidi and purpose = 'renewal' and status = 'pending' \gset
+select pg_temp.balance(:chidi) as chidi_pre_decline \gset
+set local role service_role;
+select public.fail_payment(:'declined_ref', 'Declined');
+reset role;
+select pg_temp.eq('a declined card renews from the wallet instead', pg_temp.balance(:chidi), (:chidi_pre_decline - 4500)::bigint);
+select pg_temp.eq('and keeps the plan', (select plan from public.subscriptions where profile_id = :chidi), 'pro');
+select set_config('request.jwt.claim.sub', :chidi, true);
+set local role authenticated;
+select public.remove_payment_card((select id from public.payment_cards));
+select pg_temp.eq('removing the card renews from the wallet from then on', (select card_id from public.subscriptions), null::uuid);
+reset role;
+
+-- Automatic payouts, to a confirmed account, within the limit finance sets.
+select set_config('request.jwt.claim.sub', :customer, true);
+set local role authenticated;
+select pg_temp.fails('only finance staff set the payout policy', $$ select public.admin_set_payout_policy(true, 100000) $$, 'admins only');
+reset role;
+insert into private.settings values ('paystack_payout_url', 'https://example.invalid/payout');
+select public.admin_set_payout_policy(true, 100000) from (select set_config('request.jwt.claim.sub', :admin, true)) s;
+select pg_temp.eq('finance can see the policy', (public.payout_policy()->>'enabled')::boolean, true);
+select public.admin_adjust_balance(:ada, 50000, 'Payout fixture');
+select set_config('request.jwt.claim.sub', :ada, true);
+set local role authenticated;
+insert into public.payout_accounts (profile_id, bank_name, account_number, account_name) values (auth.uid(), 'GTBank', '0123456789', 'Ada Tailoring Ltd')
+on conflict (profile_id) do update set bank_name = excluded.bank_name, account_number = excluded.account_number, account_name = excluded.account_name;
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+set local role service_role;
+update public.payout_accounts set bank_code = '058', recipient_code = 'RCP_test_ada', verified_at = now(), account_name = 'ADA TAILORING LTD'
+where profile_id = :ada;
+reset role;
+select pg_temp.eq('the server can confirm an account', (select recipient_code from public.payout_accounts where profile_id = :ada), 'RCP_test_ada');
+select set_config('request.jwt.claim.sub', :ada, true);
+set local role authenticated;
+select pg_temp.fails('nobody can confirm their own account',
+  $$ update public.payout_accounts set recipient_code = 'RCP_fake' where profile_id = auth.uid() $$, 'permission denied');
+insert into t_ids select 'auto_w', public.request_withdrawal(5000);
+reset role;
+select pg_temp.eq('a withdrawal to a confirmed account is queued for Paystack',
+  (select transfer_status || ':' || recipient_code from public.withdrawals where id = (select v from t_ids where k = 'auto_w')), 'queued:RCP_test_ada');
+select transfer_reference as auto_ref from public.withdrawals where id = (select v from t_ids where k = 'auto_w') \gset
+select set_config('request.jwt.claim.sub', :admin, true);
+set local role authenticated;
+select pg_temp.fails('staff cannot settle by hand what Paystack is sending',
+  format($$ select public.admin_process_withdrawal(%L, true, '') $$, (select v from t_ids where k = 'auto_w')), 'payout in progress');
+select pg_temp.fails('or take it back within the hour',
+  format($$ select public.admin_requeue_payout(%L, 'Stuck') $$, (select v from t_ids where k = 'auto_w')), 'payout in progress');
+reset role;
+select count(*) as ada_sent_before from public.notifications where profile_id = :ada and title = 'Withdrawal sent' \gset
+set local role service_role;
+select public.settle_withdrawal_transfer(:'auto_ref', 'sent', 'TRF_test_1', null);
+select public.settle_withdrawal_transfer(:'auto_ref', 'success', 'TRF_test_1', null);
+select public.settle_withdrawal_transfer(:'auto_ref', 'success', 'TRF_test_1', null);
+reset role;
+select pg_temp.eq('Paystack''s success marks it paid',
+  (select status from public.withdrawals where id = (select v from t_ids where k = 'auto_w')), 'paid');
+select pg_temp.eq('and tells the owner once',
+  (select count(*) from public.notifications where profile_id = :ada and title = 'Withdrawal sent'), (:ada_sent_before + 1)::bigint);
+-- Above the limit, it waits for staff.
+select public.admin_set_payout_policy(true, 2000) from (select set_config('request.jwt.claim.sub', :admin, true)) s;
+select set_config('request.jwt.claim.sub', :ada, true);
+set local role authenticated;
+insert into t_ids select 'big_w', public.request_withdrawal(2500);
+reset role;
+select pg_temp.eq('a withdrawal above the automatic limit waits for staff',
+  (select transfer_status from public.withdrawals where id = (select v from t_ids where k = 'big_w')), null::text);
+-- A failed transfer goes back to finance, with the money still held.
+select public.admin_set_payout_policy(true, 100000) from (select set_config('request.jwt.claim.sub', :admin, true)) s;
+select set_config('request.jwt.claim.sub', :ada, true);
+set local role authenticated;
+insert into t_ids select 'failed_w', public.request_withdrawal(3000);
+reset role;
+select pg_temp.balance(:ada) as ada_pre_fail \gset
+set local role service_role;
+select public.settle_withdrawal_transfer((select transfer_reference from public.withdrawals where id = (select v from t_ids where k = 'failed_w')),
+  'failed', null, 'Insufficient Paystack balance');
+reset role;
+select pg_temp.eq('a failed transfer returns to the staff queue',
+  (select status || ':' || transfer_status from public.withdrawals where id = (select v from t_ids where k = 'failed_w')), 'requested:failed');
+select pg_temp.eq('without touching the wallet', pg_temp.balance(:ada), :ada_pre_fail::bigint);
+select pg_temp.eq('and finance hears of it',
+  (select count(*) from public.notifications where profile_id = :admin and title = 'An automatic payout failed'), 1::bigint);
+select set_config('request.jwt.claim.sub', :admin, true);
+set local role authenticated;
+select public.admin_retry_payout((select v from t_ids where k = 'failed_w'));
+select pg_temp.eq('finance can try Paystack again, under a new reference',
+  (select transfer_status = 'queued' and transfer_reference like 'fw_wd_%\_%' from public.withdrawals where id = (select v from t_ids where k = 'failed_w')), true);
+reset role;
+update public.withdrawals set transfer_requested_at = now() - interval '2 hours' where id = (select v from t_ids where k = 'failed_w');
+select set_config('request.jwt.claim.sub', :admin, true);
+set local role authenticated;
+select public.admin_requeue_payout((select v from t_ids where k = 'failed_w'), 'No answer from Paystack');
+select public.admin_process_withdrawal((select v from t_ids where k = 'failed_w'), false, 'Sent back to the wallet');
+reset role;
+select pg_temp.eq('after taking it back, rejecting it refunds the wallet', pg_temp.balance(:ada), (:ada_pre_fail + 3000)::bigint);
+-- Changing the account by hand clears its confirmation.
+select set_config('request.jwt.claim.sub', :ada, true);
+set local role authenticated;
+update public.payout_accounts set account_number = '0987654321' where profile_id = auth.uid();
+select pg_temp.eq('an account changed by hand is no longer confirmed',
+  (select recipient_code is null and verified_at is null from public.payout_accounts where profile_id = auth.uid()), true);
+insert into t_ids select 'manual_w', public.request_withdrawal(1000);
+reset role;
+select pg_temp.eq('so its withdrawals wait for staff',
+  (select transfer_status from public.withdrawals where id = (select v from t_ids where k = 'manual_w')), null::text);
+
+-- ==== 43. Register checks verify, or refer to staff, automatically =========
+\set bisi '''00000000-0000-0000-0000-0000000000a1'''
+\set kemi '''00000000-0000-0000-0000-0000000000a2'''
+\set third '''00000000-0000-0000-0000-0000000000a3'''
+reset role;
+insert into storage.objects (bucket_id, name) values
+  ('verification-documents', :bisi || '/id.jpg'), ('verification-documents', :bisi || '/me.jpg'),
+  ('verification-documents', :kemi || '/id.jpg'), ('verification-documents', :kemi || '/me.jpg'),
+  ('verification-documents', :kemi || '/cac.jpg'), ('verification-documents', :third || '/id.jpg'),
+  ('verification-documents', :third || '/me.jpg');
+select set_config('request.jwt.claim.sub', :bisi, true);
+set local role authenticated;
+insert into t_ids select 'bisi_v', public.submit_verification('nin', '70123456789', :bisi || '/id.jpg', :bisi || '/me.jpg');
+select pg_temp.fails('nobody can record their own register check',
+  format($$ select public.record_identity_check('verification', %L, 'nin', 'match', null, '{}') $$, (select v from t_ids where k = 'bisi_v')), 'permission denied');
+select pg_temp.fails('or approve their own submission',
+  format($$ select public.complete_identity_review('verification', %L) $$, (select v from t_ids where k = 'bisi_v')), 'permission denied');
+reset role;
+set local role service_role;
+select pg_temp.eq('the checking function can read what it needs',
+  public.identity_check_subject('verification', (select v from t_ids where k = 'bisi_v'))->>'id_number', '70123456789');
+select public.record_identity_check('verification', (select v from t_ids where k = 'bisi_v'), 'nin', 'match', null, '{"registry_name":"BISI PHONE"}');
+select pg_temp.eq('a number on the register is not enough on its own',
+  public.complete_identity_review('verification', (select v from t_ids where k = 'bisi_v')), 'referred');
+select public.record_identity_check('verification', (select v from t_ids where k = 'bisi_v'), 'face', 'match', 97.5, '{}');
+select public.record_identity_check('verification', (select v from t_ids where k = 'bisi_v'), 'sim', 'match', null, '{}');
+select pg_temp.eq('number, face and phone all matching verify the account at once',
+  public.complete_identity_review('verification', (select v from t_ids where k = 'bisi_v')), 'approved');
+select pg_temp.eq('and asking again changes nothing',
+  public.complete_identity_review('verification', (select v from t_ids where k = 'bisi_v')), 'approved');
+reset role;
+select pg_temp.eq('the account is verified, and its tier rises',
+  (select verified_at is not null and verification_tier = 2 from public.profiles where id = :bisi), true);
+select set_config('request.jwt.claim.sub', :bisi, true);
+set local role authenticated;
+select pg_temp.eq('the owner can see what was checked', (select count(*) from public.identity_checks), 3::bigint);
+reset role;
+select set_config('request.jwt.claim.sub', :tunde, true);
+set local role authenticated;
+select pg_temp.eq('nobody else can', (select count(*) from public.identity_checks where profile_id = :bisi::uuid), 0::bigint);
+reset role;
+
+-- A selfie that does not match is referred to staff and flagged as high risk.
+select set_config('request.jwt.claim.sub', :kemi, true);
+set local role authenticated;
+insert into t_ids select 'kemi_v', public.submit_verification('bvn', '22222222222', :kemi || '/id.jpg', :kemi || '/me.jpg');
+reset role;
+set local role service_role;
+select public.record_identity_check('verification', (select v from t_ids where k = 'kemi_v'), 'bvn', 'match', null, '{}');
+select public.record_identity_check('verification', (select v from t_ids where k = 'kemi_v'), 'face', 'mismatch', 41.2, '{}');
+select pg_temp.eq('a selfie that does not match goes to a person',
+  public.complete_identity_review('verification', (select v from t_ids where k = 'kemi_v')), 'referred');
+reset role;
+select pg_temp.eq('it stays pending, never rejected by a machine',
+  (select status from public.verifications where id = (select v from t_ids where k = 'kemi_v')), 'pending');
+select pg_temp.eq('and the fraud rules hear of it',
+  (select severity from public.risk_alerts where profile_id = :kemi and kind = 'identity_face_mismatch'), 'high');
+
+-- The same NIN cannot verify a second account.
+select set_config('request.jwt.claim.sub', :third, true);
+set local role authenticated;
+insert into t_ids select 'third_v', public.submit_verification('nin', '70123456789', :third || '/id.jpg', :third || '/me.jpg');
+reset role;
+set local role service_role;
+select public.record_identity_check('verification', (select v from t_ids where k = 'third_v'), 'nin', 'match', null, '{}');
+select public.record_identity_check('verification', (select v from t_ids where k = 'third_v'), 'face', 'match', 99, '{}');
+select pg_temp.eq('an ID already verified on another account is referred',
+  public.complete_identity_review('verification', (select v from t_ids where k = 'third_v')), 'referred');
+reset role;
+select pg_temp.eq('as a high-risk duplicate',
+  (select severity from public.risk_alerts where profile_id = :third and kind = 'duplicate_identity'), 'high');
+
+-- A business on the CAC register under its own name is verified.
+select set_config('request.jwt.claim.sub', :kemi, true);
+set local role authenticated;
+insert into t_ids select 'kemi_b', public.submit_business_verification('RC1261103', 'Kemi Foods Ltd', :kemi || '/cac.jpg');
+reset role;
+set local role service_role;
+select public.record_identity_check('business_verification', (select v from t_ids where k = 'kemi_b'), 'cac', 'match', null, '{"registry_name":"KEMI FOODS LIMITED"}');
+select pg_temp.eq('a registered, active business is verified at once',
+  public.complete_identity_review('business_verification', (select v from t_ids where k = 'kemi_b')), 'approved');
+reset role;
+select pg_temp.eq('as a verified business', (select business_verified_at is not null from public.profiles where id = :kemi), true);
+
+-- ==== 44. Video carried by FindWork: who may broadcast, who may watch =====
+select set_config('request.jwt.claim.sub', :mama, true);
+set local role authenticated;
+insert into t_ids select 'lk_stream', public.schedule_stream('Live from the shop', null, null, '{}', 'livekit');
+select pg_temp.eq('a stream carried by FindWork needs no outside link',
+  (select video || ':' || coalesce(playback_url, 'none') from public.live_streams where id = (select v from t_ids where k = 'lk_stream')), 'livekit:none');
+select pg_temp.fails('a linked stream still needs its link',
+  $$ select public.schedule_stream('Linked sale', null, null, '{}', 'link') $$, 'invalid stream link');
+select pg_temp.fails('nobody can mint their own access',
+  format($$ select public.stream_access(%L, auth.uid()) $$, (select v from t_ids where k = 'lk_stream')), 'permission denied');
+reset role;
+set local role service_role;
+select pg_temp.eq('the seller may broadcast before going live, to check the camera',
+  (public.stream_access((select v from t_ids where k = 'lk_stream'), :mama)->>'publish')::boolean, true);
+select pg_temp.eq('viewers cannot join before it is live',
+  public.stream_access((select v from t_ids where k = 'lk_stream'), :customer), null::jsonb);
+reset role;
+select set_config('request.jwt.claim.sub', :mama, true);
+set local role authenticated;
+select public.update_stream((select v from t_ids where k = 'lk_stream'), 'start', null);
+reset role;
+set local role service_role;
+select pg_temp.eq('once live, a viewer may watch but never broadcast',
+  (public.stream_access((select v from t_ids where k = 'lk_stream'), :customer)->>'publish')::boolean, false);
+select pg_temp.eq('in the stream''s own room',
+  public.stream_access((select v from t_ids where k = 'lk_stream'), :customer)->>'room', 'stream-' || (select v from t_ids where k = 'lk_stream'));
+reset role;
+select set_config('request.jwt.claim.sub', :mama, true);
+set local role authenticated;
+select public.update_stream((select v from t_ids where k = 'lk_stream'), 'end', null);
+reset role;
+set local role service_role;
+select pg_temp.eq('an ended stream admits nobody, the seller included',
+  coalesce(public.stream_access((select v from t_ids where k = 'lk_stream'), :mama), public.stream_access((select v from t_ids where k = 'lk_stream'), :customer)), null::jsonb);
 reset role;
 
 reset role;

@@ -8,8 +8,10 @@ import { EmptyState, ListSkeleton } from '../../components/system/States'
 import { productImage, useProducts, useProductVariants } from '../../lib/api'
 import { useCart } from '../../store/cart'
 import { formatNaira } from '../../lib/format'
+import { useT } from '../../lib/i18n'
 
 export function Cart() {
+  const t = useT()
   const lines = useCart((s) => s.lines)
   const setQty = useCart((s) => s.setQty)
   const remove = useCart((s) => s.remove)
@@ -45,10 +47,10 @@ export function Cart() {
         {lines.length === 0 && (
           <EmptyState
             icon="ph-shopping-cart"
-            title="Your cart is empty"
+            title={t('Your cart is empty')}
             action={
               <Link to="/shop" className="text-[15px] font-semibold text-brand-hover">
-                Browse the shop
+                {t('Browse the shop')}
               </Link>
             }
           />
@@ -58,7 +60,7 @@ export function Cart() {
           <Alert className="mt-4">
             {gone.length} item{gone.length === 1 ? ' is' : 's are'} no longer sold.{' '}
             <button className="font-semibold underline" onClick={() => gone.forEach((l) => remove(l.productId, l.variantId))}>
-              Remove
+              {t('Remove')}
             </button>
           </Alert>
         )}
@@ -82,7 +84,7 @@ export function Cart() {
                         <i className={`ph ${it.qty === 1 ? 'ph-trash' : 'ph-minus'} text-[15px] text-muted`} />
                       </button>
                       <span className="text-[14.5px] font-semibold text-ink">{it.qty}</span>
-                      <button aria-label="More" onClick={() => setQty(it.id, it.qty + 1, it.variantId)} className="w-8 h-8 flex items-center justify-center">
+                      <button aria-label={t('More')} onClick={() => setQty(it.id, it.qty + 1, it.variantId)} className="w-8 h-8 flex items-center justify-center">
                         <i className="ph ph-plus text-[15px] text-muted" />
                       </button>
                     </span>
@@ -101,7 +103,7 @@ export function Cart() {
             <span className="font-display font-bold text-2xl text-ink">{formatNaira(subtotal)}</span>
           </div>
           <Button to="/checkout" disabled={gone.length > 0} className="w-full">
-            Checkout
+            {t('Checkout')}
           </Button>
         </div>
       )}

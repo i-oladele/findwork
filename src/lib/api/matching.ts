@@ -2,10 +2,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { keys } from './keys'
+import { formatDay } from '../format'
+import { msg } from '../msg'
 import type { JobPost, Product } from '../database.types'
 
-/** Where a match's points came from; they add up to `score`, out of 100. */
-export type MatchBreakdown = { score: number; skill: number; location: number; budget: number; availability: number; reputation: number; km: number | null }
+/**
+ * Where a match's points came from; they add up to `score`, out of 100. The
+ * calendar fields say what the availability points were based on: free
+ * working days before `needed_on`, or in the coming week when it is null.
+ */
+export type MatchBreakdown = {
+  score: number; skill: number; location: number; budget: number; availability: number; reputation: number; km: number | null
+  taking_bookings?: boolean; needed_on?: string | null; free_days?: number; next_free?: string | null
+}
 
 export type MatchedProvider = {
   id: string; business_name: string; category: string; area: string | null; price: number; price_unit: string
@@ -22,9 +31,20 @@ export function explainMatch(m: MatchBreakdown): string {
   else if (m.km != null && m.location > 8) parts.push(`${m.km} km away`)
   if (m.budget >= 15) parts.push('within budget')
   else if (m.budget > 0) parts.push('a little over budget')
-  if (m.availability > 0) parts.push('taking bookings')
+  parts.push(...explainAvailability(m))
   if (m.reputation >= 8) parts.push('well reviewed')
   return parts.length ? parts.join(' · ') : 'a weak fit'
+}
+
+function explainAvailability(m: MatchBreakdown): string[] {
+  if (m.free_days === undefined) return m.availability > 0 ? ['taking bookings'] : []
+  if (m.taking_bookings === false) return ['not taking bookings']
+  if (m.needed_on) {
+    if (m.free_days === 0) return ['fully booked before then']
+    if (m.free_days === 1 && m.next_free) return [`free on ${formatDay(m.next_free)}`]
+    return [`free on ${m.free_days} days before it is needed`]
+  }
+  return m.free_days > 0 ? ['free this week'] : ['busy this week']
 }
 
 export function useJobMatches(jobId: string | undefined, enabled: boolean) {
@@ -65,6 +85,9 @@ export function useRecommendedJobs() {
     },
   })
 }
+
+/** The reasons recommended_providers gives for a suggestion, marked so they are translated. */
+export const PROVIDER_REASONS = [msg('Matches what you look for'), msg('Near you'), msg('Well reviewed')] as const
 
 export type RecommendedProvider = Omit<MatchedProvider, 'match' | 'quoted' | 'invited'> & { reason: string; score: number }
 

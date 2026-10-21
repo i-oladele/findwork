@@ -3,6 +3,7 @@ import { useBusySlots, useProviderAvailability } from '../../lib/api'
 import { lagosToIso } from '../../lib/format'
 import { DAYS_AHEAD, TIMES, isOpenOn, sameDay, slotState, upcomingDays } from '../../lib/slots'
 import { SectionLabel } from './SectionLabel'
+import { useT } from '../../lib/i18n'
 
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -24,6 +25,7 @@ export function SlotPicker({
   onChange: (iso: string | null) => void
   bookingId?: string
 }) {
+  const t = useT()
   const days = useMemo(() => upcomingDays(), [])
   const [from, to] = useMemo(
     () => [new Date().toISOString(), new Date(Date.now() + (DAYS_AHEAD + 1) * 86_400_000).toISOString()],
@@ -40,25 +42,25 @@ export function SlotPicker({
 
   if (availabilityQuery.isError || busyQuery.isError) {
     return <div role="alert" className="text-[14px] text-muted">
-      We could not check available times.
+      {t('We could not check available times.')}
       <button type="button" className="ml-2 font-semibold text-brand-hover" onClick={() => {
         onChange(null)
         void availabilityQuery.refetch()
         void busyQuery.refetch()
-      }}>Try again</button>
+      }}>{t('Try again')}</button>
     </div>
   }
   if (availabilityQuery.isLoading || busyQuery.isLoading) {
-    return <p role="status" className="text-[14px] text-muted">Checking available times…</p>
+    return <p role="status" className="text-[14px] text-muted">{t('Checking available times…')}</p>
   }
 
   if (openDays.length === 0) {
-    return <p className="text-[14px] text-muted">This provider has not opened any days for booking.</p>
+    return <p className="text-[14px] text-muted">{t('This provider has not opened any days for booking.')}</p>
   }
 
   return (
     <div>
-      <SectionLabel className="mb-2.5">Day</SectionLabel>
+      <SectionLabel className="mb-2.5">{t('Day')}</SectionLabel>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-[22px] px-[22px]">
         {openDays.map((d) => {
           const active = day !== null && sameDay(d, day)
@@ -84,15 +86,15 @@ export function SlotPicker({
         })}
       </div>
 
-      <SectionLabel className="mt-5 mb-2.5">Time (Lagos)</SectionLabel>
+      <SectionLabel className="mt-5 mb-2.5">{t('Time (Lagos)')}</SectionLabel>
       <div className="grid grid-cols-3 gap-2.5">
-        {TIMES.map((t) => {
-          const state = day ? slotState({ day, time: t, durationMinutes, busy }) : 'past'
-          const iso = day ? lagosToIso(day, t) : null
+        {TIMES.map((time) => {
+          const state = day ? slotState({ day, time: time, durationMinutes, busy }) : 'past'
+          const iso = day ? lagosToIso(day, time) : null
           const active = iso !== null && iso === value
           return (
             <button
-              key={t}
+              key={time}
               type="button"
               disabled={state !== 'ok'}
               title={state === 'taken' ? 'Already booked' : undefined}
@@ -105,7 +107,7 @@ export function SlotPicker({
                     : 'bg-white border border-line text-ink font-medium'
               }`}
             >
-              {t}
+              {time}
             </button>
           )
         })}

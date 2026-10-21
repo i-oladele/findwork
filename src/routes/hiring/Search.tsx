@@ -8,6 +8,7 @@ import { ProviderCard } from '../../components/ui/ProviderCard'
 import { QueryState } from '../../components/system/QueryState'
 import { useProfile, useProviders, type ProviderFilters } from '../../lib/api'
 import { distanceBetween } from '../../lib/distance'
+import { useT } from '../../lib/i18n'
 
 const FILTERS = [
   { id: 'nearest', label: 'Nearest' },
@@ -22,13 +23,14 @@ type FilterId = (typeof FILTERS)[number]['id']
 function useDebounced<T>(value: T, ms = 300) {
   const [debounced, setDebounced] = useState(value)
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), ms)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setDebounced(value), ms)
+    return () => clearTimeout(timer)
   }, [value, ms])
   return debounced
 }
 
 export function Search() {
+  const t = useT()
   const [params, setParams] = useSearchParams()
   const category = params.get('category') ?? undefined
   const [query, setQuery] = useState(params.get('q') ?? '')
@@ -69,12 +71,12 @@ export function Search() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tailors, plumbers..."
+              placeholder={t('Search tailors, plumbers...')}
               autoFocus={!category}
               className="flex-1 min-w-0 text-[15.5px] text-ink bg-transparent outline-none placeholder:text-muted-2"
             />
             {query && (
-              <button aria-label="Clear search" onClick={() => setQuery('')} className="text-muted-2">
+              <button aria-label={t('Clear search')} onClick={() => setQuery('')} className="text-muted-2">
                 <i className="ph-bold ph-x text-sm" />
               </button>
             )}
@@ -103,12 +105,12 @@ export function Search() {
         )}
         {active.includes('nearest') && profile?.area == null && (
           <p className="mt-2 text-[13px] text-muted-2">
-            Set your area in Settings and we can sort by who is closest to you.
+            {t('Set your area in Settings and we can sort by who is closest to you.')}
           </p>
         )}
         <QueryState
           query={{ ...results, data: sorted }}
-          errorMessage="We could not search right now."
+          errorMessage={t('We could not search right now.')}
           empty={{
             icon: 'ph-magnifying-glass',
             title: 'No matches',

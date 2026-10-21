@@ -29,7 +29,9 @@ import { friendlyError } from '../../lib/supabase'
 import { formatDistance, type Point } from '../../lib/distance'
 import { formatNaira, shortId } from '../../lib/format'
 import { describeEta, directionsUrl, planStops, routeKm, type Stop } from '../../lib/routing'
+import { useRoutePlan } from '../../lib/api/logistics'
 import type { Delivery, RiderProfile, RiderVehicle } from '../../lib/database.types'
+import { useT } from '../../lib/i18n'
 
 const VEHICLES: { value: RiderVehicle; label: string }[] = [
   { value: 'motorcycle', label: 'Motorcycle' },
@@ -40,19 +42,20 @@ const VEHICLES: { value: RiderVehicle; label: string }[] = [
 
 /** Delivering for FindWork: apply, go online, take deliveries, hand them over, get paid. */
 export function Rider() {
+  const t = useT()
   const rider = useMyRider()
   if (rider.isLoading) return <FullScreenLoader />
-  if (rider.isError) return <Screen><PageHeader title="Deliver" back="/settings" /><ErrorState message="We could not load your rider profile." onRetry={() => void rider.refetch()} /></Screen>
+  if (rider.isError) return <Screen><PageHeader title={t('Deliver')} back="/settings" /><ErrorState message="We could not load your rider profile." onRetry={() => void rider.refetch()} /></Screen>
 
   return (
     <Screen>
-      <PageHeader title="Deliver with FindWork" back="/settings" />
+      <PageHeader title={t('Deliver with FindWork')} back="/settings" />
       <div className="px-[22px] pb-10">
         {!rider.data || rider.data.status === 'rejected' ? (
           <Apply previous={rider.data ?? null} />
         ) : rider.data.status === 'pending' ? (
           <Alert tone="info" className="mt-5">
-            Your application is with the team. You will get a notification when you can start delivering.
+            {t('Your application is with the team. You will get a notification when you can start delivering.')}
           </Alert>
         ) : (
           <Work rider={rider.data} />
@@ -63,6 +66,7 @@ export function Rider() {
 }
 
 function Apply({ previous }: { previous: RiderProfile | null }) {
+  const t = useT()
   const apply = useApplyAsRider()
   const [vehicle, setVehicle] = useState<RiderVehicle>(previous?.vehicle ?? 'motorcycle')
   const [plate, setPlate] = useState(previous?.plate ?? '')
@@ -73,22 +77,22 @@ function Apply({ previous }: { previous: RiderProfile | null }) {
   return (
     <>
       <p className="mt-4 text-[15px] leading-[1.55] text-muted">
-        Collect orders from sellers and deliver them to customers. You keep 80% of each delivery fee, paid into your wallet the moment the customer's code confirms the hand-over.
+        {t('Collect orders from sellers and deliver them to customers. You keep 80% of each delivery fee, paid into your wallet the moment the customer\'s code confirms the hand-over.')}
       </p>
       {previous?.status === 'rejected' && <Alert className="mt-4">Your last application was not approved: {previous.note ?? 'please check your details.'} You can apply again.</Alert>}
-      <SectionLabel className="mt-5 mb-2.5">How will you deliver?</SectionLabel>
+      <SectionLabel className="mt-5 mb-2.5">{t('How will you deliver?')}</SectionLabel>
       <div className="flex flex-wrap gap-2.5">
         {VEHICLES.map((v) => <Chip key={v.value} active={vehicle === v.value} onClick={() => setVehicle(v.value)}>{v.label}</Chip>)}
       </div>
-      {needsPlate && <div className="mt-5"><Input label="Plate number" value={plate} onChange={setPlate} placeholder="LAG-123-XY" autoCapitalize="none" /></div>}
+      {needsPlate && <div className="mt-5"><Input label={t('Plate number')} value={plate} onChange={setPlate} placeholder={t('LAG-123-XY')} autoCapitalize="none" /></div>}
       <p className="mt-4 text-[13.5px] leading-[1.5] text-muted-2">
-        Riders must be ID verified. <Link to="/get-verified" className="font-semibold text-brand-hover">Verify your ID</Link> if you have not yet: the team checks it before approving you.
+        Riders must be ID verified. <Link to="/get-verified" className="font-semibold text-brand-hover">{t('Verify your ID')}</Link> if you have not yet: the team checks it before approving you.
       </p>
       {error && <Alert className="mt-4">{error}</Alert>}
       <Button className="mt-5" disabled={!valid} loading={apply.isPending} onClick={async () => {
         setError(null)
         try { await apply.mutateAsync({ vehicle, plate, area: null }) } catch (err) { setError(friendlyError(err)) }
-      }}>Apply to deliver</Button>
+      }}>{t('Apply to deliver')}</Button>
     </>
   )
 }
@@ -121,6 +125,7 @@ function useLocationReporting(online: boolean, onPosition: (point: Point) => voi
 }
 
 function Work({ rider }: { rider: RiderProfile }) {
+  const t = useT()
   const setOnline = useSetRiderOnline()
   const available = useAvailableDeliveries(rider.online)
   const mine = useMyDeliveries(true)
@@ -142,7 +147,12 @@ function Work({ rider }: { rider: RiderProfile }) {
     }
     return list
   })
-  const plan = here && stops.length > 1 ? planStops(here, stops) : null
+  const routed = useRoutePlan(Boolean(here) && stops.length > 1, stops.map((s) => s.id).join(','))
+  // Road times in current traffic when the maps service answers; otherwise the shortest round on straight lines.
+  const roadPlan = routed.data && routed.data.stops.length === stops.length ? routed.data : null
+  const plan = here && stops.length > 1
+    ? roadPlan ? roadPlan.stops.map((r) => stops.find((s) => s.id === r.id)!).filter(Boolean) : planStops(here, stops)
+    : null
 
   return (
     <>
@@ -151,42 +161,48 @@ function Work({ rider }: { rider: RiderProfile }) {
           <div className="font-display font-semibold text-[17px] text-cream">{rider.online ? 'You are online' : 'You are offline'}</div>
           <div className="text-[13px] text-muted-3 mt-0.5">{rider.online ? 'New deliveries appear below. Your position is shared with customers whose orders you carry.' : 'Go online to see deliveries near you.'}</div>
         </div>
-        <Toggle label="Online" on={rider.online} disabled={setOnline.isPending} onChange={(on) => { setError(null); setOnline.mutate(on, { onError: (e) => setError(friendlyError(e)) }) }} />
+        <Toggle label={t('Online')} on={rider.online} disabled={setOnline.isPending} onChange={(on) => { setError(null); setOnline.mutate(on, { onError: (e) => setError(friendlyError(e)) }) }} />
       </div>
       {locationProblem && rider.online && <Alert tone="info" className="mt-3">{locationProblem}</Alert>}
       {error && <Alert className="mt-3">{error}</Alert>}
 
       <div className="grid grid-cols-3 gap-2.5 mt-4">
-        <Stat label="Today" value={formatNaira(earnings.data?.today ?? 0)} />
-        <Stat label="All time" value={formatNaira(earnings.data?.total ?? 0)} />
-        <Stat label="Delivered" value={String(rider.deliveries_done)} />
+        <Stat label={t('Today')} value={formatNaira(earnings.data?.today ?? 0)} />
+        <Stat label={t('All time')} value={formatNaira(earnings.data?.total ?? 0)} />
+        <Stat label={t('Delivered')} value={String(rider.deliveries_done)} />
       </div>
-      <Link to="/wallet" className="inline-block min-h-11 pt-3 text-[14px] font-semibold text-brand-hover">Earnings go to your wallet</Link>
+      <Link to="/wallet" className="inline-block min-h-11 pt-3 text-[14px] font-semibold text-brand-hover">{t('Earnings go to your wallet')}</Link>
 
       {active.length > 0 && (
         <>
-          <SectionLabel className="mt-4 mb-2.5">Your deliveries</SectionLabel>
+          <SectionLabel className="mt-4 mb-2.5">{t('Your deliveries')}</SectionLabel>
           {active.map((d) => <ActiveDelivery key={d.id} delivery={d} />)}
         </>
       )}
 
       {plan && here && (
         <>
-          <SectionLabel className="mt-5 mb-2.5">Suggested order of stops</SectionLabel>
+          <SectionLabel className="mt-5 mb-2.5">{t('Suggested order of stops')}</SectionLabel>
           <div className="bg-white border border-line rounded-2xl p-4">
             <ol className="space-y-2">
-              {plan.map((stop, i) => (
-                <li key={stop.id} className="flex gap-2.5 text-[14px] text-ink">
-                  <span className="font-mono text-muted-2">{i + 1}.</span>
-                  <span className="flex-1 min-w-0 truncate">{stop.label}</span>
-                </li>
-              ))}
+              {plan.map((stop, i) => {
+                const minutes = roadPlan?.stops.find((r) => r.id === stop.id)?.minutes
+                return (
+                  <li key={stop.id} className="flex gap-2.5 text-[14px] text-ink">
+                    <span className="font-mono text-muted-2">{i + 1}.</span>
+                    <span className="flex-1 min-w-0 truncate">{stop.label}</span>
+                    {minutes != null && <span className="flex-none text-[12.5px] text-muted-2">{describeEta(minutes)?.replace('About ', '~')}</span>}
+                  </li>
+                )
+              })}
             </ol>
             <p className="mt-3 text-[12.5px] leading-[1.45] text-muted-2">
-              {formatDistance(routeKm(here, plan))} in a straight line, shortest order with each order collected before it is delivered. It does not know about traffic or one-way roads.
+              {roadPlan
+                ? `The quickest order on the roads in current traffic: ${describeEta(roadPlan.total_minutes)?.toLowerCase() ?? 'a few minutes'}${roadPlan.total_km != null ? `, ${formatDistance(roadPlan.total_km)}` : ''}, collecting each order before delivering it.`
+                : `${formatDistance(routeKm(here, plan))} in a straight line: the shortest order with each order collected before it is delivered. Road times and traffic are used once a maps key is set.`}
             </p>
             <a href={directionsUrl(here, plan) ?? '#'} target="_blank" rel="noopener noreferrer" className="inline-flex items-center min-h-11 text-[14px] font-semibold text-brand-hover">
-              Open directions in Google Maps
+              {t('Open directions in Google Maps')}
             </a>
           </div>
         </>
@@ -194,14 +210,14 @@ function Work({ rider }: { rider: RiderProfile }) {
 
       {rider.online && (
         <>
-          <SectionLabel className="mt-5 mb-2.5">Waiting for a rider</SectionLabel>
-          {available.isError && <Alert>We could not load deliveries. <button className="underline" onClick={() => void available.refetch()}>Retry</button></Alert>}
-          {available.data?.length === 0 && <p className="text-[14px] text-muted py-4">Nothing waiting right now. This list refreshes on its own.</p>}
+          <SectionLabel className="mt-5 mb-2.5">{t('Waiting for a rider')}</SectionLabel>
+          {available.isError && <Alert>We could not load deliveries. <button className="underline" onClick={() => void available.refetch()}>{t('Retry')}</button></Alert>}
+          {available.data?.length === 0 && <p className="text-[14px] text-muted py-4">{t('Nothing waiting right now. This list refreshes on its own.')}</p>}
           {available.data?.map((job) => (
             <div key={job.id} className="bg-white border border-line rounded-2xl p-4 mb-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-display font-bold text-[17px] text-ink">{formatNaira(job.rider_fee)}</span>
-                {job.delivery_speed === 'same-day' && <Badge tone="warning" icon="lightning">Same day</Badge>}
+                {job.delivery_speed === 'same-day' && <Badge tone="warning" icon="lightning">{t('Same day')}</Badge>}
               </div>
               <div className="text-[14px] text-ink mt-1.5">From {job.pickup_address ?? 'FindWork fulfilment'}</div>
               <div className="text-[14px] text-ink">To {job.dropoff_area}</div>
@@ -212,7 +228,7 @@ function Work({ rider }: { rider: RiderProfile }) {
               <Button className="mt-3 h-12" loading={accept.isPending && accept.variables === job.id} disabled={accept.isPending} onClick={() => {
                 setError(null)
                 accept.mutate(job.id, { onError: (e) => setError(friendlyError(e)) })
-              }}>Take this delivery</Button>
+              }}>{t('Take this delivery')}</Button>
             </div>
           ))}
         </>
@@ -222,6 +238,7 @@ function Work({ rider }: { rider: RiderProfile }) {
 }
 
 function ActiveDelivery({ delivery: d }: { delivery: Delivery }) {
+  const t = useT()
   const tracking = useDeliveryTracking(d.order_id)
   const pickUp = useMarkPickedUp()
   const release = useReleaseDelivery()
@@ -239,8 +256,8 @@ function ActiveDelivery({ delivery: d }: { delivery: Delivery }) {
         <span className="font-mono text-[11px] tracking-[0.1em] uppercase text-muted-2">Order #{shortId(d.order_id)}</span>
         <Badge tone={d.status === 'picked_up' ? 'success' : 'warning'}>{d.status === 'picked_up' ? 'Carrying' : 'To collect'}</Badge>
       </div>
-      {d.status === 'assigned' && <div className="text-[14.5px] text-ink mt-2"><span className="font-semibold">Collect from</span> {d.pickup_address ?? 'FindWork fulfilment'}</div>}
-      <div className="text-[14.5px] text-ink mt-1.5 whitespace-pre-line"><span className="font-semibold">Deliver to</span> {d.dropoff_address}</div>
+      {d.status === 'assigned' && <div className="text-[14.5px] text-ink mt-2"><span className="font-semibold">{t('Collect from')}</span> {d.pickup_address ?? 'FindWork fulfilment'}</div>}
+      <div className="text-[14.5px] text-ink mt-1.5 whitespace-pre-line"><span className="font-semibold">{t('Deliver to')}</span> {d.dropoff_address}</div>
       {tracking.data?.contact_phone && (
         <a href={`tel:${tracking.data.contact_phone}`} className="inline-flex items-center gap-1.5 min-h-11 text-[14.5px] font-semibold text-brand-hover">
           <i className="ph-fill ph-phone" /> Call the customer
@@ -254,12 +271,12 @@ function ActiveDelivery({ delivery: d }: { delivery: Delivery }) {
           <button disabled={pending} className="flex-1 h-11 bg-success text-white rounded-lg text-[14.5px] font-semibold disabled:opacity-50" onClick={() => {
             setError(null)
             pickUp.mutate(d.id, { onError: (e) => setError(friendlyError(e)) })
-          }}>I have collected it</button>
+          }}>{t('I have collected it')}</button>
           <button disabled={pending} className="px-4 h-11 border border-line rounded-lg text-[14px] font-semibold text-muted disabled:opacity-50" onClick={() => {
             if (!window.confirm('Give this delivery back? Another rider will be able to take it.')) return
             setError(null)
             release.mutate(d.id, { onError: (e) => setError(friendlyError(e)) })
-          }}>Give back</button>
+          }}>{t('Give back')}</button>
         </div>
       ) : (
         <form className="flex gap-2.5 mt-3" onSubmit={(e) => {
@@ -267,9 +284,9 @@ function ActiveDelivery({ delivery: d }: { delivery: Delivery }) {
           setError(null)
           complete.mutate({ deliveryId: d.id, code }, { onError: (err) => { setError(friendlyError(err)); setCode('') } })
         }}>
-          <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" maxLength={4} placeholder="Customer's code" aria-label={`Delivery code for order ${shortId(d.order_id)}`}
+          <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" maxLength={4} placeholder={t('Customer\'s code')} aria-label={`Delivery code for order ${shortId(d.order_id)}`}
             className="flex-1 min-w-0 bg-cream rounded-lg h-11 px-3 font-display font-bold text-[18px] tracking-[0.2em] text-ink outline-none placeholder:text-[14px] placeholder:font-normal placeholder:tracking-normal placeholder:text-muted-2" />
-          <button type="submit" disabled={pending || code.replace(/\D/g, '').length !== 4} className="px-4 h-11 bg-success text-white rounded-lg text-[14.5px] font-semibold disabled:opacity-50">Delivered</button>
+          <button type="submit" disabled={pending || code.replace(/\D/g, '').length !== 4} className="px-4 h-11 bg-success text-white rounded-lg text-[14.5px] font-semibold disabled:opacity-50">{t('Delivered')}</button>
         </form>
       )}
     </div>

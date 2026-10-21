@@ -1,7 +1,7 @@
 import { supabase } from '../supabase'
 import type { Language } from '../database.types'
 
-export type AssistantTask = 'command' | 'support' | 'translate' | 'lesson' | 'dispute'
+export type AssistantTask = 'command' | 'support' | 'translate' | 'lesson' | 'dispute' | 'analytics'
 export type DisputeSummary = { summary: string; agreed: string[]; contested: string[]; missing: string[]; questions: string[] }
 
 export class AssistantUnavailable extends Error {}

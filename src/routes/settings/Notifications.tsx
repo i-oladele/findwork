@@ -11,6 +11,7 @@ import {
 } from '../../lib/api'
 import { timeAgo } from '../../lib/format'
 import type { NotificationKind } from '../../lib/database.types'
+import { useT } from '../../lib/i18n'
 
 const ICONS: Record<NotificationKind, string> = {
   order: 'ph-package',
@@ -99,6 +100,7 @@ function targetFor(refType: string | null, refId: string | null): string {
 }
 
 export function Notifications() {
+  const t = useT()
   const { data, isLoading, isError, refetch } = useNotifications()
   const markRead = useMarkNotificationRead()
   useNotificationsRealtime()
@@ -123,8 +125,8 @@ export function Notifications() {
         <StatusBar tone="light" />
         <div className="flex items-center gap-1 mt-1.5">
           <BackButton fallback="/home" tone="light" />
-          <div className="flex-1 font-display font-bold text-[22px] text-cream">Notifications</div>
-          <Link to="/preferences" aria-label="Notification settings" className="inline-flex items-center justify-center w-11 h-11 text-cream">
+          <div className="flex-1 font-display font-bold text-[22px] text-cream">{t('Notifications')}</div>
+          <Link to="/preferences" aria-label={t('Notification settings')} className="inline-flex items-center justify-center w-11 h-11 text-cream">
             <i className="ph ph-gear text-[21px]" />
           </Link>
         </div>
@@ -137,8 +139,8 @@ export function Notifications() {
         {data?.length === 0 && (
           <EmptyState
             icon="ph-bell-slash"
-            title="Nothing yet"
-            body="Bookings, quotes, payments and messages will show up here."
+            title={t('Nothing yet')}
+            body={t('Bookings, quotes, payments and messages will show up here.')}
           />
         )}
 

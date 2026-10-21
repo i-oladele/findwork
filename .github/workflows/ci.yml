@@ -28,6 +28,9 @@ jobs:
       - name: PRD traceability
         run: npm run prd:check
 
+      - name: Translations complete
+        run: npm run i18n:check
+
       - name: Typecheck
         run: npm run typecheck
 

@@ -14,8 +14,10 @@ import { destination, onboardingPath } from '../../lib/destination'
 import { passkeyCancelled, passkeyErrorMessage } from '../../lib/passkeys'
 import { friendlyError } from '../../lib/supabase'
 import { emptyPhone, isPhoneNumber, toE164, type PhoneValue } from '../../lib/phone'
+import { useT } from '../../lib/i18n'
 
 export function SignIn() {
+  const t = useT()
   const navigate = useNavigate()
   const location = useLocation()
   const { signIn, resendOtp, signInWithPasskey } = useAuth()
@@ -89,9 +91,9 @@ export function SignIn() {
           <i className="ph-bold ph-arrow-left text-[22px]" />
         </Link>
         <h2 className="mt-3.5 font-display font-bold text-[34px] leading-[1.05] tracking-[-0.03em] text-ink">
-          Welcome back
+          {t('Welcome back')}
         </h2>
-        <p className="mt-2.5 text-[15.5px] leading-[1.55] text-muted">Sign in to pick up where you left off.</p>
+        <p className="mt-2.5 text-[15.5px] leading-[1.55] text-muted">{t('Sign in to pick up where you left off.')}</p>
 
         <form onSubmit={submit} noValidate>
           <MethodTabs value={method} onChange={setMethod} className="mt-[26px]" />
@@ -101,7 +103,7 @@ export function SignIn() {
               <PhoneInput value={phone} onChange={setPhone} />
             ) : (
               <Input
-                label="Email address"
+                label={t('Email address')}
                 value={email}
                 onChange={setEmail}
                 placeholder="you@example.com"
@@ -112,7 +114,7 @@ export function SignIn() {
             )}
 
             <div>
-              <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mb-2">Password</div>
+              <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mb-2">{t('Password')}</div>
               <div className="flex items-center justify-between bg-white border-[1.5px] border-line rounded-lg h-[52px] px-3.5">
                 <input
                   value={password}
@@ -135,7 +137,7 @@ export function SignIn() {
 
           <div className="flex justify-end mt-3">
             <Link to="/forgot-password" className="text-[14px] font-semibold text-brand-hover">
-              Forgot password?
+              {t('Forgot password?')}
             </Link>
           </div>
 
@@ -162,7 +164,7 @@ export function SignIn() {
             loading={fingerprintBusy}
             className="mt-3 text-ink border-line"
           >
-            Sign in with fingerprint
+            {t('Sign in with fingerprint')}
           </Button>
         )}
 
@@ -171,7 +173,7 @@ export function SignIn() {
         <p className="mt-6 mb-8 text-center text-[14.5px] text-muted">
           New here?{' '}
           <Link to="/signup" className="text-brand-hover font-semibold">
-            Create an account
+            {t('Create an account')}
           </Link>
         </p>
       </div>

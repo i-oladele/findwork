@@ -6,7 +6,8 @@ import { QueryState } from '../../components/system/QueryState'
 import { ErrorState, FullScreenLoader } from '../../components/system/States'
 import { useProfile } from '../../lib/api/profile'
 import { useAnalytics, useEngagement, type EngagementReport } from '../../lib/api/analytics'
-import { project } from '../../lib/forecast'
+import { anomalies, forecast } from '../../lib/forecast'
+import { askAssistant, AssistantUnavailable } from '../../lib/api/assistant'
 import { analyticsCsv, reportDate, reportRange, type AnalyticsReport } from '../../lib/analytics'
 import { formatDateTime, formatNaira } from '../../lib/format'
 import { staffCan } from '../../lib/staff'
@@ -79,7 +80,8 @@ function AnalyticsDashboard() {
             <p>Wallet top-ups, transfers between customers and escrow are customer funds, not revenue. Delivery charges, gateway costs, taxes and operating costs are excluded from income figures.</p>
             <p>Active users have a booking, order, message, quote or wallet entry in the selected period. This measures recorded activity, not page views or logins.</p>
           </details>
-          <Projection daily={data.daily} />
+          <ForecastSection daily={data.daily} />
+          <Analyst from={from} through={through} />
           <Engagement from={from} through={through} />
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -98,20 +100,105 @@ function Metric({ label, value }: { label: string; value: string | number }) {
   return <div className="bg-white rounded-xl border border-line p-3"><div className="text-xs text-muted">{label}</div><div className="font-display font-bold text-xl mt-1 break-words">{value}</div></div>
 }
 
-/** Where marketplace fees are heading, if the last few weeks continue. */
-function Projection({ daily }: { daily: AnalyticsReport['daily'] }) {
-  const next = project(daily.map((d) => ({ date: d.date, value: d.marketplace_fees })))
-  if (!next) return <p className="text-sm text-muted">Choose a range of at least 14 days to see a projection of marketplace fees.</p>
-  const total = next.reduce((sum, d) => sum + d.value, 0)
+const SERIES = {
+  marketplace_fees: { label: 'Marketplace fees', money: true },
+  bookings: { label: 'Bookings', money: false },
+  orders: { label: 'Orders', money: false },
+  signups: { label: 'New accounts', money: false },
+} as const
+type Series = keyof typeof SERIES
+
+/**
+ * The next week from a seasonal model fitted to the selected days, with the
+ * range it expects and how it did on the last week; and the days in the
+ * period it did not expect.
+ */
+function ForecastSection({ daily }: { daily: AnalyticsReport['daily'] }) {
+  const [series, setSeries] = useState<Series>('marketplace_fees')
+  const history = daily.map((d) => ({ date: d.date, value: Number(d[series]) }))
+  const f = forecast(history)
+  const unusual = anomalies(history)
+  const show = (n: number) => (SERIES[series].money ? formatNaira(n) : n.toLocaleString('en-NG'))
   return (
     <div>
-      <h3 className="font-semibold text-lg">Next 7 days, if this continues</h3>
-      <p className="text-sm text-muted mt-1">
-        About {formatNaira(total)} in marketplace fees. A straight-line trend through the selected days, adjusted for the day of the week. It is arithmetic on recent history, not a forecast model: a promotion, an outage or a holiday is not in it.
-      </p>
-      <div className="grid grid-cols-7 gap-1.5 mt-3 text-center">
-        {next.map((d) => <div key={d.date} className="bg-white border border-line rounded-lg py-2"><div className="text-[10.5px] text-muted">{d.date.slice(5)}</div><div className="text-[12px] font-semibold text-ink mt-0.5">{formatNaira(d.value)}</div></div>)}
+      <h3 className="font-semibold text-lg">The next 7 days</h3>
+      <div className="flex flex-wrap gap-2 mt-2" role="group" aria-label="Figure to forecast">
+        {(Object.keys(SERIES) as Series[]).map((key) => (
+          <button key={key} onClick={() => setSeries(key)} aria-pressed={series === key}
+            className={`rounded-full px-3.5 py-1.5 text-[13px] ${series === key ? 'bg-ink text-white font-semibold' : 'bg-white border border-line text-ink'}`}>{SERIES[key].label}</button>
+        ))}
       </div>
+      {!f ? <p className="text-sm text-muted mt-2">Choose a range of at least 14 days to see a forecast.</p> : (
+        <>
+          <p className="text-sm text-muted mt-2">
+            About {show(f.days.reduce((sum, d) => sum + d.value, 0))} in total. A seasonal model (Holt-Winters, with a weekly rhythm) fitted to the selected days; each day shows the range it expects four times in five. It learns from these days only: a coming promotion, outage or holiday is not in it.
+          </p>
+          <div className="grid grid-cols-7 gap-1.5 mt-3 text-center">
+            {f.days.map((d) => (
+              <div key={d.date} className="bg-white border border-line rounded-lg py-2 px-0.5">
+                <div className="text-[10.5px] text-muted">{d.date.slice(5)}</div>
+                <div className="text-[12px] font-semibold text-ink mt-0.5 break-words">{show(d.value)}</div>
+                <div className="text-[9.5px] text-muted-2 mt-0.5 break-words">{show(d.low)}–{show(d.high)}</div>
+              </div>
+            ))}
+          </div>
+          {f.backtest && (
+            <p className="text-[13px] text-muted mt-2">
+              Checked on the last 7 days, predicted from the weeks before: off by {show(f.backtest.mae)} a day on average{f.backtest.mape !== null ? ` (${f.backtest.mape}%)` : ''}, against {show(f.backtest.baseline_mae)} for simply repeating the week before.
+              {f.backtest.mae > f.backtest.baseline_mae && ' On this period the simple repeat did better, so treat the forecast with care.'}
+            </p>
+          )}
+        </>
+      )}
+      {unusual.length > 0 && (
+        <div className="mt-3">
+          <div className="text-sm font-semibold text-ink">Days the model did not expect</div>
+          <ul className="mt-1 space-y-1 text-[13px] text-muted">
+            {unusual.slice(-8).map((a) => <li key={a.date}>{a.date}: {show(a.value)}, {a.direction === 'high' ? 'well above' : 'well below'} the {show(a.expected)} expected</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+type AnalystAnswer = { answer: string; figures: string[]; caveats: string[] }
+
+/**
+ * Questions about the figures, answered by Claude from the same reports this
+ * page shows, read on the server with the asker's own permissions.
+ */
+function Analyst({ from, through }: { from: string; through: string }) {
+  const [question, setQuestion] = useState('')
+  const [answer, setAnswer] = useState<AnalystAnswer | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  async function ask(q: string) {
+    setBusy(true); setError(null); setAnswer(null)
+    try { setAnswer(await askAssistant<AnalystAnswer>('analytics', { from, through, question: q })) }
+    catch (err) { setError(err instanceof AssistantUnavailable ? 'The analyst is not set up yet: it needs the assistant\'s API key (see the README).' : (err as Error).message) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="bg-white rounded-xl border border-line p-4">
+      <h3 className="font-semibold text-lg">Ask the analyst</h3>
+      <p className="text-sm text-muted mt-1">Answers come only from this period's figures, the forecast and the unusual days above. It says when the figures cannot answer.</p>
+      <form className="flex gap-2 mt-3" onSubmit={(e) => { e.preventDefault(); if (question.trim().length >= 3) void ask(question.trim()) }}>
+        <input value={question} onChange={(e) => setQuestion(e.target.value)} maxLength={500} placeholder="Why did orders drop last week?" aria-label="Question about the figures"
+          className="flex-1 min-w-0 bg-cream rounded-lg h-11 px-3 text-[14px] text-ink outline-none" />
+        <button type="submit" disabled={busy || question.trim().length < 3} className="px-4 h-11 bg-ink text-cream rounded-lg text-[14px] font-semibold disabled:opacity-50">Ask</button>
+      </form>
+      <button className="min-h-11 text-[14px] font-semibold text-brand-hover" disabled={busy} onClick={() => void ask('Summarise this period: what stands out, what changed, the unusual days, and what to watch next.')}>
+        {busy ? 'Reading the figures…' : 'Summarise this period'}
+      </button>
+      {error && <p role="alert" className="text-sm text-brand mt-1">{error}</p>}
+      {answer && (
+        <div className="mt-2 space-y-2 text-[14px] leading-[1.55] text-ink">
+          <p className="whitespace-pre-line">{answer.answer}</p>
+          {answer.figures.length > 0 && <ul className="list-disc pl-5 text-[13px] text-muted">{answer.figures.map((f) => <li key={f}>{f}</li>)}</ul>}
+          {answer.caveats.length > 0 && <p className="text-[12.5px] text-muted-2">Caveats: {answer.caveats.join(' ')}</p>}
+        </div>
+      )}
     </div>
   )
 }

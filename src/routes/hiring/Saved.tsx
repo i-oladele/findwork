@@ -5,26 +5,28 @@ import { ProviderCard } from '../../components/ui/ProviderCard'
 import { QueryState } from '../../components/system/QueryState'
 import { useFavourites, useProfile, useToggleFavourite } from '../../lib/api'
 import { distanceBetween } from '../../lib/distance'
+import { useT } from '../../lib/i18n'
 
 export function Saved() {
+  const t = useT()
   const favourites = useFavourites()
   const { data: profile } = useProfile()
   const remove = useToggleFavourite()
 
   return (
     <Screen bottomNav="customer">
-      <PageHeader title="Saved providers" back="/home" />
+      <PageHeader title={t('Saved providers')} back="/home" />
       <div className="px-[22px] pb-6">
         <QueryState
           query={favourites}
-          errorMessage="We could not load your saved providers."
+          errorMessage={t('We could not load your saved providers.')}
           empty={{
             icon: 'ph-heart',
             title: 'Nothing saved yet',
             body: 'Tap the heart on a provider to keep them here for later.',
             action: (
               <Link to="/search" className="text-[15px] font-semibold text-brand-hover">
-                Find a pro
+                {t('Find a pro')}
               </Link>
             ),
           }}
@@ -40,7 +42,7 @@ export function Saved() {
                   disabled={remove.isPending}
                   className="mt-1.5 ml-1 text-[13.5px] font-semibold text-muted"
                 >
-                  Remove from saved
+                  {t('Remove from saved')}
                 </button>
               </div>
             ))

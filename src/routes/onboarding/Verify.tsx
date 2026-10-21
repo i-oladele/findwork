@@ -11,6 +11,7 @@ import { destination } from '../../lib/destination'
 import { passkeyCancelled, passkeyErrorMessage } from '../../lib/passkeys'
 import { friendlyError } from '../../lib/supabase'
 import { formatPhone } from '../../lib/phone'
+import { useT } from '../../lib/i18n'
 
 type VerifyState = { method: 'phone' | 'email'; phone?: string; email?: string; next?: string }
 
@@ -41,6 +42,7 @@ function forgetPending() {
 }
 
 export function Verify() {
+  const t = useT()
   const navigate = useNavigate()
   const location = useLocation()
   const { session, verifyOtp, resendOtp, registerPasskey } = useAuth()
@@ -62,8 +64,8 @@ export function Verify() {
 
   useEffect(() => {
     if (secondsLeft <= 0) return
-    const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000)
+    return () => clearTimeout(timer)
   }, [secondsLeft])
 
   // The email also carries a link. Tapped on this device, it signs this tab
@@ -151,10 +153,10 @@ export function Verify() {
             <i className="ph-fill ph-fingerprint text-[34px] text-success" />
           </span>
           <h2 className="mt-6 font-display font-bold text-[34px] leading-[1.05] tracking-[-0.03em] text-ink">
-            Code confirmed
+            {t('Code confirmed')}
           </h2>
           <p className="mt-2.5 text-[15.5px] leading-[1.55] text-muted">
-            Now use your fingerprint or face to turn on fingerprint sign-in. Next time, that is all it takes.
+            {t('Now use your fingerprint or face to turn on fingerprint sign-in. Next time, that is all it takes.')}
           </p>
           {error && (
             <div role="alert" className="flex items-start gap-2.5 mt-5">
@@ -163,14 +165,14 @@ export function Verify() {
             </div>
           )}
           <Button onClick={turnOnFingerprint} loading={enrolling} icon="fingerprint" className="mt-7">
-            Use my fingerprint
+            {t('Use my fingerprint')}
           </Button>
           <button
             type="button"
             onClick={() => navigate(afterCode, { replace: true })}
             className="w-full h-12 mt-2 text-[15px] font-semibold text-muted"
           >
-            Skip for now
+            {t('Skip for now')}
           </button>
         </div>
       </Screen>
@@ -192,21 +194,21 @@ export function Verify() {
     <Screen>
       <StatusBar />
       <div className="px-6 pt-2">
-        <Link to="/signup" onClick={forgetPending} aria-label="Back" className="inline-flex items-center justify-center w-11 h-11 -ml-2.5 text-ink">
+        <Link to="/signup" onClick={forgetPending} aria-label={t('Back')} className="inline-flex items-center justify-center w-11 h-11 -ml-2.5 text-ink">
           <i className="ph-bold ph-arrow-left text-[22px]" />
         </Link>
         <h2 className="mt-3.5 font-display font-bold text-[34px] leading-[1.05] tracking-[-0.03em] text-ink">
-          Enter your code
+          {t('Enter your code')}
         </h2>
         <p className="mt-2.5 text-[15.5px] leading-[1.55] text-muted">
           We sent a 6-digit code to <span className="font-semibold text-ink">{target}</span>.{' '}
           <Link to="/signup" onClick={forgetPending} className="text-brand-hover font-semibold">
-            Change
+            {t('Change')}
           </Link>
         </p>
         {pending.method === 'email' && (
           <p className="mt-2 text-[14px] leading-[1.5] text-muted-2">
-            You can also tap the link in that email. Not there after a minute? Check spam and promotions.
+            {t('You can also tap the link in that email. Not there after a minute? Check spam and promotions.')}
           </p>
         )}
 
@@ -246,7 +248,7 @@ export function Verify() {
               </span>
             ) : (
               <button onClick={resend} className="text-brand-hover font-semibold">
-                Resend code
+                {t('Resend code')}
               </button>
             )}
           </div>
@@ -260,8 +262,8 @@ export function Verify() {
           <div className="flex items-center gap-3 mt-7 bg-white border border-line rounded-2xl p-[18px_20px]">
             <i className="ph-fill ph-fingerprint text-2xl text-success" />
             {/* A non-breaking hyphen: "sign-" and "in" must not split across lines. */}
-            <div className="flex-1 font-display font-semibold text-[16px] text-ink">Turn on fingerprint sign‑in</div>
-            <Toggle label="Turn on fingerprint sign-in" on={wantsFingerprint} onChange={setWantsFingerprint} />
+            <div className="flex-1 font-display font-semibold text-[16px] text-ink">{t('Turn on fingerprint sign‑in')}</div>
+            <Toggle label={t('Turn on fingerprint sign-in')} on={wantsFingerprint} onChange={setWantsFingerprint} />
           </div>
         )}
       </div>

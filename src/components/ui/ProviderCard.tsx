@@ -5,6 +5,7 @@ import { PlaceholderImage } from './PlaceholderImage'
 import { formatNaira } from '../../lib/format'
 import { describeDistance } from '../../lib/distance'
 import type { ProviderProfile } from '../../lib/database.types'
+import { useT } from '../../lib/i18n'
 
 /** One provider in a list: search results, the home feed. */
 export function ProviderCard({
@@ -17,6 +18,7 @@ export function ProviderCard({
   /** Crow-flies distance from the viewer, when both have an area set. */
   distanceKm?: number | null
 }) {
+  const t = useT()
   return (
     <Card to={`/provider/${p.id}`} active={active} className="flex gap-3.5 p-3.5 mt-3">
       <PlaceholderImage src={p.photo_urls[0]} className="w-[68px] h-[68px] flex-none" />
@@ -26,11 +28,11 @@ export function ProviderCard({
           {p.reviews > 0 ? (
             <StarRating rating={Number(p.rating)} reviews={p.reviews} />
           ) : (
-            <span className="text-[12px] text-muted-2 whitespace-nowrap">No reviews yet</span>
+            <span className="text-[12px] text-muted-2 whitespace-nowrap">{t('No reviews yet')}</span>
           )}
         </div>
         <div className="text-[13px] text-muted-2 mt-0.5 truncate">
-          {p.category} · {p.area ?? p.location}
+          {t(p.category)} · {p.area ?? p.location}
           {describeDistance(distanceKm) && ` · ${describeDistance(distanceKm)}`}
         </div>
         <div className="flex items-center justify-between mt-2 gap-2">
@@ -39,17 +41,17 @@ export function ProviderCard({
             <span className="text-xs font-normal text-muted-2"> / {p.price_unit}</span>
           </span>
           <span className="flex gap-1.5">
-            {p.plan !== 'free' && <Badge tone="warning">Pro</Badge>}
+            {p.plan !== 'free' && <Badge tone="warning">{t('Pro')}</Badge>}
             {p.verified ? (
               <Badge tone="success" icon="shield-check">
-                Verified
+                {t('Verified')}
               </Badge>
             ) : (
-              <Badge tone="neutral">New</Badge>
+              <Badge tone="neutral">{t('New')}</Badge>
             )}
           </span>
         </div>
-        {!p.taking_bookings && <div className="text-[12px] text-warning-text mt-1.5">Not taking bookings right now</div>}
+        {!p.taking_bookings && <div className="text-[12px] text-warning-text mt-1.5">{t('Not taking bookings right now')}</div>}
       </div>
     </Card>
   )

@@ -7,8 +7,10 @@ import { QueryState } from '../../components/system/QueryState'
 import { productImage, useProducts } from '../../lib/api'
 import { useCartCount } from '../../store/cart'
 import { formatNaira } from '../../lib/format'
+import { useT } from '../../lib/i18n'
 
 export function Shop() {
+  const t = useT()
   const cartCount = useCartCount()
   const products = useProducts()
   const [query, setQuery] = useState('')
@@ -23,9 +25,9 @@ export function Shop() {
       <StatusBar />
       <div className="px-[22px] pt-2 pb-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display font-bold text-[28px] tracking-[-0.03em] text-ink">Shop</h2>
+          <h2 className="font-display font-bold text-[28px] tracking-[-0.03em] text-ink">{t('Shop')}</h2>
           <Link to="/orders" className="text-[14.5px] font-semibold text-brand-hover">
-            My orders
+            {t('My orders')}
           </Link>
         </div>
         <div className="flex items-center gap-2.5 mt-3">
@@ -34,7 +36,7 @@ export function Shop() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search products"
+              placeholder={t('Search products')}
               className="flex-1 min-w-0 text-[15.5px] text-ink bg-transparent outline-none placeholder:text-muted-2"
             />
           </div>
@@ -63,7 +65,7 @@ export function Shop() {
         <div className="mt-2">
           <QueryState
             query={{ ...products, data: filtered }}
-            errorMessage="We could not load the shop."
+            errorMessage={t('We could not load the shop.')}
             empty={{ icon: 'ph-storefront', title: q ? 'Nothing matches' : 'The shop is empty' }}
           >
             {(list) => (

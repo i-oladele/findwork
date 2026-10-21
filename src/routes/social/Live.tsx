@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { PageHeader } from '../../components/chrome/PageHeader'
@@ -23,6 +23,7 @@ import {
   useStreamMessages,
   useStreamProducts,
   useStreams,
+  useLiveVideoAvailable,
   useStreamViewers,
   useUpdateStream,
   type StreamWithSeller,
@@ -31,6 +32,11 @@ import { friendlyError } from '../../lib/supabase'
 import { formatDateTime, formatNaira } from '../../lib/format'
 import { playbackFor } from '../../lib/stream'
 import { useCart } from '../../store/cart'
+
+// The video client is large; it loads only on a stream that FindWork carries.
+const LiveBroadcast = lazy(() => import('../../components/ui/LiveVideo').then((m) => ({ default: m.LiveBroadcast })))
+const LiveWatch = lazy(() => import('../../components/ui/LiveVideo').then((m) => ({ default: m.LiveWatch })))
+const videoLoading = <div className="bg-ink rounded-2xl py-16 text-center text-[14px] text-muted-3">Loading the video…</div>
 
 /** Sellers who are live now, and streams coming up. */
 export function Streams() {
@@ -67,23 +73,42 @@ function StreamForm() {
   const navigate = useNavigate()
   const schedule = useScheduleStream()
   const { data: products } = useMyProducts()
+  const { data: liveVideo } = useLiveVideoAvailable()
+  const [video, setVideo] = useState<'livekit' | 'link' | null>(null)
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
   const [when, setWhen] = useState('')
   const [chosen, setChosen] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const live = (products ?? []).filter((p) => p.status === 'live')
-  const valid = title.trim().length >= 3 && /^https:\/\/\S+$/.test(url.trim())
+  // FindWork carries the video when it can; a pasted link is the other choice.
+  const source = video ?? (liveVideo ? 'livekit' : 'link')
+  const valid = title.trim().length >= 3 && (source === 'livekit' || /^https:\/\/\S+$/.test(url.trim()))
 
   return (
     <Screen>
       <PageHeader title="Set up a live sale" back="/live" icon="x" />
       <div className="px-[22px] pb-8 space-y-4">
-        <Alert tone="info" className="mt-4">
-          FindWork runs the selling room: the chat, your pinned products and checkout. The video itself comes from the app you broadcast with (YouTube Live, or any service that gives you a watch link). Paste that link below.
-        </Alert>
         <Input label="Title" value={title} onChange={setTitle} placeholder="Friday fabric sale" />
-        <Input label="Link where people watch the video" value={url} onChange={setUrl} placeholder="https://youtube.com/live/…" autoCapitalize="none" hint="YouTube links and direct video links play inside FindWork; other links open in a new tab." />
+        {liveVideo && (
+          <fieldset>
+            <legend className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mb-2">Video</legend>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" aria-pressed={source === 'livekit'} onClick={() => setVideo('livekit')}
+                className={`rounded-full px-[15px] py-2 text-[13.5px] ${source === 'livekit' ? 'bg-ink text-white font-semibold' : 'bg-white border border-line text-ink font-medium'}`}>From this phone&apos;s camera</button>
+              <button type="button" aria-pressed={source === 'link'} onClick={() => setVideo('link')}
+                className={`rounded-full px-[15px] py-2 text-[13.5px] ${source === 'link' ? 'bg-ink text-white font-semibold' : 'bg-white border border-line text-ink font-medium'}`}>A link from another app</button>
+            </div>
+          </fieldset>
+        )}
+        {source === 'livekit' ? (
+          <Alert tone="info">You broadcast from your camera inside FindWork, and viewers watch beside the chat and your products. You can check your camera before going live.</Alert>
+        ) : (
+          <>
+            <Alert tone="info">FindWork runs the selling room: the chat, your pinned products and checkout. The video comes from the app you broadcast with (YouTube Live, or any service that gives you a watch link). Paste that link below.</Alert>
+            <Input label="Link where people watch the video" value={url} onChange={setUrl} placeholder="https://youtube.com/live/…" autoCapitalize="none" hint="YouTube links and direct video links play inside FindWork; other links open in a new tab." />
+          </>
+        )}
         <label className="block text-[14px] text-text-soft">When (optional)
           <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="block w-full mt-1.5 bg-white border-[1.5px] border-line rounded-lg h-[52px] px-3.5 text-ink" />
         </label>
@@ -103,7 +128,10 @@ function StreamForm() {
         <Button disabled={!valid} loading={schedule.isPending} onClick={async () => {
           setError(null)
           try {
-            const id = await schedule.mutateAsync({ title: title.trim(), playbackUrl: url.trim(), scheduledFor: when ? new Date(when).toISOString() : null, productIds: chosen.slice(0, 20) })
+            const id = await schedule.mutateAsync({
+              title: title.trim(), video: source, playbackUrl: source === 'link' ? url.trim() : null,
+              scheduledFor: when ? new Date(when).toISOString() : null, productIds: chosen.slice(0, 20),
+            })
             navigate(`/live/${id}`, { replace: true })
           } catch (err) { setError(friendlyError(err)) }
         }}>Create the stream</Button>
@@ -134,7 +162,8 @@ function Room({ s }: { s: StreamWithSeller }) {
   const [added, setAdded] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const mine = user?.id === s.seller_id
-  const playback = playbackFor(s.playback_url)
+  const carried = s.video === 'livekit'
+  const playback = s.playback_url ? playbackFor(s.playback_url) : null
   const pinned = products.data?.find((p) => p.id === s.pinned_product_id)
   const run = (input: Parameters<typeof update.mutate>[0]) => { setError(null); update.mutate(input, { onError: (e) => setError(friendlyError(e)) }) }
 
@@ -146,7 +175,9 @@ function Room({ s }: { s: StreamWithSeller }) {
 
         {s.status === 'scheduled' && <Alert tone="info">This stream has not started{s.scheduled_for ? `. It is planned for ${formatDateTime(s.scheduled_for)}` : ''}.</Alert>}
         {s.status === 'ended' && <Alert tone="info">This stream has ended. The products are still on sale in the store.</Alert>}
-        {isLive && (
+        {carried && mine && <Suspense fallback={videoLoading}><LiveBroadcast streamId={s.id} ended={s.status === 'ended'} /></Suspense>}
+        {carried && !mine && isLive && <Suspense fallback={videoLoading}><LiveWatch streamId={s.id} /></Suspense>}
+        {!carried && isLive && playback && (
           <div className="bg-ink rounded-2xl overflow-hidden">
             {playback.kind === 'video' && <video controls autoPlay playsInline src={playback.src} aria-label={s.title} className="w-full max-h-[50vh]" />}
             {playback.kind === 'embed' && <iframe src={playback.src} title={s.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen className="w-full aspect-video" />}

@@ -3,7 +3,7 @@ import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { useStaff } from './admin'
 import { keys } from './keys'
-import type { Invoice, OrgRole, Organization, PurchaseOrder } from '../database.types'
+import type { Invoice, OrgRole, Organization, PurchaseOrder, StockItem, StockMovement } from '../database.types'
 
 export type MyOrganization = Organization & { role: OrgRole }
 type Named = { full_name: string } | null
@@ -159,6 +159,7 @@ export function useHoldPurchaseOrder() {
 
 export type ProcurementSummary = {
   spent: number; in_escrow: number; awaiting_approval: number; open: number; completed: number
+  stock_items: number; low_stock: number; to_receive: number
   suppliers: { supplier_id: string; name: string; tier: number; trust: number; orders: number; spent: number; status: 'approved' | 'blocked' | null }[]
   months: { month: string; spent: number }[]
 }
@@ -195,6 +196,65 @@ export function useAdminResolvePurchaseOrder() {
   return useProcurementAction(async (input: { id: string; outcome: 'release' | 'refund'; note: string }) => {
     const { error } = await supabase.rpc('admin_resolve_purchase_order', { p_po_id: input.id, p_outcome: input.outcome, p_note: input.note })
     if (error) throw error
+  })
+}
+
+/** The buying side's stock: an organisation's, or the signed-in person's own when organizationId is null. */
+export function useStockItems(organizationId: string | null) {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: keys.procurement.stock(organizationId),
+    enabled: Boolean(user),
+    queryFn: async (): Promise<StockItem[]> => {
+      const base = supabase.from('stock_items').select('*')
+      const scoped = organizationId ? base.eq('organization_id', organizationId) : base.eq('owner_id', user!.id)
+      const { data, error } = await scoped.order('name').limit(500)
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export type StockMovementWithActor = StockMovement & { actor: Named }
+
+export function useStockHistory(itemId: string | null) {
+  return useQuery({
+    queryKey: keys.procurement.stockHistory(itemId ?? ''),
+    enabled: Boolean(itemId),
+    queryFn: async (): Promise<StockMovementWithActor[]> => {
+      const { data, error } = await supabase.from('stock_movements')
+        .select('*, actor:profiles!stock_movements_actor_id_fkey(full_name)').eq('item_id', itemId!).order('created_at', { ascending: false }).limit(50)
+      if (error) throw error
+      return data as unknown as StockMovementWithActor[]
+    },
+  })
+}
+
+/** itemId null adds an item by hand. */
+export function useSaveStockItem() {
+  return useProcurementAction(async (input: { itemId: string | null; organizationId: string | null; name: string; unit: string; reorderLevel: number | null }): Promise<string> => {
+    const { data, error } = await supabase.rpc('save_stock_item', {
+      p_item_id: input.itemId, p_organization_id: input.organizationId, p_name: input.name, p_unit: input.unit, p_reorder_level: input.reorderLevel,
+    })
+    if (error) throw error
+    return data
+  })
+}
+
+/** 'used' takes quantity off what is on hand; 'counted' sets it to quantity and needs a note. */
+export function useRecordStock() {
+  return useProcurementAction(async (input: { itemId: string; reason: 'used' | 'counted'; quantity: number; note: string }) => {
+    const { error } = await supabase.rpc('record_stock', { p_item_id: input.itemId, p_reason: input.reason, p_quantity: input.quantity, p_note: input.note || null })
+    if (error) throw error
+  })
+}
+
+/** Records what arrived on a delivered purchase order, once. */
+export function useReceivePurchaseOrderStock() {
+  return useProcurementAction(async (input: { id: string; lines: { name: string; unit: string; quantity: number }[] }): Promise<number> => {
+    const { data, error } = await supabase.rpc('receive_purchase_order_stock', { p_po_id: input.id, p_lines: input.lines })
+    if (error) throw error
+    return data
   })
 }
 

@@ -25,6 +25,7 @@ import {
 } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatDate, formatNaira, parseNaira } from '../../lib/format'
+import { StockSection } from './Stock'
 
 /**
  * Buying in bulk, for yourself or for an organisation: what has been spent
@@ -56,6 +57,7 @@ export function Procurement() {
             </div>
             {creating && <CreateOrganization onClose={() => setCreating(false)} onCreated={setChosen} />}
             <Summary organizationId={org?.id ?? null} canManageSuppliers={org ? org.role !== 'buyer' : false} />
+            <StockSection key={org?.id ?? 'mine'} organizationId={org?.id ?? null} canManage={org ? org.role !== 'buyer' : true} />
           </>
         )}
 
@@ -107,6 +109,9 @@ function Summary({ organizationId, canManageSuppliers }: { organizationId: strin
               <Tile label="Awaiting approval" value={String(s.awaiting_approval)} />
               <Tile label="Open orders" value={String(s.open)} />
             </div>
+            {s.to_receive > 0 && (
+              <Alert tone="info" className="mt-3">{s.to_receive === 1 ? 'One delivered order has' : `${s.to_receive} delivered orders have`} not been added to stock yet. Open the order to record what arrived.</Alert>
+            )}
 
             {s.months.length > 0 && (
               <>

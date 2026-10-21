@@ -15,6 +15,7 @@ import { Input } from '../../components/ui/Input'
 import { SectionLabel } from '../../components/ui/SectionLabel'
 import { EvidenceGallery, PrivatePhoto } from '../../components/ui/PrivateAttachment'
 import { FullScreenLoader } from '../../components/system/States'
+import { useIdentityChecks, useRunIdentityCheck } from '../../lib/api/verification'
 import {
   adminFindProfiles,
   useAdminAdjustBalance,
@@ -28,6 +29,10 @@ import {
   useAdminDisputes,
   useAdminMarkTopupRefunded,
   useAdminOrders,
+  useAdminRequeuePayout,
+  useAdminRetryPayout,
+  usePayoutPolicy,
+  useSetPayoutPolicy,
   useAdminRefundsDue,
   useAdminReplySupport,
   useAdminReports,
@@ -311,11 +316,15 @@ function PayoutsTab({ onError }: TabProps) {
   const { data } = useAdminWithdrawals()
   const { data: refunds } = useAdminRefundsDue()
   const process = useAdminProcessWithdrawal()
+  const retry = useAdminRetryPayout()
+  const requeue = useAdminRequeuePayout()
   const [note, setNote] = useState<Record<string, string>>({})
-  if (!data?.length && !refunds?.length) return <Empty text="No withdrawals or refunds waiting." />
+  const policy = <PayoutPolicyPanel onError={onError} />
+  if (!data?.length && !refunds?.length) return <>{policy}<Empty text="No withdrawals or refunds waiting." /></>
 
   return (
     <>
+      {policy}
       {refunds && refunds.length > 0 && <RefundsDue refunds={refunds} onError={onError} />}
       {refunds && refunds.length > 0 && data && data.length > 0 && (
         <SectionLabel className="mt-5 mb-2.5">Withdrawals</SectionLabel>
@@ -330,6 +339,32 @@ function PayoutsTab({ onError }: TabProps) {
           <div className="text-[13.5px] text-text-soft mt-1">
             {w.bank_name} · {w.account_number} · {w.account_name}
           </div>
+          {(w.transfer_status === 'queued' || w.transfer_status === 'sent') ? (
+            <>
+              <Alert tone="info" className="mt-3">
+                Paystack is sending this{w.transfer_requested_at ? ` (asked ${formatDateTime(w.transfer_requested_at)})` : ''}. Reference {w.transfer_reference}.
+              </Alert>
+              {w.transfer_requested_at && Date.now() - new Date(w.transfer_requested_at).getTime() > 3_600_000 && (
+                <div className="flex gap-2 mt-3">
+                  <input value={note[w.id] ?? ''} onChange={(e) => setNote((n) => ({ ...n, [w.id]: e.target.value }))}
+                    placeholder="Why, after checking Paystack" className="flex-1 min-w-0 h-11 bg-cream rounded-lg px-3 text-[14px] text-ink outline-none placeholder:text-muted-2" />
+                  <button className="h-11 px-3 border border-line rounded-lg text-[13.5px] font-semibold text-ink" disabled={requeue.isPending || (note[w.id] ?? '').trim().length < 3}
+                    onClick={() => {
+                      if (!window.confirm('Only do this once the Paystack dashboard shows the transfer did not go out. Take it back to settle by hand?')) return
+                      onError(null)
+                      requeue.mutate({ id: w.id, note: note[w.id] ?? '' }, { onError: (e) => onError(friendlyError(e)) })
+                    }}>Take back</button>
+                </div>
+              )}
+            </>
+          ) : (<>
+          {w.transfer_status === 'failed' && (
+            <div className="mt-3">
+              <Alert>Automatic payout failed: {w.failure_reason ?? 'no reason given'}</Alert>
+              <button className="min-h-11 text-[14px] font-semibold text-brand-hover" disabled={retry.isPending}
+                onClick={() => { onError(null); retry.mutate(w.id, { onError: (e) => onError(friendlyError(e)) }) }}>Try Paystack again</button>
+            </div>
+          )}
           <input
             value={note[w.id] ?? ''}
             onChange={(e) => setNote((n) => ({ ...n, [w.id]: e.target.value }))}
@@ -358,9 +393,45 @@ function PayoutsTab({ onError }: TabProps) {
               Reject
             </button>
           </div>
+          </>)}
         </Panel>
       ))}
     </>
+  )
+}
+
+/** Whether withdrawals to bank-confirmed accounts go out through Paystack on their own, and up to how much. */
+function PayoutPolicyPanel({ onError }: Pick<TabProps, 'onError'>) {
+  const { data: policy } = usePayoutPolicy()
+  const save = useSetPayoutPolicy()
+  const [max, setMax] = useState<string | null>(null)
+  if (!policy) return null
+  const shownMax = max ?? String(policy.max)
+  const parsedMax = Number(shownMax.replace(/\D/g, ''))
+  return (
+    <Panel>
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-display font-semibold text-[15.5px] text-ink">Automatic payouts</span>
+        <Badge tone={policy.enabled && policy.configured ? 'success' : 'neutral'}>{policy.enabled && policy.configured ? 'On' : 'Off'}</Badge>
+      </div>
+      {!policy.configured ? (
+        <p className="text-[13px] text-muted-2 mt-2">Not set up: deploy paystack-payout and add its rows to private.settings (see the README). Until then every withdrawal is sent by hand.</p>
+      ) : (
+        <>
+          <p className="text-[13px] text-muted-2 mt-2">Withdrawals to accounts the bank confirmed are sent by Paystack Transfers up to this amount. Larger ones, and any from an account with an open high-risk alert, wait here.</p>
+          <div className="flex gap-2 mt-3">
+            <input value={shownMax} onChange={(e) => setMax(e.target.value)} inputMode="numeric" aria-label="Automatic payout limit in naira"
+              className="flex-1 min-w-0 h-11 bg-cream rounded-lg px-3 text-[14px] text-ink outline-none" />
+            <button className="h-11 px-3 bg-ink text-cream rounded-lg text-[13.5px] font-semibold" disabled={save.isPending || parsedMax < 1000}
+              onClick={() => { onError(null); save.mutate({ enabled: policy.enabled, max: parsedMax }, { onError: (e) => onError(friendlyError(e)) }) }}>Save limit</button>
+          </div>
+          <button className="min-h-11 mt-1 text-[14px] font-semibold text-brand-hover" disabled={save.isPending}
+            onClick={() => { onError(null); save.mutate({ enabled: !policy.enabled, max: policy.max }, { onError: (e) => onError(friendlyError(e)) }) }}>
+            {policy.enabled ? 'Turn automatic payouts off' : 'Turn automatic payouts on'}
+          </button>
+        </>
+      )}
+    </Panel>
   )
 }
 
@@ -520,6 +591,7 @@ function BusinessVerifications({ onError }: TabProps) {
           <div className="font-display font-semibold text-[16px] text-ink">{v.business_name}</div>
           <div className="text-[14px] text-ink mt-1"><span className="font-mono">{v.rc_number}</span> · {v.profile?.full_name || 'Unnamed account'}</div>
           <PrivatePhoto bucket="verification-documents" path={v.document_path} label="CAC certificate" className="w-40 h-28 mt-3" />
+          <RegisterChecks subjectType="business_verification" subjectId={v.id} onError={onError} />
           <input value={note[v.id] ?? ''} onChange={(e) => setNote((n) => ({ ...n, [v.id]: e.target.value }))}
             placeholder="Reason, if rejecting (they will see it)" aria-label={`Reason for ${v.business_name}`}
             className="w-full h-11 mt-3 bg-cream rounded-lg px-3 text-[14px] text-ink outline-none placeholder:text-muted-2" />
@@ -537,6 +609,47 @@ function BusinessVerifications({ onError }: TabProps) {
         </Panel>
       ))}
     </>
+  )
+}
+
+const CHECK_LABEL = { nin: 'NIN', bvn: 'BVN', cac: 'CAC', face: 'Face', sim: 'Phone (SIM)' } as const
+const OUTCOME = {
+  match: { label: 'Matches', tone: 'success' },
+  mismatch: { label: 'Does not match', tone: 'danger' },
+  not_found: { label: 'Not on the register', tone: 'danger' },
+  error: { label: 'Could not check', tone: 'neutral' },
+} as const
+
+/** What the national register said, beside the documents; staff can ask again. */
+function RegisterChecks({ subjectType, subjectId, onError }: TabProps & { subjectType: 'verification' | 'business_verification'; subjectId: string }) {
+  const { data: checks } = useIdentityChecks(subjectType, subjectId)
+  const run = useRunIdentityCheck()
+  // The latest answer for each kind of check.
+  const latest = Object.values(Object.fromEntries((checks ?? []).map((c) => [c.kind, c])))
+  return (
+    <div className="mt-3 bg-cream rounded-xl p-3">
+      <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted-2 mb-1.5">National register</div>
+      {latest.length === 0 ? <p className="text-[13px] text-muted-2">Not checked{subjectType === 'verification' ? ' (only a NIN or BVN can be)' : ''}.</p> : (
+        <ul className="space-y-1.5">
+          {latest.map((c) => {
+            const detail = (c.detail ?? {}) as { registry_name?: string; message?: string; status?: string }
+            return (
+              <li key={c.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink">
+                <span className="font-semibold">{CHECK_LABEL[c.kind]}</span>
+                <Badge tone={OUTCOME[c.outcome].tone}>{OUTCOME[c.outcome].label}{c.confidence !== null ? ` · ${c.confidence}%` : ''}</Badge>
+                {detail.registry_name && <span className="text-muted-2">Register: {detail.registry_name}</span>}
+                {detail.status && <span className="text-muted-2">{detail.status}</span>}
+                {c.outcome === 'error' && detail.message && <span className="text-muted-2">{detail.message}</span>}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <button className="min-h-11 text-[13.5px] font-semibold text-brand-hover" disabled={run.isPending} onClick={() => {
+        onError(null)
+        run.mutate(subjectType === 'verification' ? { verification_id: subjectId } : { business_verification_id: subjectId }, { onError: (e) => onError(friendlyError(e)) })
+      }}>{run.isPending ? 'Checking…' : latest.length ? 'Check again' : 'Check with the register'}</button>
+    </div>
   )
 }
 
@@ -578,6 +691,7 @@ function VerificationTab({ onError }: TabProps) {
                 <PrivatePhoto bucket="verification-documents" path={v.selfie_path} label="Selfie" className="w-24 h-24" />
               </div>
             </div>
+            <RegisterChecks subjectType="verification" subjectId={v.id} onError={onError} />
             <input
               value={note[v.id] ?? ''}
               onChange={(e) => setNote((n) => ({ ...n, [v.id]: e.target.value }))}

@@ -16,22 +16,26 @@ import { friendlyError } from '../../lib/supabase'
 import { formatDateTime } from '../../lib/format'
 import { formatPhone } from '../../lib/phone'
 import type { VerificationIdType } from '../../lib/database.types'
+import { msg, useT } from '../../lib/i18n'
 
 const ID_TYPES: { type: VerificationIdType; label: string; field: string }[] = [
-  { type: 'nin', label: 'NIN', field: 'Your 11-digit NIN' },
-  { type: 'bvn', label: 'BVN', field: 'Your 11-digit BVN' },
-  { type: 'passport', label: 'International passport', field: 'Passport number' },
-  { type: 'drivers_licence', label: "Driver's licence", field: 'Licence number' },
-  { type: 'voters_card', label: "Voter's card", field: 'VIN on your card' },
+  { type: 'nin', label: msg('NIN'), field: msg('Your 11-digit NIN') },
+  { type: 'bvn', label: msg('BVN'), field: msg('Your 11-digit BVN') },
+  { type: 'passport', label: msg('International passport'), field: msg('Passport number') },
+  { type: 'drivers_licence', label: msg('Driver\'s licence'), field: msg('Licence number') },
+  { type: 'voters_card', label: msg('Voter\'s card'), field: msg('VIN on your card') },
 ]
 
 /**
- * Verifying an account: an ID and a selfie, checked by the FindWork team,
- * who approve or say what to fix. Reached from the notice on Home until the
- * account is verified. Automatic NIN/BVN checks through a KYC provider can
- * replace the manual review later without changing this screen much.
+ * Verifying an account: an ID and a selfie. A NIN or BVN is checked with the
+ * national register (through Dojah) as soon as it is sent, and the account
+ * is verified on the spot when the number, name and face all match.
+ * Anything else, including other kinds of ID, is checked by the FindWork
+ * team, who approve or say what to fix. Reached from the notice on Home
+ * until the account is verified.
  */
 export function GetVerified() {
+  const t = useT()
   const { user } = useAuth()
   const { data: profile, isLoading: profileLoading } = useProfile()
   const { data: latest, isLoading } = useMyVerification()
@@ -49,18 +53,19 @@ export function GetVerified() {
 
   return (
     <Screen>
-      <PageHeader title="Get verified" back="/home" />
+      <PageHeader title={t('Get verified')} back="/home" />
       <div className="px-6 pt-3 pb-10">
         <p className="text-[15.5px] leading-[1.55] text-muted">
-          Verify your identity to use every FindWork service. Our team checks your ID and lets you know.
+          Verify your identity to use every FindWork service. A NIN or BVN is checked with the national register
+          straight away; anything that needs a closer look is checked by our team.
         </p>
 
         <div className="mt-5 bg-white border border-line rounded-2xl overflow-hidden">
-          <Step done={Boolean(user?.phone_confirmed_at || user?.email_confirmed_at)} icon="phone" label="Phone or email" detail={contact} />
+          <Step done={Boolean(user?.phone_confirmed_at || user?.email_confirmed_at)} icon="phone" label={t('Phone or email')} detail={contact} />
           <Step
             done={verified}
             icon="identification-card"
-            label="ID checked by FindWork"
+            label={t('ID checked')}
             detail={verified ? 'Verified' : pending ? 'Being checked' : rejected ? 'Needs another look' : 'Send your ID below'}
             last
           />
@@ -70,22 +75,22 @@ export function GetVerified() {
           <>
             <div className="mt-6 flex justify-center">
               <Badge tone="success" icon="shield-check">
-                Verified
+                {t('Verified')}
               </Badge>
             </div>
-            <p className="mt-3 text-center text-[15px] text-muted">You can use every FindWork service.</p>
+            <p className="mt-3 text-center text-[15px] text-muted">{t('You can use every FindWork service.')}</p>
             <Button to="/home" className="mt-6 w-full">
-              Back to home
+              {t('Back to home')}
             </Button>
           </>
         ) : pending ? (
           <>
             <Alert tone="info" className="mt-5">
-              We are checking your ID, sent {formatDateTime(latest!.created_at)}. We will notify you as soon as it is
-              done.
+              Our team is checking your ID, sent {formatDateTime(latest!.created_at)}. We will notify you as soon as it
+              is done.
             </Alert>
             <Button to="/home" className="mt-6 w-full">
-              Back to home
+              {t('Back to home')}
             </Button>
           </>
         ) : (
@@ -97,7 +102,7 @@ export function GetVerified() {
             )}
             <SubmitForm />
             <Link to="/home" className="block text-center mt-4 text-[15px] font-semibold text-muted">
-              Do this later
+              {t('Do this later')}
             </Link>
           </>
         )}
@@ -109,6 +114,7 @@ export function GetVerified() {
 
 /** The top tier: a CAC registration number and certificate, checked by the team. */
 function BusinessSection({ verifiedAt }: { verifiedAt: string | null }) {
+  const t = useT()
   const { data: latest } = useMyBusinessVerification()
   const submit = useSubmitBusinessVerification()
   const [rcNumber, setRcNumber] = useState('')
@@ -121,11 +127,11 @@ function BusinessSection({ verifiedAt }: { verifiedAt: string | null }) {
   return (
     <div className="mt-8 border-t border-line pt-6">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display font-semibold text-[18px] text-ink">Verify a business</h2>
-        {verifiedAt && <Badge tone="success" icon="buildings">Business verified</Badge>}
+        <h2 className="font-display font-semibold text-[18px] text-ink">{t('Verify a business')}</h2>
+        {verifiedAt && <Badge tone="success" icon="buildings">{t('Business verified')}</Badge>}
       </div>
       <p className="mt-1.5 text-[14.5px] leading-[1.5] text-muted">
-        For registered businesses: send your CAC number and certificate. A verified business has the highest withdrawal and transfer limits.
+        {t('For registered businesses: send your CAC number and certificate. A verified business has the highest withdrawal and transfer limits.')}
       </p>
       {verifiedAt ? null : latest?.status === 'pending' ? (
         <Alert tone="info" className="mt-4">We are checking {latest.business_name}, sent {formatDateTime(latest.created_at)}.</Alert>
@@ -133,17 +139,17 @@ function BusinessSection({ verifiedAt }: { verifiedAt: string | null }) {
         <>
           {latest?.status === 'rejected' && <Alert className="mt-4">Your last submission was not approved: {latest.note ?? 'please send it again.'}</Alert>}
           <div className="mt-4 space-y-4">
-            <Input label="CAC registration number" value={rcNumber} onChange={setRcNumber} placeholder="RC1234567" autoCapitalize="none" />
-            <Input label="Registered business name" value={businessName} onChange={setBusinessName} autoCapitalize="words" />
+            <Input label={t('CAC registration number')} value={rcNumber} onChange={setRcNumber} placeholder="RC1234567" autoCapitalize="none" />
+            <Input label={t('Registered business name')} value={businessName} onChange={setBusinessName} autoCapitalize="words" />
           </div>
-          <SectionLabel className="mt-5 mb-1.5">Photo of your CAC certificate</SectionLabel>
+          <SectionLabel className="mt-5 mb-1.5">{t('Photo of your CAC certificate')}</SectionLabel>
           <PhotoPicker bucket="verification-documents" value={certificate} onChange={setCertificate} onError={setError} max={1} />
           {error && <Alert className="mt-4">{error}</Alert>}
           <Button className="mt-5 w-full" disabled={!canSend} loading={submit.isPending} onClick={async () => {
             setError(null)
             try { await submit.mutateAsync({ rcNumber: cleaned, businessName: businessName.trim(), documentPath: certificate[0] }) }
             catch (err) { setError(friendlyError(err)) }
-          }}>Send business for checking</Button>
+          }}>{t('Send business for checking')}</Button>
         </>
       )}
     </div>
@@ -151,6 +157,7 @@ function BusinessSection({ verifiedAt }: { verifiedAt: string | null }) {
 }
 
 function SubmitForm() {
+  const t = useT()
   const submit = useSubmitVerification()
   const [idType, setIdType] = useState<VerificationIdType>('nin')
   const [idNumber, setIdNumber] = useState('')
@@ -158,7 +165,7 @@ function SubmitForm() {
   const [selfie, setSelfie] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  const chosen = ID_TYPES.find((t) => t.type === idType)!
+  const chosen = ID_TYPES.find((option) => option.type === idType)!
   const digitsOnly = idType === 'nin' || idType === 'bvn'
   const cleaned = idNumber.replace(/[\s-]/g, '')
   const numberValid = digitsOnly ? /^\d{11}$/.test(cleaned) : cleaned.length >= 5 && cleaned.length <= 30
@@ -167,6 +174,8 @@ function SubmitForm() {
   async function send() {
     setError(null)
     try {
+      // Approved: the profile refreshes and the screen shows Verified.
+      // Anything else: it shows that the team is checking.
       await submit.mutateAsync({ idType, idNumber: cleaned, documentPath: document[0], selfiePath: selfie[0] })
     } catch (err) {
       setError(friendlyError(err))
@@ -175,18 +184,18 @@ function SubmitForm() {
 
   return (
     <>
-      <SectionLabel className="mt-6 mb-2.5">ID type</SectionLabel>
+      <SectionLabel className="mt-6 mb-2.5">{t('ID type')}</SectionLabel>
       <div className="flex flex-wrap gap-2.5">
-        {ID_TYPES.map((t) => (
-          <Chip key={t.type} active={idType === t.type} icon={idType === t.type ? 'check' : undefined} onClick={() => setIdType(t.type)}>
-            {t.label}
+        {ID_TYPES.map((option) => (
+          <Chip key={option.type} active={idType === option.type} icon={idType === option.type ? 'check' : undefined} onClick={() => setIdType(option.type)}>
+            {t(option.label)}
           </Chip>
         ))}
       </div>
 
       <div className="mt-5">
         <Input
-          label={chosen.field}
+          label={t(chosen.field)}
           value={idNumber}
           onChange={setIdNumber}
           type={digitsOnly ? 'tel' : 'text'}
@@ -196,26 +205,27 @@ function SubmitForm() {
         />
       </div>
 
-      <SectionLabel className="mt-5 mb-1.5">Photo of your {chosen.label === 'NIN' || chosen.label === 'BVN' ? 'ID card or slip' : chosen.label.toLowerCase()}</SectionLabel>
-      <p className="mb-2.5 text-[13px] text-muted-2">The whole document, in focus, with nothing covered.</p>
+      <SectionLabel className="mt-5 mb-1.5">{t('Photo of your {document}', { document: chosen.label === 'NIN' || chosen.label === 'BVN' ? t('ID card or slip') : t(chosen.label).toLowerCase() })}</SectionLabel>
+      <p className="mb-2.5 text-[13px] text-muted-2">{t('The whole document, in focus, with nothing covered.')}</p>
       <PhotoPicker bucket="verification-documents" value={document} onChange={setDocument} onError={setError} max={1} />
 
-      <SectionLabel className="mt-5 mb-1.5">A selfie</SectionLabel>
-      <p className="mb-2.5 text-[13px] text-muted-2">Your face, in good light, looking at the camera.</p>
+      <SectionLabel className="mt-5 mb-1.5">{t('A selfie')}</SectionLabel>
+      <p className="mb-2.5 text-[13px] text-muted-2">{t('Your face, in good light, looking at the camera.')}</p>
       <PhotoPicker bucket="verification-documents" value={selfie} onChange={setSelfie} onError={setError} max={1} capture="user" />
 
       <div className="flex items-start gap-2.5 mt-5">
         <i className="ph-fill ph-lock-simple text-[17px] text-muted-2 relative top-0.5" />
         <p className="text-[13.5px] leading-[1.5] text-muted">
-          Only the FindWork team sees these, only to confirm who you are. They are never shown to anyone else.
+          {t('Only the FindWork team and our identity checker (Dojah, which asks the national register) see these, only to confirm who you are. They are never shown to anyone else.')}
         </p>
       </div>
 
       {error && <Alert className="mt-4">{error}</Alert>}
 
       <Button onClick={send} disabled={!canSend} loading={submit.isPending} className="mt-6 w-full">
-        Send for checking
+        {t('Send for checking')}
       </Button>
+      {submit.isPending && <p className="mt-2 text-center text-[13px] text-muted-2">{t('Checking with the national register. This can take up to a minute.')}</p>}
     </>
   )
 }
@@ -233,6 +243,7 @@ function Step({
   detail: string
   last?: boolean
 }) {
+  const t = useT()
   return (
     <div className={`flex items-center gap-3.5 px-5 py-[17px] ${last ? '' : 'border-b border-line-soft'}`}>
       <i className={`${done ? 'ph-fill ph-check-circle text-success' : `ph ph-${icon} text-ink`} text-2xl`} />
@@ -240,7 +251,7 @@ function Step({
         <div className="text-[16px] font-semibold text-ink">{label}</div>
         <div className="text-[13.5px] text-muted-2 mt-0.5 truncate">{detail}</div>
       </div>
-      {done && <span className="font-mono text-[11px] tracking-[0.1em] uppercase text-success-text">Done</span>}
+      {done && <span className="font-mono text-[11px] tracking-[0.1em] uppercase text-success-text">{t('Done')}</span>}
     </div>
   )
 }

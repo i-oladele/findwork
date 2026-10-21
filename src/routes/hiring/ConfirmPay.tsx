@@ -10,8 +10,10 @@ import { ListSkeleton } from '../../components/system/States'
 import { platformFee, usePayBooking, useProvider, useProviderPackages, useWalletSummary } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatDateTime, formatNaira } from '../../lib/format'
+import { useT } from '../../lib/i18n'
 
 export function ConfirmPay() {
+  const t = useT()
   const { id } = useParams<{ id: string }>()
   const [params] = useSearchParams()
   const location = useLocation()
@@ -28,11 +30,11 @@ export function ConfirmPay() {
   if (!at) {
     return (
       <Screen>
-        <PageHeader title="Review your booking" back={`/book/${id}/time`} />
+        <PageHeader title={t('Review your booking')} back={`/book/${id}/time`} />
         <div className="px-[22px] pt-6">
-          <Alert tone="info">Pick a day and time first.</Alert>
+          <Alert tone="info">{t('Pick a day and time first.')}</Alert>
           <Button to={`/book/${id}/time`} className="mt-4 w-full">
-            Choose a time
+            {t('Choose a time')}
           </Button>
         </div>
       </Screen>
@@ -60,7 +62,7 @@ export function ConfirmPay() {
 
   return (
     <Screen>
-      <PageHeader title="Review your booking" back={`/book/${id}/time`} />
+      <PageHeader title={t('Review your booking')} back={`/book/${id}/time`} />
       <div className="px-[22px] pb-6">
         {!ready ? (
           <div className="pt-5">
@@ -73,7 +75,7 @@ export function ConfirmPay() {
                 <PlaceholderImage src={provider.photo_urls[0]} className="w-[54px] h-[54px] flex-none" />
                 <div className="min-w-0">
                   <div className="font-display font-semibold text-[16.5px] text-ink">{provider.business_name}</div>
-                  <div className="text-[13.5px] text-muted mt-1">{pkg?.name ?? `${provider.category} service`}</div>
+                  <div className="text-[13.5px] text-muted mt-1">{pkg?.name ?? t('{category} service', { category: t(provider.category) })}</div>
                 </div>
               </div>
               <div className="flex items-center gap-2.5 mt-4 pt-4 border-t border-line-soft">
@@ -82,29 +84,29 @@ export function ConfirmPay() {
               </div>
               <div className="flex items-center gap-2.5 mt-2.5">
                 <i className="ph ph-map-pin text-[19px] text-brand" />
-                <span className="text-[14px] text-muted">Share the exact address in chat once they accept.</span>
+                <span className="text-[14px] text-muted">{t('Share the exact address in chat once they accept.')}</span>
               </div>
             </div>
 
-            <SectionLabel className="mt-5 mb-2.5">What you pay</SectionLabel>
+            <SectionLabel className="mt-5 mb-2.5">{t('What you pay')}</SectionLabel>
             <div className="bg-white border border-line rounded-2xl p-[18px]">
-              <Row label="Service" value={formatNaira(price)} />
-              <Row label="Service fee (5%)" value={formatNaira(fee)} />
+              <Row label={t('Service')} value={formatNaira(price)} />
+              <Row label={t('Service fee (5%)')} value={formatNaira(fee)} />
               <div className="flex justify-between text-[15px] text-text-soft mt-2.5">
-                <span>Escrow protection</span>
-                <span className="text-success-text font-semibold">Free</span>
+                <span>{t('Escrow protection')}</span>
+                <span className="text-success-text font-semibold">{t('Free')}</span>
               </div>
               <div className="flex justify-between items-baseline mt-3.5 pt-3.5 border-t border-line-soft">
-                <span className="font-display font-semibold text-[16px] text-ink">Total</span>
+                <span className="font-display font-semibold text-[16px] text-ink">{t('Total')}</span>
                 <span className="font-display font-bold text-[22px] text-ink">{formatNaira(total)}</span>
               </div>
             </div>
 
-            <SectionLabel className="mt-5 mb-2.5">Pay with</SectionLabel>
+            <SectionLabel className="mt-5 mb-2.5">{t('Pay with')}</SectionLabel>
             <div className="flex items-center gap-3.5 bg-white border-[1.5px] border-brand rounded-2xl p-4">
               <i className="ph-fill ph-wallet text-2xl text-success" />
               <div className="flex-1">
-                <div className="text-[15.5px] font-semibold text-ink">FindWork wallet</div>
+                <div className="text-[15.5px] font-semibold text-ink">{t('FindWork wallet')}</div>
                 <div className="text-[13px] text-muted-2 mt-0.5">Balance {formatNaira(balance)}</div>
               </div>
               {shortfall > 0 && (
@@ -112,7 +114,7 @@ export function ConfirmPay() {
                   to={`/wallet/add?amount=${shortfall}&return=${encodeURIComponent(location.pathname + location.search)}`}
                   className="text-[14px] font-semibold text-brand-hover"
                 >
-                  Top up
+                  {t('Top up')}
                 </Link>
               )}
             </div>

@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { msg, useT } from '../../lib/i18n'
 
 type NavItem = {
   label: string
@@ -7,23 +8,24 @@ type NavItem = {
 }
 
 const customerItems: NavItem[] = [
-  { label: 'Home', path: '/home', icon: 'house' },
-  { label: 'Shop', path: '/shop', icon: 'storefront' },
-  { label: 'Bookings', path: '/bookings', icon: 'calendar-check' },
-  { label: 'Wallet', path: '/wallet', icon: 'wallet' },
-  { label: 'Chat', path: '/messages', icon: 'chat-circle' },
+  { label: msg('Home'), path: '/home', icon: 'house' },
+  { label: msg('Shop'), path: '/shop', icon: 'storefront' },
+  { label: msg('Bookings'), path: '/bookings', icon: 'calendar-check' },
+  { label: msg('Wallet'), path: '/wallet', icon: 'wallet' },
+  { label: msg('Chat'), path: '/messages', icon: 'chat-circle' },
 ]
 
 const providerItems: NavItem[] = [
-  { label: 'Dashboard', path: '/provider', icon: 'squares-four' },
-  { label: 'Jobs', path: '/provider/jobs', icon: 'briefcase' },
-  { label: 'Requests', path: '/provider/requests', icon: 'calendar-check' },
-  { label: 'Services', path: '/provider/services', icon: 'list-checks' },
-  { label: 'Earnings', path: '/provider/earnings', icon: 'wallet' },
+  { label: msg('Dashboard'), path: '/provider', icon: 'squares-four' },
+  { label: msg('Jobs'), path: '/provider/jobs', icon: 'briefcase' },
+  { label: msg('Requests'), path: '/provider/requests', icon: 'calendar-check' },
+  { label: msg('Services'), path: '/provider/services', icon: 'list-checks' },
+  { label: msg('Earnings'), path: '/provider/earnings', icon: 'wallet' },
 ]
 
 export function BottomNav({ mode }: { mode: 'customer' | 'provider' }) {
   const { pathname } = useLocation()
+  const t = useT()
   const items = mode === 'customer' ? customerItems : providerItems
 
   return (
@@ -42,7 +44,7 @@ export function BottomNav({ mode }: { mode: 'customer' | 'provider' }) {
               }`}
             />
             <span className={`text-[10.5px] ${active ? 'font-semibold text-brand' : 'font-medium text-muted'}`}>
-              {item.label}
+              {t(item.label)}
             </span>
           </Link>
         )

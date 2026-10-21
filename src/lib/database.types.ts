@@ -55,6 +55,7 @@ export type NotificationKind =
 export type ReportTargetType = 'classified' | 'message' | 'profile' | 'job' | 'rfq' | 'post' | 'stream'
 export type ReportStatus = 'open' | 'actioned' | 'dismissed'
 export type SupportTopic = 'payments' | 'bookings' | 'orders' | 'account' | 'bug' | 'other'
+export type PaymentPurpose = 'topup' | 'checkout' | 'plan' | 'renewal'
 export type VerificationIdType = 'nin' | 'bvn' | 'passport' | 'drivers_licence' | 'voters_card'
 export type VerificationStatus = 'pending' | 'approved' | 'rejected'
 /** refund_due / refunded: paid into an account deleted before it landed. */
@@ -101,7 +102,8 @@ export type Database = {
         Relationships: []
       }
       live_streams: {
-        Row: { id: string; seller_id: string; title: string; playback_url: string; status: StreamStatus; scheduled_for: string | null; started_at: string | null; ended_at: string | null; pinned_product_id: string | null; peak_viewers: number; created_at: string }
+        /** video 'livekit': FindWork carries the video and playback_url is null; 'link': it plays from playback_url. */
+        Row: { id: string; seller_id: string; title: string; video: 'link' | 'livekit'; playback_url: string | null; status: StreamStatus; scheduled_for: string | null; started_at: string | null; ended_at: string | null; pinned_product_id: string | null; peak_viewers: number; created_at: string }
         Insert: never
         Update: never
         Relationships: [Rel<'live_streams_seller_id_fkey', 'seller_id', 'provider_profiles'>]
@@ -174,10 +176,22 @@ export type Database = {
         Relationships: []
       }
       purchase_orders: {
-        Row: { id: string; number: number; rfq_id: string; quote_id: string; organization_id: string | null; buyer_id: string; payer_id: string; supplier_id: string; title: string; amount: number; commission: number; escrow_held: number; status: PurchaseOrderStatus; decided_by: string | null; decision_note: string | null; hold_reason: string | null; funded_at: string | null; delivered_at: string | null; closed_at: string | null; created_at: string }
+        Row: { id: string; number: number; rfq_id: string; quote_id: string; organization_id: string | null; buyer_id: string; payer_id: string; supplier_id: string; title: string; amount: number; commission: number; escrow_held: number; status: PurchaseOrderStatus; decided_by: string | null; decision_note: string | null; hold_reason: string | null; funded_at: string | null; delivered_at: string | null; closed_at: string | null; stock_received_at: string | null; created_at: string }
         Insert: never
         Update: never
         Relationships: [Rel<'purchase_orders_supplier_id_fkey', 'supplier_id', 'profiles'>, Rel<'purchase_orders_buyer_id_fkey', 'buyer_id', 'profiles'>, Rel<'purchase_orders_organization_id_fkey', 'organization_id', 'organizations'>]
+      }
+      stock_items: {
+        Row: { id: string; organization_id: string | null; owner_id: string | null; name: string; unit: string; on_hand: number; reorder_level: number | null; created_at: string; updated_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      stock_movements: {
+        Row: { id: string; item_id: string; delta: number; reason: 'received' | 'used' | 'counted'; purchase_order_id: string | null; note: string | null; actor_id: string; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'stock_movements_actor_id_fkey', 'actor_id', 'profiles'>]
       }
       invoices: {
         Row: { id: string; number: number; purchase_order_id: string; supplier_id: string; payer_id: string; organization_id: string | null; amount: number; status: 'issued' | 'paid' | 'void'; issued_at: string; paid_at: string | null }
@@ -681,6 +695,8 @@ export type Database = {
           description: string
           budget: number
           needed_by: string | null
+          /** The calendar day it is needed by, when given; matching checks providers' calendars against it. */
+          needed_on: string | null
           /** The trade wanted and where; both feed matching. */
           category: string | null
           area: string | null
@@ -695,6 +711,7 @@ export type Database = {
           description: string
           budget: number
           needed_by?: string | null
+          needed_on?: string | null
           category?: string | null
           area?: string | null
           status?: JobStatus
@@ -705,6 +722,7 @@ export type Database = {
           description?: string
           budget?: number
           needed_by?: string | null
+          needed_on?: string | null
           category?: string | null
           area?: string | null
           status?: JobStatus
@@ -930,8 +948,9 @@ export type Database = {
         Relationships: []
       }
       subscriptions: {
-        Row: { profile_id: string; plan: string; since: string; renews_at: string | null }
-        /** No client write policy — subscribe_plan. */
+        /** card_id: the saved card renewals are charged to; null renews from the wallet. */
+        Row: { profile_id: string; plan: string; since: string; renews_at: string | null; card_id: string | null }
+        /** No client write policy — subscribe_plan, set_plan_card. */
         Insert: never
         Update: never
         Relationships: []
@@ -1030,6 +1049,13 @@ export type Database = {
           refund_note: string | null
           refunded_by: string | null
           refunded_at: string | null
+          purpose: PaymentPurpose
+          /** What to do once paid: the cart for a checkout, the plan for a plan. */
+          payload: Json
+          /** The orders placed or plan changed after payment, or { error } when that could not be done. */
+          outcome: Json | null
+          card_id: string | null
+          for_renews_at: string | null
         }
         /** Created by the paystack-initialize Edge Function. */
         Insert: never
@@ -1043,6 +1069,10 @@ export type Database = {
           account_number: string
           account_name: string
           updated_at: string
+          /** Set only by the payout-account Edge Function, once the bank has confirmed the account. */
+          bank_code: string | null
+          recipient_code: string | null
+          verified_at: string | null
         }
         Insert: {
           profile_id: string
@@ -1071,6 +1101,24 @@ export type Database = {
         Update: never
         Relationships: [Rel<'favourites_provider_id_fkey', 'provider_id', 'provider_profiles'>]
       }
+      identity_checks: {
+        /** One answer from the national register (through Dojah) about an ID or business submission. */
+        Row: {
+          id: string; profile_id: string; subject_type: 'verification' | 'business_verification'; subject_id: string
+          kind: 'nin' | 'bvn' | 'cac' | 'face' | 'sim'; provider: string; outcome: 'match' | 'mismatch' | 'not_found' | 'error'
+          confidence: number | null; detail: Json; created_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      payment_cards: {
+        /** The code that charges the card never reaches the client. */
+        Row: { id: string; profile_id: string; brand: string | null; last4: string; exp_month: number | null; exp_year: number | null; bank: string | null; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       withdrawals: {
         Row: {
           id: string
@@ -1084,6 +1132,13 @@ export type Database = {
           processed_by: string | null
           processed_at: string | null
           created_at: string
+          /** Automatic payouts: queued for Paystack, sent by it, or failed and back with staff. */
+          recipient_code: string | null
+          transfer_reference: string | null
+          transfer_status: 'queued' | 'sent' | 'failed' | null
+          transfer_code: string | null
+          failure_reason: string | null
+          transfer_requested_at: string | null
         }
         /** request_withdrawal / admin_process_withdrawal. */
         Insert: never
@@ -1129,7 +1184,7 @@ export type Database = {
       record_post_view: { Args: { p_post_id: string }; Returns: undefined }
       toggle_post_like: { Args: { p_post_id: string }; Returns: Json }
       social_feed: { Args: { p_kind: 'story' | 'reel' | null; p_author_id: string | null }; Returns: Json }
-      schedule_stream: { Args: { p_title: string; p_playback_url: string; p_scheduled_for: string | null; p_product_ids: string[] }; Returns: string }
+      schedule_stream: { Args: { p_title: string; p_playback_url: string | null; p_scheduled_for: string | null; p_product_ids: string[]; p_video?: 'link' | 'livekit' }; Returns: string }
       update_stream: { Args: { p_stream_id: string; p_action: 'start' | 'end' | 'pin'; p_product_id: string | null }; Returns: undefined }
       send_stream_message: { Args: { p_stream_id: string; p_body: string }; Returns: string }
       remove_stream_message: { Args: { p_message_id: string }; Returns: undefined }
@@ -1164,6 +1219,15 @@ export type Database = {
       hold_purchase_order: { Args: { p_po_id: string; p_reason: string }; Returns: undefined }
       admin_resolve_purchase_order: { Args: { p_po_id: string; p_outcome: 'release' | 'refund'; p_note: string }; Returns: undefined }
       procurement_summary: { Args: { p_organization_id: string | null }; Returns: Json }
+      remove_payment_card: { Args: { p_card_id: string }; Returns: undefined }
+      set_plan_card: { Args: { p_card_id: string | null }; Returns: undefined }
+      payout_policy: { Args: Record<never, never>; Returns: Json }
+      admin_set_payout_policy: { Args: { p_enabled: boolean; p_max: number }; Returns: undefined }
+      admin_retry_payout: { Args: { p_withdrawal_id: string }; Returns: undefined }
+      admin_requeue_payout: { Args: { p_withdrawal_id: string; p_note: string }; Returns: undefined }
+      save_stock_item: { Args: { p_item_id: string | null; p_organization_id: string | null; p_name: string; p_unit: string; p_reorder_level: number | null }; Returns: string }
+      record_stock: { Args: { p_item_id: string; p_reason: 'used' | 'counted'; p_quantity: number; p_note: string | null }; Returns: undefined }
+      receive_purchase_order_stock: { Args: { p_po_id: string; p_lines: Json }; Returns: number }
       nearby_classifieds: { Args: { p_lat: number; p_lng: number; p_radius_km: number; p_category: string | null }; Returns: Json }
       propose_meetup: { Args: { p_classified_id: string; p_place: string; p_meet_at: string }; Returns: string }
       update_meetup: { Args: { p_meetup_id: string; p_action: 'confirm' | 'complete' | 'cancel' }; Returns: undefined }
@@ -1479,6 +1543,10 @@ export type TrustedContact = Tables<'trusted_contacts'>
 export type SosAlert = Tables<'sos_alerts'>
 export type Organization = Tables<'organizations'>
 export type PurchaseOrder = Tables<'purchase_orders'>
+export type StockItem = Tables<'stock_items'>
+export type PaymentCard = Tables<'payment_cards'>
+export type IdentityCheck = Tables<'identity_checks'>
+export type StockMovement = Tables<'stock_movements'>
 export type Invoice = Tables<'invoices'>
 export type RfqItem = Tables<'rfq_items'>
 export type Certificate = Tables<'certificates'>

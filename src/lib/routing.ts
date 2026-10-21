@@ -1,4 +1,5 @@
 import { distanceKm, type Point } from './distance'
+import { bestOrder, MAX_EXACT_STOPS } from '../../supabase/functions/_shared/routeSolver.ts'
 
 /**
  * A stop on a rider's round: collecting an order or handing it over. An
@@ -17,62 +18,16 @@ export function routeKm(start: Point, stops: Stop[]): number {
   return total
 }
 
-/** An order is only valid if every parcel is collected before it is delivered. */
-function collectsFirst(stops: Stop[]): boolean {
-  const collected = new Set<string>()
-  const needsPickup = new Set(stops.filter((s) => s.kind === 'pickup').map((s) => s.deliveryId))
-  for (const stop of stops) {
-    if (stop.kind === 'pickup') collected.add(stop.deliveryId)
-    else if (needsPickup.has(stop.deliveryId) && !collected.has(stop.deliveryId)) return false
-  }
-  return true
-}
-
 /**
- * The order to visit stops in. Starts with the nearest stop that can be done
- * next, then keeps swapping pairs while that shortens the round. With the
- * handful of orders a rider carries this finds the best order or very close
- * to it. Distances are straight lines: it does not know about one-way
- * streets, bridges or traffic.
+ * The order to visit stops in: the shortest round from where the rider is,
+ * with each order collected before it is delivered. Exact (see
+ * routeSolver.ts), on straight-line distances; the route-plan Edge Function
+ * does the same on road travel times in current traffic when a maps key is
+ * set.
  */
 export function planStops(start: Point, stops: Stop[]): Stop[] {
-  const remaining = [...stops]
-  const collected = new Set<string>()
-  const needsPickup = new Set(stops.filter((s) => s.kind === 'pickup').map((s) => s.deliveryId))
-  const order: Stop[] = []
-  let at: Point = start
-  while (remaining.length > 0) {
-    let best = -1
-    let bestKm = Infinity
-    remaining.forEach((stop, i) => {
-      const ready = stop.kind === 'pickup' || !needsPickup.has(stop.deliveryId) || collected.has(stop.deliveryId)
-      const km = distanceKm(at, stop)
-      if (ready && km < bestKm) {
-        best = i
-        bestKm = km
-      }
-    })
-    const [next] = remaining.splice(best, 1)
-    if (next.kind === 'pickup') collected.add(next.deliveryId)
-    order.push(next)
-    at = next
-  }
-
-  let improved = true
-  while (improved) {
-    improved = false
-    for (let i = 0; i < order.length - 1; i++) {
-      for (let j = i + 1; j < order.length; j++) {
-        const swapped = [...order]
-        ;[swapped[i], swapped[j]] = [swapped[j], swapped[i]]
-        if (collectsFirst(swapped) && routeKm(start, swapped) < routeKm(start, order) - 1e-9) {
-          order.splice(0, order.length, ...swapped)
-          improved = true
-        }
-      }
-    }
-  }
-  return order
+  const order = bestOrder(stops.slice(0, MAX_EXACT_STOPS), (from, to) => distanceKm(from === -1 ? start : stops[from], stops[to]))
+  return [...order.map((i) => stops[i]), ...stops.slice(MAX_EXACT_STOPS)]
 }
 
 /** Turn-by-turn directions in Google Maps for the planned round. Needs no API key: it is an ordinary link. */

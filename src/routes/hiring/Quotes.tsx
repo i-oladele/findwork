@@ -6,18 +6,20 @@ import { Badge } from '../../components/ui/Badge'
 import { QueryState } from '../../components/system/QueryState'
 import { useMyJobs } from '../../lib/api'
 import { agoPhrase, formatNaira } from '../../lib/format'
+import { useT } from '../../lib/i18n'
 
 /** The jobs the signed-in user has posted, and how many quotes each has. */
 export function Quotes() {
+  const t = useT()
   const jobs = useMyJobs()
 
   return (
     <Screen>
       <PageHeader
-        title="My posted jobs"
+        title={t('My posted jobs')}
         back="/home"
         right={
-          <Link to="/post-job" aria-label="Post a job" className="inline-flex items-center justify-center w-11 h-11 bg-brand rounded-xl text-white">
+          <Link to="/post-job" aria-label={t('Post a job')} className="inline-flex items-center justify-center w-11 h-11 bg-brand rounded-xl text-white">
             <i className="ph-bold ph-plus text-xl" />
           </Link>
         }
@@ -25,14 +27,14 @@ export function Quotes() {
       <div className="px-[22px] pb-6">
         <QueryState
           query={jobs}
-          errorMessage="We could not load your jobs."
+          errorMessage={t('We could not load your jobs.')}
           empty={{
             icon: 'ph-note-pencil',
             title: 'No jobs posted',
             body: 'Post what you need and providers will send you quotes.',
             action: (
               <Link to="/post-job" className="text-[15px] font-semibold text-brand-hover">
-                Post a job
+                {t('Post a job')}
               </Link>
             ),
           }}
@@ -47,7 +49,7 @@ export function Quotes() {
                       {job.quote_count > 0 ? `${job.quote_count} quote${job.quote_count === 1 ? '' : 's'}` : 'Waiting'}
                     </Badge>
                   ) : (
-                    <Badge tone="neutral">Closed</Badge>
+                    <Badge tone="neutral">{t('Closed')}</Badge>
                   )}
                 </div>
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-line-soft text-[13.5px] text-muted-2">

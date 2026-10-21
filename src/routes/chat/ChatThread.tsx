@@ -21,6 +21,7 @@ import {
 import { useThreadContext } from '../../lib/api/matching'
 import { formatDate, formatTime } from '../../lib/format'
 import type { ChatMessage } from '../../lib/database.types'
+import { useT } from '../../lib/i18n'
 
 /** Groups consecutive messages by Lagos calendar day, for the date dividers. */
 function byDay(messages: ChatMessage[]) {
@@ -35,6 +36,7 @@ function byDay(messages: ChatMessage[]) {
 }
 
 export function ChatThread() {
+  const t = useT()
   const { id: threadId } = useParams<{ id: string }>()
   const { user } = useAuth()
   const { data: partner } = useThreadPartner(threadId)
@@ -78,7 +80,7 @@ export function ChatThread() {
           {partnerAsProvider && (
             <Link
               to={`/provider/${partnerAsProvider.id}`}
-              aria-label="View profile"
+              aria-label={t('View profile')}
               className="inline-flex items-center justify-center w-11 h-11 text-cream"
             >
               <i className="ph ph-user-circle text-[22px]" />
@@ -115,14 +117,14 @@ export function ChatThread() {
         <div className="flex items-center gap-2.5 bg-success-bg rounded-xl px-3.5 py-[11px] mb-4">
           <i className="ph-fill ph-shield-check text-lg text-success-text" />
           <p className="m-0 text-[12.5px] leading-[1.4] text-success-text">
-            Keep payments inside FindWork. Escrow cannot protect cash or direct transfers.
+            {t('Keep payments inside FindWork. Escrow cannot protect cash or direct transfers.')}
           </p>
         </div>
 
         {messages.isLoading && <ListSkeleton rows={3} />}
         {messages.isError && <ErrorState message="We could not load this conversation." onRetry={() => messages.refetch()} />}
         {messages.data?.length === 0 && (
-          <p className="text-center text-[14px] text-muted py-8">Say hello — ask about availability, price or directions.</p>
+          <p className="text-center text-[14px] text-muted py-8">{t('Say hello — ask about availability, price or directions.')}</p>
         )}
         {messages.hasNextPage && (
           <button
@@ -159,7 +161,7 @@ export function ChatThread() {
                     <div className={`flex items-center gap-2 font-mono text-[10px] mt-1.5 ${mine ? 'justify-end text-muted-2' : 'text-muted'}`}>
                       {formatTime(m.created_at)}
                       {!mine && (
-                        <button onClick={() => setReporting(reporting === m.id ? null : m.id)} aria-label="Report message">
+                        <button onClick={() => setReporting(reporting === m.id ? null : m.id)} aria-label={t('Report message')}>
                           <i className="ph ph-flag text-[11px]" />
                         </button>
                       )}
@@ -170,7 +172,7 @@ export function ChatThread() {
             })}
           </div>
         ))}
-        {reporting && <ReportButton targetType="message" targetId={reporting} label="Report this message" className="mb-3" />}
+        {reporting && <ReportButton targetType="message" targetId={reporting} label={t('Report this message')} className="mb-3" />}
         <div ref={bottom} />
       </div>
 

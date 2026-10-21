@@ -7,15 +7,16 @@ import { Alert } from '../../components/ui/Alert'
 import { useStartTopUp, useWalletSummary } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatNaira, parseNaira } from '../../lib/format'
+import { goToPaystack } from '../../lib/payRedirect'
+import { useT } from '../../lib/i18n'
 
 const PRESETS = [5000, 10000, 25000, 50000]
 const MIN = 100
 const MAX = 1_000_000
 
-/** Where TopUpReturn sends the user after paying, keyed by payment reference. */
-export const RETURN_KEY = 'findwork-topup-return'
 
 export function AddMoney() {
+  const t = useT()
   const [params] = useSearchParams()
   const suggested = Number(params.get('amount')) || 0
   const returnTo = params.get('return')
@@ -32,12 +33,7 @@ export function AddMoney() {
     setError(null)
     try {
       const { reference, authorization_url } = await start.mutateAsync(amount)
-      try {
-        sessionStorage.setItem(RETURN_KEY, JSON.stringify({ reference, returnTo }))
-      } catch {
-        // Without session storage the user still lands on their wallet.
-      }
-      window.location.assign(authorization_url)
+      goToPaystack(reference, authorization_url, returnTo)
     } catch (err) {
       setError(friendlyError(err))
     }
@@ -45,17 +41,17 @@ export function AddMoney() {
 
   return (
     <Screen>
-      <PageHeader title="Add money" back={returnTo ?? '/wallet'} icon="x" />
+      <PageHeader title={t('Add money')} back={returnTo ?? '/wallet'} icon="x" />
       <div className="px-[22px] pb-6">
         <div className="text-center mt-[26px]">
-          <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2">Amount</div>
+          <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2">{t('Amount')}</div>
           <div className="flex items-center justify-center mt-2.5 font-display font-bold text-[48px] tracking-[-0.03em] text-ink">
             <span>₦</span>
             <input
               value={raw ? Number(parseNaira(raw)).toLocaleString('en-NG') : ''}
               onChange={(e) => setRaw(e.target.value)}
               inputMode="numeric"
-              aria-label="Amount in naira"
+              aria-label={t('Amount in naira')}
               className="w-[220px] bg-transparent outline-none text-center"
             />
           </div>
@@ -79,10 +75,9 @@ export function AddMoney() {
         <div className="flex items-start gap-3 bg-white border border-line rounded-2xl p-4 mt-6">
           <i className="ph-fill ph-shield-check text-[22px] text-success" />
           <div>
-            <div className="text-[15px] font-semibold text-ink">Pay securely with Paystack</div>
+            <div className="text-[15px] font-semibold text-ink">{t('Pay securely with Paystack')}</div>
             <p className="text-[13.5px] leading-[1.5] text-muted mt-1">
-              Card, bank transfer or USSD. Your wallet is credited as soon as Paystack confirms the payment —
-              FindWork never sees your card details.
+              {t('Card, bank transfer or USSD. Your wallet is credited as soon as Paystack confirms the payment — FindWork never sees your card details.')}
             </p>
           </div>
         </div>

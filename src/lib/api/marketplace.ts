@@ -66,6 +66,7 @@ export function usePostJob() {
       description: string
       budget: number
       needed_by?: string
+      needed_on?: string | null
       category?: string | null
       area?: string | null
     }): Promise<string> => {

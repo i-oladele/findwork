@@ -6,9 +6,11 @@ import { Card } from '../../components/ui/Card'
 import { QueryState } from '../../components/system/QueryState'
 import { useDisputes, useMyBookings } from '../../lib/api'
 import { formatDateTime, formatNaira } from '../../lib/format'
+import { useT } from '../../lib/i18n'
 
 /** Every booking with the customer's money on hold, and what happens next for each. */
 export function Escrow() {
+  const t = useT()
   const bookings = useMyBookings()
   const { data: disputes } = useDisputes()
   const held = bookings.data?.filter((b) => (b.status === 'pending' || b.status === 'active') && b.escrow_held > 0)
@@ -17,22 +19,21 @@ export function Escrow() {
 
   return (
     <Screen>
-      <PageHeader title="Escrow" back="/wallet" />
+      <PageHeader title={t('Escrow')} back="/wallet" />
       <div className="px-[22px] pb-8">
         <div className="bg-ink rounded-2xl p-[22px] mt-4">
           <Badge tone="danger" icon="lock-simple">
-            Held
+            {t('Held')}
           </Badge>
           <div className="font-display font-bold text-[40px] tracking-[-0.03em] text-cream mt-4">{formatNaira(total)}</div>
           <p className="mt-2 text-[14.5px] leading-[1.5] text-muted-3">
-            Money you paid for bookings sits here until you confirm the job is done. If a provider declines or you
-            cancel before the start time, it comes back to your wallet.
+            {t('Money you paid for bookings sits here until you confirm the job is done. If a provider declines or you cancel before the start time, it comes back to your wallet.')}
           </p>
         </div>
 
         <QueryState
           query={{ ...bookings, data: held }}
-          errorMessage="We could not load your bookings."
+          errorMessage={t('We could not load your bookings.')}
           empty={{ icon: 'ph-lock-simple-open', title: 'Nothing held right now' }}
         >
           {(list) =>
@@ -47,11 +48,11 @@ export function Escrow() {
                 </div>
                 <div className="mt-2.5">
                   {disputed.has(b.id) ? (
-                    <Badge tone="danger" icon="scales">On hold — dispute open</Badge>
+                    <Badge tone="danger" icon="scales">{t('On hold — dispute open')}</Badge>
                   ) : b.status === 'pending' ? (
-                    <Badge tone="warning" icon="clock">Waiting for the provider to accept</Badge>
+                    <Badge tone="warning" icon="clock">{t('Waiting for the provider to accept')}</Badge>
                   ) : (
-                    <Badge tone="success" icon="check-circle">Accepted — release when the job is done</Badge>
+                    <Badge tone="success" icon="check-circle">{t('Accepted — release when the job is done')}</Badge>
                   )}
                 </div>
               </Card>
@@ -64,7 +65,7 @@ export function Escrow() {
           <p className="text-[13.5px] leading-[1.5] text-text-soft">
             Release and cancel from{' '}
             <Link to="/bookings" className="font-semibold text-brand-hover">
-              Bookings
+              {t('Bookings')}
             </Link>
             . If something went wrong, report a problem there and our team will hold the money until it is settled.
           </p>

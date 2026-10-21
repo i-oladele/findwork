@@ -16,8 +16,10 @@ import { useAuth } from '../../lib/authContext'
 import { useCertificates, useProfile, useProvider, useProviderPackages, useProviderReviews, usePortfolio } from '../../lib/api'
 import { formatDate, formatNaira } from '../../lib/format'
 import { describeDistance, distanceBetween } from '../../lib/distance'
+import { useT } from '../../lib/i18n'
 
 export function ProviderProfile() {
+  const t = useT()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -48,7 +50,7 @@ export function ProviderProfile() {
           {provider.isError ? (
             <ErrorState message="We could not load this provider." onRetry={() => provider.refetch()} />
           ) : (
-            <EmptyState icon="ph-user-circle-minus" title="Provider not found" body="They may have closed their account." />
+            <EmptyState icon="ph-user-circle-minus" title={t('Provider not found')} body={t('They may have closed their account.')} />
           )}
         </div>
       </Screen>
@@ -89,7 +91,7 @@ export function ProviderProfile() {
           <div className="pb-1.5 min-w-0">
             <div className="font-display font-bold text-[22px] tracking-[-0.02em] text-ink truncate">{p.business_name}</div>
             <div className="text-[13.5px] text-muted mt-0.5">
-              {p.category} · {p.area ?? p.location}
+              {t(p.category)} · {p.area ?? p.location}
               {describeDistance(distance) && ` · ${describeDistance(distance)}`}
             </div>
           </div>
@@ -98,18 +100,18 @@ export function ProviderProfile() {
         <div className="flex flex-wrap gap-2 mt-3.5">
           {p.verified ? (
             <Badge tone="success" icon="shield-check">
-              Verified
+              {t('Verified')}
             </Badge>
           ) : (
-            <Badge tone="neutral">Not yet verified</Badge>
+            <Badge tone="neutral">{t('Not yet verified')}</Badge>
           )}
           <Badge tone={p.trust_score >= 60 ? 'success' : 'neutral'}>Trust {p.trust_score}</Badge>
           {p.plan !== 'free' && (
             <Badge tone="warning" icon="medal">
-              Pro
+              {t('Pro')}
             </Badge>
           )}
-          {!p.taking_bookings && <Badge tone="danger">Not taking bookings</Badge>}
+          {!p.taking_bookings && <Badge tone="danger">{t('Not taking bookings')}</Badge>}
         </div>
 
         <div className="flex bg-white border border-line rounded-2xl mt-4">
@@ -121,11 +123,11 @@ export function ProviderProfile() {
           </div>
           <div className="flex-1 p-3.5 text-center border-r border-line-soft">
             <div className="font-display font-bold text-[18px] text-ink">{p.jobs_done}</div>
-            <div className="text-[11.5px] text-muted-2 mt-0.5">jobs done</div>
+            <div className="text-[11.5px] text-muted-2 mt-0.5">{t('jobs done')}</div>
           </div>
           <div className="flex-1 p-3.5 text-center">
             <div className="font-display font-bold text-[18px] text-ink">{formatDate(p.created_at).split(' ').slice(1).join(' ')}</div>
-            <div className="text-[11.5px] text-muted-2 mt-0.5">on FindWork since</div>
+            <div className="text-[11.5px] text-muted-2 mt-0.5">{t('on FindWork since')}</div>
           </div>
         </div>
 
@@ -133,7 +135,7 @@ export function ProviderProfile() {
 
         {p.photo_urls.length > 0 && (
           <>
-            <SectionLabel className="mt-5 mb-2.5">Their work</SectionLabel>
+            <SectionLabel className="mt-5 mb-2.5">{t('Their work')}</SectionLabel>
             <div className="flex gap-2.5 overflow-x-auto -mx-[22px] px-[22px] pb-1">
               {p.photo_urls.map((url) => (
                 <img
@@ -150,7 +152,7 @@ export function ProviderProfile() {
 
         {(certificates?.length ?? 0) > 0 && (
           <>
-            <SectionLabel className="mt-5 mb-2.5">FindWork certificates</SectionLabel>
+            <SectionLabel className="mt-5 mb-2.5">{t('FindWork certificates')}</SectionLabel>
             <div className="flex flex-wrap gap-2">
               {certificates!.map((c) => (
                 <Link key={c.id} to={`/certificate/${c.code}`} className="inline-flex items-center gap-1.5 rounded-full bg-success-bg text-success-text px-3 py-1.5 text-[13px] font-semibold">
@@ -161,18 +163,18 @@ export function ProviderProfile() {
           </>
         )}
 
-        <QueryState query={portfolio} errorMessage="We could not load this portfolio." skeletonRows={1}>
+        <QueryState query={portfolio} errorMessage={t('We could not load this portfolio.')} skeletonRows={1}>
           {(items) => items.length > 0 && <>
-            <SectionLabel className="mt-5 mb-2.5">Portfolio & credentials</SectionLabel>
+            <SectionLabel className="mt-5 mb-2.5">{t('Portfolio & credentials')}</SectionLabel>
             <div className="space-y-3">{items.map((item) => <article key={item.id} className="bg-white border border-line rounded-2xl p-4"><PortfolioAsset item={item} /></article>)}</div>
           </>}
         </QueryState>
 
-        <SectionLabel className="mt-5 mb-2.5">Services</SectionLabel>
+        <SectionLabel className="mt-5 mb-2.5">{t('Services')}</SectionLabel>
         {livePackages.length === 0 ? (
           <div className="bg-white border border-line rounded-2xl p-4">
             <div className="flex items-baseline justify-between">
-              <span className="font-display font-semibold text-[16.5px] text-ink">{p.category} service</span>
+              <span className="font-display font-semibold text-[16.5px] text-ink">{t('{category} service', { category: t(p.category) })}</span>
               <span className="font-display font-bold text-[17px] text-ink">{formatNaira(p.price)}</span>
             </div>
             <div className="text-[13.5px] text-muted mt-1.5">Per {p.price_unit}</div>
@@ -196,9 +198,9 @@ export function ProviderProfile() {
           ))
         )}
 
-        <SectionLabel className="mt-6 mb-2.5">Reviews</SectionLabel>
+        <SectionLabel className="mt-6 mb-2.5">{t('Reviews')}</SectionLabel>
         {!reviews?.length ? (
-          <p className="text-[14px] text-muted">No reviews yet. Reviews come only from customers who booked and paid.</p>
+          <p className="text-[14px] text-muted">{t('No reviews yet. Reviews come only from customers who booked and paid.')}</p>
         ) : (
           <div className="space-y-2.5">
             {reviews.map((r) => (
@@ -214,7 +216,7 @@ export function ProviderProfile() {
           </div>
         )}
 
-        {!isMine && <ReportButton targetType="profile" targetId={p.id} label="Report this provider" className="mt-6" />}
+        {!isMine && <ReportButton targetType="profile" targetId={p.id} label={t('Report this provider')} className="mt-6" />}
         <div className="h-20" />
       </div>
 
@@ -224,7 +226,7 @@ export function ProviderProfile() {
             to="/provider/services"
             className="flex-1 flex items-center justify-center h-14 border-[1.5px] border-ink rounded-xl font-semibold text-[17px] text-ink"
           >
-            This is you — manage services
+            {t('This is you — manage services')}
           </Link>
         ) : (
           <>

@@ -6,12 +6,14 @@ import { QueryState } from '../../components/system/QueryState'
 import { RequireProvider } from '../../components/system/RequireProvider'
 import { useMySentQuotes, useOpenJobs } from '../../lib/api'
 import { agoPhrase, formatNaira } from '../../lib/format'
+import { useT } from '../../lib/i18n'
 
 export function OpenJobs() {
   return <RequireProvider>{() => <JobList />}</RequireProvider>
 }
 
 function JobList() {
+  const t = useT()
   const jobs = useOpenJobs()
   const { data: recommended } = useRecommendedJobs()
   const fit = new Map((recommended ?? []).map((j) => [j.id, j]))
@@ -22,12 +24,12 @@ function JobList() {
     <Screen bottomNav="provider">
       <StatusBar />
       <div className="px-[22px] pt-2.5 pb-6">
-        <h2 className="font-display font-bold text-[28px] tracking-[-0.03em] text-ink">Open jobs</h2>
-        <p className="text-[13.5px] text-muted mt-1.5">Jobs customers have posted, the best fit for you first. Send a quote; if they accept, it is booked and paid into escrow.</p>
+        <h2 className="font-display font-bold text-[28px] tracking-[-0.03em] text-ink">{t('Open jobs')}</h2>
+        <p className="text-[13.5px] text-muted mt-1.5">{t('Jobs customers have posted, the best fit for you first. Send a quote; if they accept, it is booked and paid into escrow.')}</p>
 
         <QueryState
           query={jobs}
-          errorMessage="We could not load open jobs."
+          errorMessage={t('We could not load open jobs.')}
           empty={{ icon: 'ph-briefcase', title: 'No open jobs right now', body: 'New jobs appear here as customers post them.' }}
         >
           {(list) =>
@@ -40,7 +42,7 @@ function JobList() {
                 <p className="mt-2 text-sm leading-[1.5] text-muted line-clamp-3">{job.description}</p>
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   {fit.get(job.id)?.invited && (
-                    <span className="bg-success-bg text-success-text rounded-full px-2.5 py-1 text-[11.5px] font-bold">Invited to quote</span>
+                    <span className="bg-success-bg text-success-text rounded-full px-2.5 py-1 text-[11.5px] font-bold">{t('Invited to quote')}</span>
                   )}
                   {(fit.get(job.id)?.match.score ?? 0) >= 50 && (
                     <span className="bg-cream rounded-full px-2.5 py-1 text-[11.5px] font-semibold text-text-soft" title={explainMatch(fit.get(job.id)!.match)}>
@@ -67,7 +69,7 @@ function JobList() {
                       Quote sent
                     </span>
                   ) : (
-                    <span className="text-[15px] font-semibold text-brand-hover">Send a quote</span>
+                    <span className="text-[15px] font-semibold text-brand-hover">{t('Send a quote')}</span>
                   )}
                 </div>
               </Card>

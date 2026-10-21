@@ -10,6 +10,7 @@ import { PhoneInput } from '../../components/ui/PhoneInput'
 import { phoneUnavailable, useAuth, type AuthMethod } from '../../lib/authContext'
 import { friendlyError } from '../../lib/supabase'
 import { emptyPhone, isPhoneNumber, toE164, type PhoneValue } from '../../lib/phone'
+import { useT } from '../../lib/i18n'
 
 /**
  * Email accounts get a reset link. Phone accounts get a one-time code, which
@@ -17,6 +18,7 @@ import { emptyPhone, isPhoneNumber, toE164, type PhoneValue } from '../../lib/ph
  * new password.
  */
 export function ForgotPassword() {
+  const t = useT()
   const navigate = useNavigate()
   const { requestPasswordReset } = useAuth()
   const [method, setMethod] = useState<AuthMethod>('phone')
@@ -52,7 +54,7 @@ export function ForgotPassword() {
 
   return (
     <Screen>
-      <PageHeader title="Reset your password" back="/signin" />
+      <PageHeader title={t('Reset your password')} back="/signin" />
       <div className="px-6 pt-4">
         {sent ? (
           <Alert tone="success">
@@ -62,13 +64,13 @@ export function ForgotPassword() {
         ) : (
           <form onSubmit={submit} noValidate>
             <p className="text-[15.5px] leading-[1.55] text-muted">
-              Tell us how you signed up and we will help you back in.
+              {t('Tell us how you signed up and we will help you back in.')}
             </p>
             <MethodTabs value={method} onChange={setMethod} className="mt-5" />
             <div className="mt-5">
               {method === 'email' ? (
                 <Input
-                  label="Email address"
+                  label={t('Email address')}
                   value={email}
                   onChange={setEmail}
                   type="email"

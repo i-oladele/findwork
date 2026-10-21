@@ -17,12 +17,13 @@ import {
 import { friendlyError } from '../../lib/supabase'
 import { formatDateTime, formatNaira } from '../../lib/format'
 import type { BookingStatus } from '../../lib/database.types'
+import { msg, useT } from '../../lib/i18n'
 
 const TABS: { label: string; status: BookingStatus }[] = [
-  { label: 'New', status: 'pending' },
-  { label: 'Accepted', status: 'active' },
-  { label: 'Done', status: 'done' },
-  { label: 'Cancelled', status: 'cancelled' },
+  { label: msg('New'), status: 'pending' },
+  { label: msg('Accepted'), status: 'active' },
+  { label: msg('Done'), status: 'done' },
+  { label: msg('Cancelled'), status: 'cancelled' },
 ]
 
 export function Requests() {
@@ -30,6 +31,7 @@ export function Requests() {
 }
 
 function RequestList() {
+  const t = useT()
   const [tab, setTab] = useState<BookingStatus>('pending')
   const bookings = useIncomingBookings()
   const newCount = bookings.data?.filter((b) => b.status === 'pending').length ?? 0
@@ -39,18 +41,18 @@ function RequestList() {
     <Screen bottomNav="provider">
       <StatusBar />
       <div className="px-[22px] pt-2.5 pb-6">
-        <h2 className="font-display font-bold text-[28px] tracking-[-0.03em] text-ink">Bookings</h2>
+        <h2 className="font-display font-bold text-[28px] tracking-[-0.03em] text-ink">{t('Bookings')}</h2>
         <div className="flex gap-1 bg-line-soft rounded-lg p-1 mt-3.5">
-          {TABS.map((t) => (
+          {TABS.map((option) => (
             <button
-              key={t.status}
-              onClick={() => setTab(t.status)}
+              key={option.status}
+              onClick={() => setTab(option.status)}
               className={`flex-1 flex items-center justify-center gap-1.5 h-10 rounded-md text-[13.5px] ${
-                tab === t.status ? 'bg-white font-semibold text-ink' : 'font-medium text-muted'
+                tab === option.status ? 'bg-white font-semibold text-ink' : 'font-medium text-muted'
               }`}
             >
-              {t.label}
-              {t.status === 'pending' && newCount > 0 && (
+              {t(option.label)}
+              {option.status === 'pending' && newCount > 0 && (
                 <span className="min-w-[19px] h-[19px] rounded-full bg-brand text-white font-mono text-[10.5px] flex items-center justify-center">
                   {newCount}
                 </span>
@@ -61,7 +63,7 @@ function RequestList() {
 
         <QueryState
           query={{ ...bookings, data: tab === 'done' || tab === 'cancelled' ? list?.slice().reverse() : list }}
-          errorMessage="We could not load your bookings."
+          errorMessage={t('We could not load your bookings.')}
           empty={{
             icon: 'ph-calendar-blank',
             title: tab === 'pending' ? 'No new requests' : 'Nothing here',
@@ -83,6 +85,7 @@ function RequestList() {
 
 /** One booking from the provider's side, with whatever they can do next. */
 export function RequestCard({ booking: b, highlighted }: { booking: BookingWithCustomer; highlighted?: boolean }) {
+  const t = useT()
   const respond = useRespondToBooking()
   const cancel = useCancelBooking()
   const [error, setError] = useState<string | null>(null)
@@ -137,18 +140,18 @@ export function RequestCard({ booking: b, highlighted }: { booking: BookingWithC
             disabled={respond.isPending}
             className="flex-1 flex items-center justify-center h-12 bg-success text-white rounded-lg text-[15px] font-semibold disabled:opacity-50"
           >
-            Accept booking
+            {t('Accept booking')}
           </button>
         ) : (
           <span className="flex-1 flex items-center">
-            {b.status === 'active' && <Badge tone="success" icon="check-circle">Accepted — customer releases payment when done</Badge>}
-            {b.status === 'done' && <Badge tone="success" icon="check-circle">Paid</Badge>}
-            {b.status === 'cancelled' && <Badge tone="neutral">Cancelled · customer refunded</Badge>}
+            {b.status === 'active' && <Badge tone="success" icon="check-circle">{t('Accepted — customer releases payment when done')}</Badge>}
+            {b.status === 'done' && <Badge tone="success" icon="check-circle">{t('Paid')}</Badge>}
+            {b.status === 'cancelled' && <Badge tone="neutral">{t('Cancelled · customer refunded')}</Badge>}
           </span>
         )}
         <Link
           to={`/chat/with/${b.customer_id}`}
-          aria-label="Message customer"
+          aria-label={t('Message customer')}
           className="flex-none flex items-center justify-center w-12 h-12 border border-line rounded-lg text-ink"
         >
           <i className="ph ph-chat-circle-dots text-lg" />
@@ -166,7 +169,7 @@ export function RequestCard({ booking: b, highlighted }: { booking: BookingWithC
           disabled={respond.isPending}
           className="flex items-center justify-center w-full h-11 mt-1.5 text-[15px] font-semibold text-muted"
         >
-          Decline
+          {t('Decline')}
         </button>
       )}
       {b.status === 'active' && (
@@ -178,13 +181,13 @@ export function RequestCard({ booking: b, highlighted }: { booking: BookingWithC
               }
               className="text-[14px] font-semibold text-muted"
             >
-              Cancel booking
+              {t('Cancel booking')}
             </button>
           ) : (
             <span />
           )}
           <Link to={`/disputes/new/booking/${b.id}`} className="text-[14px] font-semibold text-brand-hover">
-            Report a problem
+            {t('Report a problem')}
           </Link>
         </div>
       )}

@@ -6,6 +6,7 @@
 export const keys = {
   addresses: { all: ['addresses'] as const },
   profile: {
+    all: ['profile'] as const,
     me: () => ['profile', 'me'] as const,
     byId: (id: string) => ['profile', id] as const,
   },
@@ -44,6 +45,8 @@ export const keys = {
     transactions: () => ['wallet', 'transactions'] as const,
     payoutAccount: () => ['wallet', 'payout-account'] as const,
     withdrawals: () => ['wallet', 'withdrawals'] as const,
+    banks: () => ['wallet', 'banks'] as const,
+    cards: () => ['wallet', 'cards'] as const,
   },
   commerce: {
     products: () => ['products'] as const,
@@ -57,10 +60,13 @@ export const keys = {
     order: (id: string) => ['orders', id] as const,
   },
   verification: {
+    all: ['verification'] as const,
     mine: () => ['verification', 'mine'] as const,
     business: () => ['verification', 'business'] as const,
+    checks: (subjectId: string) => ['verification', 'checks', subjectId] as const,
   },
   trust: {
+    all: ['trust'] as const,
     score: (id: string) => ['trust', id] as const,
     limits: () => ['trust', 'limits'] as const,
   },
@@ -161,6 +167,8 @@ export const keys = {
     order: (id: string) => ['procurement', 'order', id] as const,
     summary: (orgId: string | null) => ['procurement', 'summary', orgId] as const,
     held: () => ['procurement', 'held'] as const,
+    stock: (orgId: string | null) => ['procurement', 'stock', orgId] as const,
+    stockHistory: (itemId: string) => ['procurement', 'stock-history', itemId] as const,
   },
   social: {
     all: ['social'] as const,
@@ -169,6 +177,7 @@ export const keys = {
     stream: (id: string) => ['social', 'streams', id] as const,
     streamProducts: (id: string) => ['social', 'streams', id, 'products'] as const,
     streamMessages: (id: string) => ['social', 'streams', id, 'messages'] as const,
+    liveVideo: () => ['social', 'live-video'] as const,
   },
   security: {
     all: ['security'] as const,
@@ -185,6 +194,7 @@ export const keys = {
     disputes: () => ['admin', 'disputes'] as const,
     orders: () => ['admin', 'orders'] as const,
     withdrawals: () => ['admin', 'withdrawals'] as const,
+    payoutPolicy: () => ['admin', 'payout-policy'] as const,
     refunds: () => ['admin', 'refunds'] as const,
     verifications: () => ['admin', 'verifications'] as const,
     reports: () => ['admin', 'reports'] as const,

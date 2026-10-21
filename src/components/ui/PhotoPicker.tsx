@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Spinner } from '../system/States'
 import { useUpload, type UploadBucket } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
+import { useT } from '../../lib/i18n'
 
 /**
  * Pick photos from the camera or gallery and upload them straight away.
@@ -26,6 +27,7 @@ export function PhotoPicker({
   capture?: 'user' | 'environment'
   onUploadingChange?: (uploading: boolean) => void
 }) {
+  const t = useT()
   const input = useRef<HTMLInputElement>(null)
   // Private uploads have no public URL to show, so keep a local preview of
   // each file picked in this session, keyed by what the upload returned.
@@ -63,7 +65,7 @@ export function PhotoPicker({
           <img src={previews.current[v] ?? v} alt="" className="w-full h-full object-cover rounded-lg bg-line-soft" />
           <button
             type="button"
-            aria-label="Remove photo"
+            aria-label={t('Remove photo')}
             disabled={uploading}
             onClick={() => {
               if (previews.current[v]) { URL.revokeObjectURL(previews.current[v]); delete previews.current[v] }
@@ -80,7 +82,7 @@ export function PhotoPicker({
           type="button"
           onClick={() => input.current?.click()}
           disabled={uploading}
-          aria-label="Add photo"
+          aria-label={t('Add photo')}
           className="w-[74px] h-[74px] border-[1.5px] border-dashed border-muted-4 rounded-lg flex items-center justify-center text-muted-2"
         >
           {uploading ? <Spinner className="w-5 h-5" /> : <i className="ph ph-camera text-2xl" />}

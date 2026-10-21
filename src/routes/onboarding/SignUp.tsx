@@ -12,8 +12,10 @@ import { phoneUnavailable, useAuth, type AuthMethod } from '../../lib/authContex
 import { destination } from '../../lib/destination'
 import { friendlyError } from '../../lib/supabase'
 import { emptyPhone, isPhoneNumber, toE164, type PhoneValue } from '../../lib/phone'
+import { useT } from '../../lib/i18n'
 
 export function SignUp() {
+  const t = useT()
   const navigate = useNavigate()
   const { signUp } = useAuth()
 
@@ -81,7 +83,7 @@ export function SignUp() {
           <i className="ph-bold ph-arrow-left text-[22px]" />
         </Link>
         <h2 className="mt-3.5 font-display font-bold text-[34px] leading-[1.05] tracking-[-0.03em] text-ink">
-          Create your account
+          {t('Create your account')}
         </h2>
         <p className="mt-2.5 text-[15.5px] leading-[1.55] text-muted">
           It takes a minute. We will {method === 'phone' ? 'text' : 'email'} you a code to confirm it is you.
@@ -95,7 +97,7 @@ export function SignUp() {
               <PhoneInput value={phone} onChange={setPhone} />
             ) : (
               <Input
-                label="Email address"
+                label={t('Email address')}
                 value={email}
                 onChange={setEmail}
                 placeholder="you@example.com"
@@ -106,14 +108,14 @@ export function SignUp() {
             )}
             <div className="grid grid-cols-2 gap-3">
               <Input
-                label="First name"
+                label={t('First name')}
                 value={firstName}
                 onChange={setFirstName}
                 autoComplete="given-name"
                 autoCapitalize="words"
               />
               <Input
-                label="Last name"
+                label={t('Last name')}
                 value={lastName}
                 onChange={setLastName}
                 autoComplete="family-name"
@@ -121,7 +123,7 @@ export function SignUp() {
               />
             </div>
             <div>
-              <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mb-2">Password</div>
+              <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mb-2">{t('Password')}</div>
               <div className="flex items-center justify-between bg-white border-[1.5px] border-line rounded-lg h-[52px] px-3.5">
                 <input
                   value={password}
@@ -140,7 +142,7 @@ export function SignUp() {
                 </button>
               </div>
               <p className="mt-2 text-[13px] leading-[1.45] text-muted-2">
-                At least 8 characters, with one number.
+                {t('At least 8 characters, with one number.')}
               </p>
             </div>
           </div>
@@ -163,11 +165,11 @@ export function SignUp() {
         <p className="mt-3.5 text-center text-[13px] leading-[1.5] text-muted-2">
           By creating an account you agree to our{' '}
           <Link to="/legal/terms" className="underline">
-            Terms
+            {t('Terms')}
           </Link>{' '}
           and{' '}
           <Link to="/legal/privacy" className="underline">
-            Privacy Policy
+            {t('Privacy Policy')}
           </Link>
           .
         </p>
@@ -181,7 +183,7 @@ export function SignUp() {
             state={{ method, email: email.trim() || undefined, phone: phone.number.trim() ? phone : undefined }}
             className="text-brand-hover font-semibold"
           >
-            Sign in
+            {t('Sign in')}
           </Link>
         </p>
       </div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseCommand, parseRole } from '../voice'
-import { buildRequest, DESTINATIONS, InputError, readResult } from '../../../supabase/functions/assistant/prompts.ts'
+import { analyticsRange, buildRequest, DESTINATIONS, InputError, readResult } from '../../../supabase/functions/assistant/prompts.ts'
 
 describe('commands understood on the device', () => {
   it('opens the screen a plain request names', () => {
@@ -62,6 +62,23 @@ describe('what the assistant is asked', () => {
     expect(request.schema?.required).toEqual(['summary', 'agreed', 'contested', 'missing', 'questions'])
   })
 
+  it('answers staff only from the figures, keeping the question out of the instructions', () => {
+    const request = buildRequest('analytics', { question: 'Why did orders fall?', figures: '{"report":{"period":{"orders":12}}}', from: '2026-09-01', through: '2026-09-30' })
+    expect(request.system).toContain('Never invent a number')
+    expect(request.system).toContain('{"report":{"period":{"orders":12}}}')
+    expect(request.system).toContain('2026-09-01 to 2026-09-30')
+    expect(request.user).toBe('Why did orders fall?')
+    expect(request.schema?.required).toEqual(['answer', 'figures', 'caveats'])
+  })
+
+  it('reads a staff report range as Lagos dates, and refuses a bad one', () => {
+    expect(analyticsRange('2026-09-01', '2026-09-30')).toEqual({ from: '2026-08-31T23:00:00.000Z', to: '2026-09-30T23:00:00.000Z' })
+    expect(analyticsRange('2026-09-30', '2026-09-01')).toBeNull()
+    expect(analyticsRange('2026-02-30', '2026-03-01')).toBeNull()
+    expect(analyticsRange('2025-01-01', '2026-09-01')).toBeNull()
+    expect(analyticsRange("2026-09-01'; drop", '2026-09-02')).toBeNull()
+  })
+
   it('falls back to English for a language it does not offer', () => {
     expect(buildRequest('command', { text: 'open wallet', language: 'fr' }).user).toContain('Reply language: English')
   })
@@ -77,6 +94,11 @@ describe('reading the assistant\'s answer', () => {
   it('keeps a search query only for a search', () => {
     expect(readResult('command', '{"route":"/search","query":"plumber","reply":"Looking."}').query).toBe('plumber')
     expect(readResult('command', '{"route":"/wallet","query":"plumber","reply":"ok"}').query).toBe('')
+  })
+
+  it('reads the analyst\'s answer, dropping anything malformed', () => {
+    expect(readResult('analytics', '{"answer":"Orders fell on Sunday.","figures":["28 Sep: 3 orders",7],"caveats":"none"}'))
+      .toEqual({ answer: 'Orders fell on Sunday.', figures: ['28 Sep: 3 orders'], caveats: [] })
   })
 
   it('tolerates a summary with missing or malformed parts', () => {

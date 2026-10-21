@@ -17,12 +17,14 @@ import {
 import { formatDateTime, formatNaira } from '../../lib/format'
 import type { ProviderProfile } from '../../lib/database.types'
 import { RequestCard } from './Requests'
+import { useT } from '../../lib/i18n'
 
 export function ProviderDashboard() {
   return <RequireProvider>{(p) => <Dashboard provider={p} />}</RequireProvider>
 }
 
 function Dashboard({ provider }: { provider: ProviderProfile }) {
+  const t = useT()
   const { data: bookings } = useIncomingBookings()
   const { data: wallet } = useWalletSummary()
   const { data: ledger } = useTransactions()
@@ -36,8 +38,8 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
   const upcoming = (bookings ?? []).filter((b) => b.status === 'active')
   const weekAgo = Date.now() - 7 * 86_400_000
   const earnedThisWeek = (ledger ?? [])
-    .filter((t) => (t.kind === 'release' || t.kind === 'fee') && new Date(t.created_at).getTime() >= weekAgo)
-    .reduce((s, t) => s + t.balance_delta, 0)
+    .filter((tx) => (tx.kind === 'release' || tx.kind === 'fee') && new Date(tx.created_at).getTime() >= weekAgo)
+    .reduce((s, tx) => s + tx.balance_delta, 0)
   const liveCount = (packages ?? []).filter((p) => p.status === 'live').length
   const productsLive = (products ?? []).filter((p) => p.status === 'live').length
   const toSend = (sellerOrders ?? []).filter((o) => o.status === 'placed').length
@@ -48,7 +50,7 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
         <StatusBar tone="light" />
         <div className="flex items-center justify-between mt-1.5">
           <div className="min-w-0">
-            <div className="text-[13.5px] text-muted-3">Selling as</div>
+            <div className="text-[13.5px] text-muted-3">{t('Selling as')}</div>
             <Link to="/work-profile" className="font-display font-bold text-[19px] text-cream mt-0.5 block truncate">
               {provider.business_name}
             </Link>
@@ -61,7 +63,7 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
               <span className={`w-2 h-2 rounded-full ${provider.taking_bookings ? 'bg-success' : 'bg-muted-2'}`} />
               {provider.taking_bookings ? 'Open' : 'Closed'}
             </Link>
-            <Link to="/notifications" aria-label="Notifications" className="relative inline-flex items-center justify-center w-11 h-11 text-cream">
+            <Link to="/notifications" aria-label={t('Notifications')} className="relative inline-flex items-center justify-center w-11 h-11 text-cream">
               <i className="ph ph-bell text-[22px]" />
               {unread > 0 && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-brand" />}
             </Link>
@@ -79,12 +81,12 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
       <div className="px-[22px] pt-[18px] pb-6">
         <div className="flex gap-3">
           <Link to="/provider/earnings" className="flex-1 bg-white border border-line rounded-2xl p-[15px]">
-            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2">Last 7 days</div>
+            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2">{t('Last 7 days')}</div>
             <div className="font-display font-bold text-[22px] text-ink mt-1.5">{formatNaira(earnedThisWeek)}</div>
-            <div className="text-xs text-muted-2 mt-1.5">After fees</div>
+            <div className="text-xs text-muted-2 mt-1.5">{t('After fees')}</div>
           </Link>
           <Link to="/provider/requests" className="flex-1 bg-white border border-line rounded-2xl p-[15px]">
-            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2">To answer</div>
+            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-2">{t('To answer')}</div>
             <div className="font-display font-bold text-[22px] text-ink mt-1.5">{pending.length}</div>
             <div className={`text-xs mt-1.5 ${pending.length ? 'text-warning-text' : 'text-muted-2'}`}>
               {pending.length ? 'Booking requests' : 'All clear'}
@@ -96,7 +98,7 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
           <Link to="/get-verified" className="flex items-center gap-3 bg-warning-bg rounded-2xl p-4 mt-4">
             <i className="ph-fill ph-seal-check text-[22px] text-warning-text" />
             <span className="flex-1 text-[14px] leading-[1.45] text-warning-text">
-              Get verified — customers look for the badge.
+              {t('Get verified — customers look for the badge.')}
             </span>
             <i className="ph-bold ph-caret-right text-warning-text" />
           </Link>
@@ -105,7 +107,7 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
           <Link to="/provider/services/new" className="flex items-center gap-3 bg-white border-[1.5px] border-brand rounded-2xl p-4 mt-4">
             <i className="ph-fill ph-plus-circle text-[22px] text-brand" />
             <span className="flex-1 text-[14px] leading-[1.45] text-ink">
-              Add your first service so customers can book a fixed price.
+              {t('Add your first service so customers can book a fixed price.')}
             </span>
           </Link>
         )}
@@ -120,16 +122,16 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
           </Link>
         )}
 
-        <SectionLabel className="mt-[22px] mb-2.5">Needs you now</SectionLabel>
+        <SectionLabel className="mt-[22px] mb-2.5">{t('Needs you now')}</SectionLabel>
         {pending[0] ? (
           <RequestCard booking={pending[0]} highlighted />
         ) : (
-          <div className="bg-white border border-line rounded-2xl p-6 text-center text-sm text-muted">Nothing needs you right now.</div>
+          <div className="bg-white border border-line rounded-2xl p-6 text-center text-sm text-muted">{t('Nothing needs you right now.')}</div>
         )}
 
         {upcoming.length > 0 && (
           <>
-            <SectionLabel className="mt-[22px] mb-2.5">Coming up</SectionLabel>
+            <SectionLabel className="mt-[22px] mb-2.5">{t('Coming up')}</SectionLabel>
             <div className="bg-white border border-line rounded-2xl overflow-hidden">
               {upcoming.slice(0, 3).map((b, i, arr) => (
                 <Link
@@ -152,19 +154,19 @@ function Dashboard({ provider }: { provider: ProviderProfile }) {
           </>
         )}
 
-        <SectionLabel className="mt-[22px] mb-2.5">Shortcuts</SectionLabel>
+        <SectionLabel className="mt-[22px] mb-2.5">{t('Shortcuts')}</SectionLabel>
         <div className="grid grid-cols-2 gap-3">
-          <Shortcut to="/provider/jobs" icon="magnifying-glass" color="text-brand" label="Find jobs" detail={jobs ? `${jobs.length} open` : ' '} />
-          <Shortcut to="/provider/services" icon="list-checks" color="text-brand" label="My services" detail={`${liveCount} live`} />
-          <Shortcut to="/provider/portfolio" icon="images" color="text-brand" label="Portfolio" detail="Work & credentials" />
-          <Shortcut to="/provider/products" icon="storefront" color="text-brand" label="My products" detail={`${productsLive} in the shop`} />
-          <Shortcut to="/provider/orders" icon="package" color="text-success" label="Orders" detail={toSend ? `${toSend} to send` : 'Nothing to send'} />
-          <Shortcut to="/provider/coupons" icon="ticket" color="text-brand" label="Coupons" detail="Discount codes" />
-          <Shortcut to="/feed/new" icon="film-reel" color="text-brand" label="Stories & reels" detail="Show your work" />
-          <Shortcut to="/live/new" icon="broadcast" color="text-success" label="Go live" detail="Sell on a stream" />
-          <Shortcut to="/provider/availability" icon="calendar-dots" color="text-success" label="Availability" detail={provider.taking_bookings ? 'Taking bookings' : 'Paused'} />
-          <Shortcut to="/provider/earnings" icon="wallet" color="text-success" label="Payouts" detail={`${formatNaira(wallet?.balance ?? 0)} available`} />
-          <Shortcut to="/courses" icon="graduation-cap" color="text-success" label="Learn & certify" detail="Build your skills" />
+          <Shortcut to="/provider/jobs" icon="magnifying-glass" color="text-brand" label={t('Find jobs')} detail={jobs ? `${jobs.length} open` : ' '} />
+          <Shortcut to="/provider/services" icon="list-checks" color="text-brand" label={t('My services')} detail={`${liveCount} live`} />
+          <Shortcut to="/provider/portfolio" icon="images" color="text-brand" label={t('Portfolio')} detail="Work & credentials" />
+          <Shortcut to="/provider/products" icon="storefront" color="text-brand" label={t('My products')} detail={`${productsLive} in the shop`} />
+          <Shortcut to="/provider/orders" icon="package" color="text-success" label={t('Orders')} detail={toSend ? `${toSend} to send` : 'Nothing to send'} />
+          <Shortcut to="/provider/coupons" icon="ticket" color="text-brand" label={t('Coupons')} detail="Discount codes" />
+          <Shortcut to="/feed/new" icon="film-reel" color="text-brand" label={t('Stories & reels')} detail="Show your work" />
+          <Shortcut to="/live/new" icon="broadcast" color="text-success" label={t('Go live')} detail="Sell on a stream" />
+          <Shortcut to="/provider/availability" icon="calendar-dots" color="text-success" label={t('Availability')} detail={provider.taking_bookings ? 'Taking bookings' : 'Paused'} />
+          <Shortcut to="/provider/earnings" icon="wallet" color="text-success" label={t('Payouts')} detail={`${formatNaira(wallet?.balance ?? 0)} available`} />
+          <Shortcut to="/courses" icon="graduation-cap" color="text-success" label={t('Learn & certify')} detail="Build your skills" />
           <Shortcut to="/plans" icon="crown" color="text-brand" label={provider.plan === 'free' ? 'Upgrade plan' : 'Your plan'} detail="Lower fees" />
         </div>
       </div>

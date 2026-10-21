@@ -8,8 +8,10 @@ import { SlotPicker } from '../../components/ui/SlotPicker'
 import { ListSkeleton } from '../../components/system/States'
 import { useProvider, useProviderPackages } from '../../lib/api'
 import { formatDateTime, formatNaira } from '../../lib/format'
+import { useT } from '../../lib/i18n'
 
 export function PickTime() {
+  const t = useT()
   const { id } = useParams<{ id: string }>()
   const [params] = useSearchParams()
   const navigate = useNavigate()
@@ -39,7 +41,7 @@ export function PickTime() {
           </div>
         ) : (
           <>
-            <SectionLabel className="mt-[18px] mb-2.5">Service</SectionLabel>
+            <SectionLabel className="mt-[18px] mb-2.5">{t('Service')}</SectionLabel>
             {live.length > 1 ? (
               <div className="space-y-2">
                 {live.map((p) => (

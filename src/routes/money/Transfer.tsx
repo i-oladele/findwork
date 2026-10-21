@@ -10,11 +10,13 @@ import { TrustBadge } from '../../components/ui/TrustBadge'
 import { findTransferRecipient, useMyLimits, useTransferFunds, useWalletSummary, type TransferRecipient } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatNaira, parseNaira } from '../../lib/format'
+import { useT } from '../../lib/i18n'
 
 const MIN = 100
 
 /** Send money from your wallet to another FindWork account, found by its phone number or email. */
 export function Transfer() {
+  const t = useT()
   const { data: wallet } = useWalletSummary()
   const { data: limits } = useMyLimits()
   const send = useTransferFunds()
@@ -63,17 +65,17 @@ export function Transfer() {
 
   return (
     <Screen>
-      <PageHeader title="Send money" back="/wallet" />
+      <PageHeader title={t('Send money')} back="/wallet" />
       <div className="px-[22px] pb-8">
         <div className="bg-ink rounded-2xl p-[18px] mt-4">
-          <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2">Available</div>
+          <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2">{t('Available')}</div>
           <div className="font-display font-bold text-[34px] text-cream mt-1">{formatNaira(balance)}</div>
         </div>
 
         {sent && <Alert tone="success" className="mt-4">{formatNaira(sent.amount)} sent to {sent.name}.</Alert>}
 
-        <SectionLabel className="mt-5 mb-2">Who to</SectionLabel>
-        <Input value={contact} onChange={(v) => { setContact(v); setRecipient(null) }} placeholder="Phone number or email" icon="user" autoCapitalize="none" />
+        <SectionLabel className="mt-5 mb-2">{t('Who to')}</SectionLabel>
+        <Input value={contact} onChange={(v) => { setContact(v); setRecipient(null) }} placeholder={t('Phone number or email')} icon="user" autoCapitalize="none" />
         {recipient ? (
           <div className="flex items-center gap-3 bg-white border border-line rounded-2xl p-4 mt-3">
             <i className="ph-fill ph-check-circle text-2xl text-success" />
@@ -83,29 +85,29 @@ export function Transfer() {
             </div>
           </div>
         ) : (
-          <Button variant="secondary" className="mt-3 h-12 text-ink" onClick={find} disabled={contact.trim().length < 6} loading={searching}>Find account</Button>
+          <Button variant="secondary" className="mt-3 h-12 text-ink" onClick={find} disabled={contact.trim().length < 6} loading={searching}>{t('Find account')}</Button>
         )}
 
         {recipient && (
           <>
-            <SectionLabel className="mt-5 mb-2">Amount</SectionLabel>
+            <SectionLabel className="mt-5 mb-2">{t('Amount')}</SectionLabel>
             <div className="flex items-center gap-2 bg-white border-[1.5px] border-line rounded-lg h-[56px] px-4">
               <span className="font-display font-bold text-xl text-ink">₦</span>
-              <input value={raw} onChange={(e) => { setRaw(e.target.value); setAttempt(crypto.randomUUID()) }} inputMode="numeric" placeholder="5000" aria-label="Amount to send"
+              <input value={raw} onChange={(e) => { setRaw(e.target.value); setAttempt(crypto.randomUUID()) }} inputMode="numeric" placeholder="5000" aria-label={t('Amount to send')}
                 className="flex-1 min-w-0 bg-transparent outline-none font-display font-bold text-xl text-ink placeholder:text-muted-4" />
             </div>
-            <div className="mt-4"><Input label="Note (optional)" value={note} onChange={setNote} placeholder="What it is for" /></div>
+            <div className="mt-4"><Input label={t('Note (optional)')} value={note} onChange={setNote} placeholder={t('What it is for')} /></div>
             {limits && (
               <p className="mt-2 text-[13px] text-muted-2">
                 {limits.label}: up to {formatNaira(limits.daily_transfer)} a day, {formatNaira(left ?? 0)} left today.
-                {limits.tier < 3 && <> <Link to="/get-verified" className="font-semibold text-brand-hover">Raise your limit</Link></>}
+                {limits.tier < 3 && <> <Link to="/get-verified" className="font-semibold text-brand-hover">{t('Raise your limit')}</Link></>}
               </p>
             )}
             <p className="mt-2 text-[13px] leading-[1.45] text-muted-2">
-              A transfer is a gift between accounts: it is not held in escrow and FindWork cannot reverse it. Pay for work or goods through a booking or an order instead.
+              {t('A transfer is a gift between accounts: it is not held in escrow and FindWork cannot reverse it. Pay for work or goods through a booking or an order instead.')}
             </p>
-            {amount > balance && <Alert className="mt-4">That is more than your balance.</Alert>}
-            {left !== null && amount <= balance && amount > left && <Alert className="mt-4">That is more than you can send today.</Alert>}
+            {amount > balance && <Alert className="mt-4">{t('That is more than your balance.')}</Alert>}
+            {left !== null && amount <= balance && amount > left && <Alert className="mt-4">{t('That is more than you can send today.')}</Alert>}
           </>
         )}
         {error && <Alert className="mt-4">{error}</Alert>}
