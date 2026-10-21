@@ -1,10 +1,17 @@
 import { supabase } from './supabase'
 import { deviceLabel } from './device'
+import { isNativeApp } from './native'
+import { disableNativePush, enableNativePush, nativePushEnabled } from './nativePush'
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined
 
-/** Push needs a service worker, the Push API, and a key to subscribe with. iPhones need the app added to the Home Screen first. */
+/**
+ * In a browser, push needs a service worker, the Push API, and a key to
+ * subscribe with; iPhones need the site added to the Home Screen first. The
+ * iPhone and Android apps use the phone's own push instead (nativePush.ts).
+ */
 export function pushSupported(): boolean {
+  if (isNativeApp) return true
   return Boolean(VAPID_PUBLIC_KEY) && typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 }
 
@@ -25,15 +32,17 @@ async function registration() {
   return (await navigator.serviceWorker.getRegistration('/')) ?? (await navigator.serviceWorker.register('/sw.js', { scope: '/' }))
 }
 
-/** Whether this browser is currently subscribed. */
+/** Whether this browser, or this phone, currently gets pushes. */
 export async function pushEnabled(): Promise<boolean> {
+  if (isNativeApp) return nativePushEnabled()
   if (!pushSupported() || Notification.permission !== 'granted') return false
   const existing = await navigator.serviceWorker.getRegistration('/')
   return Boolean(await existing?.pushManager.getSubscription())
 }
 
-/** Asks permission, subscribes this browser and tells the server where to send. */
+/** Asks permission, subscribes this browser (or registers this phone) and tells the server where to send. */
 export async function enablePush(): Promise<void> {
+  if (isNativeApp) return enableNativePush()
   if (!pushSupported()) throw new Error('This browser cannot receive push notifications. On an iPhone, add FindWork to your Home Screen first.')
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') throw new Error('Notifications are blocked for FindWork. Allow them in your browser settings, then try again.')
@@ -52,6 +61,7 @@ export async function enablePush(): Promise<void> {
 }
 
 export async function disablePush(): Promise<void> {
+  if (isNativeApp) return disableNativePush()
   const existing = await navigator.serviceWorker.getRegistration('/')
   const subscription = await existing?.pushManager.getSubscription()
   if (!subscription) return

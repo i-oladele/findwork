@@ -774,5 +774,7 @@
  "Your verification needs another look": "Your verification need another check",
  "{category} service": "{category} service",
  "· confirmed by your bank": "· your bank don confirm am",
- "— the name your bank has for this account": "— di name wey your bank get for dis account"
+ "— the name your bank has for this account": "— di name wey your bank get for dis account",
+ "This phone could not be set up for notifications. Try again later.": "We no fit set up notifications for dis phone. Abeg try again later.",
+ "Notifications are blocked for FindWork. Allow them in your phone's Settings, then try again.": "Notifications don block for FindWork. Allow dem for your phone Settings, then try again."
 }

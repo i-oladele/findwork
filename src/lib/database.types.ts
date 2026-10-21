@@ -230,6 +230,13 @@ export type Database = {
         Update: never
         Relationships: []
       }
+      push_devices: {
+        /** The iPhone and Android apps' FCM tokens; each person reads only their own. */
+        Row: { id: string; profile_id: string; platform: 'ios' | 'android'; token: string; label: string; created_at: string; saved_at: string; last_sent_at: string | null }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       rider_profiles: {
         Row: { id: string; vehicle: RiderVehicle; plate: string | null; area: string | null; status: RiderStatus; note: string | null; reviewed_by: string | null; reviewed_at: string | null; online: boolean; lat: number | null; lng: number | null; located_at: string | null; deliveries_done: number; created_at: string }
         Insert: never
@@ -1242,6 +1249,8 @@ export type Database = {
       save_preferences: { Args: { p_language: Language; p_muted_kinds: string[]; p_interests: string[] }; Returns: undefined }
       save_push_subscription: { Args: { p_endpoint: string; p_p256dh: string; p_auth: string; p_label: string }; Returns: undefined }
       remove_push_subscription: { Args: { p_endpoint: string }; Returns: undefined }
+      save_push_device: { Args: { p_token: string; p_platform: 'ios' | 'android'; p_label: string }; Returns: undefined }
+      remove_push_device: { Args: { p_token: string }; Returns: undefined }
       apply_as_rider: { Args: { p_vehicle: RiderVehicle; p_plate: string; p_area: string | null }; Returns: undefined }
       admin_review_rider: { Args: { p_rider_id: string; p_approve: boolean; p_note: string }; Returns: undefined }
       set_rider_online: { Args: { p_online: boolean }; Returns: undefined }

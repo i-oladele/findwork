@@ -774,5 +774,7 @@
  "Your verification needs another look": "Tabbatarwarka tana buƙatar sake dubawa",
  "{category} service": "Sabis na {category}",
  "· confirmed by your bank": "· bankinka ya tabbatar",
- "— the name your bank has for this account": "— sunan da bankinka ke da shi na wannan asusun"
+ "— the name your bank has for this account": "— sunan da bankinka ke da shi na wannan asusun",
+ "This phone could not be set up for notifications. Try again later.": "Ba a iya saita sanarwa a wannan wayar ba. Don Allah sake gwadawa daga baya.",
+ "Notifications are blocked for FindWork. Allow them in your phone's Settings, then try again.": "An toshe sanarwar FindWork. Ba da izini a Saitunan wayarka, sannan ka sake gwadawa."
 }

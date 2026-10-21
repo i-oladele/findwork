@@ -37,7 +37,7 @@ The PRD introduction and conclusion also describe the following expectations. Ro
 
 | Requirement / roadmap phase | Current status and acceptance still required |
 |---|---|
-| Mobile app (PRD p.2), native delivery | iPhone and Android projects (Capacitor) wrap the web app with FindWork's icon and splash, camera, microphone and location permissions, links that open the app, and payments in an in-app browser. The iPhone build compiles and runs in the simulator. Native push (APNs/FCM), passkeys in the app, store listings and signing remain; plans and paid courses are not sold in the iPhone app pending an in-app purchase decision. |
+| Mobile app (PRD p.2), native delivery | iPhone and Android projects (Capacitor) wrap the web app with FindWork's icon and splash, camera, microphone and location permissions, links that open the app, and payments in an in-app browser. The iPhone build compiles and runs in the simulator. Push reaches the apps through Firebase Cloud Messaging once a Firebase project and its keys are added (README → Push in the apps); no push has reached a phone yet. Passkeys in the app, store listings and signing remain; plans and paid courses are not sold in the iPhone app pending an in-app purchase decision. |
 | Certifications and service packages (PRD introduction) | Packages and provider-supplied credential uploads implemented. Course certificates are issued on passing and can be verified by code without an account; the three starter courses have lessons and quizzes awaiting practitioner review. |
 | Scale to millions (PRD conclusion) | Unverified aspiration. Define traffic/data targets, then load-test and document capacity, availability and recovery limits. |
 | Phase 1: brand and UI/UX | UI system exists. Brand positioning/messaging/assets, prototype/design handoff, navigation, responsive/device and accessibility acceptance remain unverified. |
@@ -212,13 +212,13 @@ PRD feature begins on page 6.
 | F07-I02 | Linked with Order Tracking | implemented |
 | F07-I03 | Integrated with Dispute Resolution | implemented |
 
-Evidence / relevant current code: [src/lib/api/chat.ts](../../src/lib/api/chat.ts), [src/components/ui/VoiceRecorder.tsx](../../src/components/ui/VoiceRecorder.tsx), [src/components/ui/ChatComposer.tsx](../../src/components/ui/ChatComposer.tsx), [supabase/migrations/20261004001300_push_and_preferences.sql](../../supabase/migrations/20261004001300_push_and_preferences.sql), [supabase/functions/send-push/index.ts](../../supabase/functions/send-push/index.ts), [public/sw.js](../../public/sw.js), [src/lib/push.ts](../../src/lib/push.ts), [src/routes/chat/ChatThread.tsx](../../src/routes/chat/ChatThread.tsx).
+Evidence / relevant current code: [src/lib/api/chat.ts](../../src/lib/api/chat.ts), [src/components/ui/VoiceRecorder.tsx](../../src/components/ui/VoiceRecorder.tsx), [src/components/ui/ChatComposer.tsx](../../src/components/ui/ChatComposer.tsx), [supabase/migrations/20261004001300_push_and_preferences.sql](../../supabase/migrations/20261004001300_push_and_preferences.sql), [supabase/functions/send-push/index.ts](../../supabase/functions/send-push/index.ts), [public/sw.js](../../public/sw.js), [src/lib/push.ts](../../src/lib/push.ts), [supabase/migrations/20261021000100_native_push.sql](../../supabase/migrations/20261021000100_native_push.sql), [supabase/functions/send-push/fcm.ts](../../supabase/functions/send-push/fcm.ts), [src/lib/nativePush.ts](../../src/lib/nativePush.ts), [src/routes/chat/ChatThread.tsx](../../src/routes/chat/ChatThread.tsx).
 
-Remaining: A chat shows the open booking, order, purchase order and dispute between the two people, each linking to its screen. Every in-app notification can be pushed to devices with push on; sending needs the send-push function deployed with a VAPID key pair, pg_net and two settings rows, none of which is configured, and no push has reached a real device.
+Remaining: A chat shows the open booking, order, purchase order and dispute between the two people, each linking to its screen. Every in-app notification can be pushed to browsers and to the iPhone and Android apps with push on; sending needs the send-push function deployed with a VAPID key pair (browsers) or a Firebase project and service account (apps), pg_net and two settings rows, none of which is configured, and no push has reached a real device.
 
 Acceptance: Use two accounts to exchange text, voice and media, paginate old messages, verify unread state, deny outsiders and follow transaction-linked push deep links.
 
-Verification: Subscription rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 33); the sender's logic is unit tested. No push has been delivered to a device.
+Verification: Subscription rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 33), and the apps' device rules on 21 October 2026 (section 45); the sender's logic, including FCM sign-in and its answers, is unit tested. No push has been delivered to a device.
 
 ## F08 · Product Management
 

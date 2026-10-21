@@ -774,5 +774,7 @@
  "Your verification needs another look": "Ìfìdímúlẹ̀ rẹ nílò àyẹ̀wò mìíràn",
  "{category} service": "Iṣẹ́ {category}",
  "· confirmed by your bank": "· báńkì rẹ ti jẹ́rìí rẹ̀",
- "— the name your bank has for this account": "— orúkọ tí báńkì rẹ ní fún àkáǹtì yìí"
+ "— the name your bank has for this account": "— orúkọ tí báńkì rẹ ní fún àkáǹtì yìí",
+ "This phone could not be set up for notifications. Try again later.": "A kò lè ṣètò ìfitónilétí lórí fóònù yìí. Jọ̀wọ́ gbìyànjú nígbà mìíràn.",
+ "Notifications are blocked for FindWork. Allow them in your phone's Settings, then try again.": "A ti dí ìfitónilétí FindWork. Gbà wọ́n láàyè nínú Ètò fóònù rẹ, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i."
 }

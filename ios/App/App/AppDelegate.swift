@@ -1,5 +1,7 @@
 import UIKit
 import Capacitor
+import FirebaseCore
+import FirebaseMessaging
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,8 +9,38 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Push goes through Firebase Cloud Messaging, configured from the
+        // project's GoogleService-Info.plist (README → Phone apps). Without
+        // that file the app runs as before; turning push on says it failed.
+        if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil {
+            FirebaseApp.configure()
+        }
         return true
+    }
+
+    // Push: Apple hands over this phone's token; Firebase swaps it for the FCM
+    // token that send-push addresses, which goes on to the app's registration
+    // listener (src/lib/nativePush.ts).
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        guard FirebaseApp.app() != nil else {
+            NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: PushSetupError.firebaseNotConfigured)
+            return
+        }
+        Messaging.messaging().apnsToken = deviceToken
+        // Deprecated in Firebase 12 in favour of registering by installation ID,
+        // which is opt-in. Android's plugin and send-push both use registration
+        // tokens, so the iPhone does too; the deprecation warning is expected.
+        Messaging.messaging().token { token, error in
+            if let token = token {
+                NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: token)
+            } else {
+                NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error ?? PushSetupError.noToken)
+            }
+        }
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
@@ -40,5 +72,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                           sessionRole: connectingSceneSession.role)
         config.delegateClass = SceneDelegate.self
         return config
+    }
+}
+
+enum PushSetupError: LocalizedError {
+    case firebaseNotConfigured, noToken
+
+    var errorDescription: String? {
+        switch self {
+        case .firebaseNotConfigured: return "GoogleService-Info.plist is not in the app, so Firebase is not set up"
+        case .noToken: return "Firebase did not return a token"
+        }
     }
 }

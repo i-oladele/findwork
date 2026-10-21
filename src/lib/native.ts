@@ -34,6 +34,18 @@ export function appPathFor(url: string): string | null {
 }
 
 /**
+ * Where a tapped push takes the app: the in-app path it carries (the inbox,
+ * which passes on to the screen the notification is about, as on the web),
+ * never another site.
+ */
+export function pushTapPath(data: unknown): string {
+  const { url, notification_id: id } = (data ?? {}) as { url?: unknown; notification_id?: unknown }
+  if (typeof url === 'string' && /^\/(?![/\\])/.test(url)) return url
+  if (typeof id === 'string' && id) return `/notifications?open=${encodeURIComponent(id)}`
+  return '/notifications'
+}
+
+/**
  * Opens a payment page. In the apps it opens in an in-app browser rather
  * than replacing the app, and when the browser closes the app checks the
  * payment, whether or not the return link brought it back first.
@@ -53,12 +65,13 @@ export async function openPaymentPage(url: string, onClosed: () => void): Promis
 
 /**
  * Sets up the native shell once: status bar, splash screen, links that open
- * the app, and Android's back button.
+ * the app, Android's back button, and pushes that are tapped.
  */
 export async function startNativeShell(navigate: (path: string) => void): Promise<void> {
   if (!isNativeApp) return
-  const [{ App }, { StatusBar, Style }, { SplashScreen }, { Browser }] = await Promise.all([
+  const [{ App }, { StatusBar, Style }, { SplashScreen }, { Browser }, { PushNotifications }] = await Promise.all([
     import('@capacitor/app'), import('@capacitor/status-bar'), import('@capacitor/splash-screen'), import('@capacitor/browser'),
+    import('@capacitor/push-notifications'),
   ])
   await StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
   await App.addListener('appUrlOpen', ({ url }) => {
@@ -70,6 +83,12 @@ export async function startNativeShell(navigate: (path: string) => void): Promis
   await App.addListener('backButton', ({ canGoBack }) => {
     if (canGoBack) window.history.back()
     else void App.exitApp()
+  })
+  // A tap that launched the app is held by the plugin until this listens.
+  // While the app is open, the inbox updates by itself, so pushes are not
+  // shown on top of it (the plugin's default).
+  await PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
+    navigate(pushTapPath(notification.data))
   })
   await SplashScreen.hide()
 }

@@ -56,7 +56,7 @@ and carries on without it; with them, the feature switches on:
 | Live video for selling, from the phone camera | Sellers paste a link from another streaming app | `supabase secrets set LIVEKIT_URL=wss://<project>.livekit.cloud LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=...` |
 | Road routing in traffic: rider rounds and arrival times | Rounds are planned on distance; arrival times are estimates, labelled as such | `supabase secrets set GOOGLE_MAPS_API_KEY=...` with the Routes API enabled |
 | Assistant: voice commands beyond the built-in phrases, support answers, chat translation, lesson help, dispute summaries, the staff analyst | Common English and Pidgin commands still work on the device; everything else shows a hint | `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...` (`ASSISTANT_MODEL` optionally picks the model; a key that is not scoped to a workspace also needs `ANTHROPIC_WORKSPACE_ID=wrkspc_...`) |
-| Push notifications | The in-app inbox only; the push switch is hidden | See below |
+| Push notifications | The in-app inbox only; in a browser the push switch is hidden | Browsers: see below. The iPhone and Android apps: Phone apps → Push in the apps |
 | Second sign-in step (authenticator app) | Not offered | Authentication → Multi-Factor: enable TOTP |
 | Text-message sign-up codes | Phone sign-up moves people to the email form | Termii, under the auth settings below |
 
@@ -92,7 +92,9 @@ supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... \
 ```
 
 Put the public key in `.env.local` as `VITE_VAPID_PUBLIC_KEY`, and tell the
-database where the function is (SQL editor, once per project):
+database where the function is (SQL editor, once per project). The VAPID keys
+are for browsers only; the apps are pushed through Firebase (Phone apps →
+Push in the apps), and either works without the other:
 
 ```sql
 insert into private.settings values
@@ -255,7 +257,8 @@ The iPhone and Android apps are the same web app in a Capacitor shell
 (`capacitor.config.ts`, `ios/`, `android/`). Inside them,
 `src/lib/native.ts` handles the status bar and splash screen, links to the
 website that open the app (payment returns, sign-up and password emails),
-Android's back button, and payment pages in an in-app browser.
+Android's back button, payment pages in an in-app browser, and pushes that
+are tapped (see Push in the apps).
 
 ```bash
 npm run cap:sync      # build the web app and copy it into both projects
@@ -277,9 +280,63 @@ Before a store build:
   digital goods, so the iPhone app does not sell plans or paid courses
   (`digitalPurchasesAllowed` in `src/lib/native.ts`). Bookings, goods and
   top-ups are not affected. Decide whether to add in-app purchase.
-- **Push in the apps** needs native push (APNs and Firebase Cloud Messaging);
-  web push does not reach an app. Passkeys in the apps need the
-  `webcredentials` association above.
+- **Passkeys in the apps** need the `webcredentials` association above.
+
+### Push in the apps
+
+Web push does not reach an app, so the apps are pushed through Firebase Cloud
+Messaging: Android directly, the iPhone through FCM's bridge to Apple's push
+service. The code is in place (`src/lib/nativePush.ts`, `fcm.ts` in
+`supabase/functions/send-push`, the `push_devices` table); what is missing is
+a Firebase project and its keys.
+
+1. **Firebase project.** At [console.firebase.google.com](https://console.firebase.google.com),
+   create a project (Analytics is not needed). Its project ID, under Project
+   settings → General, is `FCM_PROJECT_ID` below.
+2. **Android.** Add an Android app to the project with the package name
+   `africa.findwork.app`, download `google-services.json` and put it in
+   `android/app/`. The build applies the Google services plugin only when the
+   file is there. It identifies the project rather than granting access, so it
+   can be committed.
+3. **iPhone.**
+   - Add an iOS app with the bundle ID `africa.findwork.app`, download
+     `GoogleService-Info.plist`, and drag it into the `App` group in Xcode,
+     with the App target ticked. Without it the app runs as before, but turning
+     push on says the phone could not be set up.
+   - Make an APNs key: [developer.apple.com](https://developer.apple.com/account/resources/authkeys/list)
+     → Keys → +, tick Apple Push Notifications service (APNs), and download the
+     `.p8` file (Apple offers it once). In Firebase → Project settings → Cloud
+     Messaging → Apple app configuration, upload it as the APNs authentication
+     key with its Key ID and your Team ID. One key serves development and store
+     builds.
+   - The Push Notifications capability is already in the project
+     (`ios/App/App/App.entitlements`), as is the Firebase Messaging package
+     (firebase-ios-sdk 12.19.2, fetched by Xcode on first open). Check that
+     Signing & Capabilities shows Push Notifications once the signing team is
+     set; automatic signing turns push on for the App ID.
+4. **The sender.** Firebase → Project settings → Service accounts → Generate
+   new private key. That JSON file is a secret: keep it out of the repository.
+
+   ```bash
+   supabase db push      # the push_devices table, before the function that reads it
+   supabase secrets set FCM_PROJECT_ID=<project id> \
+     FCM_SERVICE_ACCOUNT_JSON="$(cat path/to/service-account.json)"
+   supabase functions deploy send-push --no-verify-jwt
+   ```
+
+   send-push also needs `PUSH_HOOK_SECRET` and the two `private.settings` rows
+   from Setting up the backend, and `pg_net` enabled.
+5. **Check on a phone.** Settings → Preferences → Push notifications on this
+   device: the phone asks for permission, and a row appears in `push_devices`.
+   With the app in the background, message yourself from another account;
+   tapping the alert opens the conversation. If nothing arrives, the
+   function's logs give FCM's reason: `THIRD_PARTY_AUTH_ERROR` means the APNs
+   key is missing or wrong in Firebase.
+
+Push is on or off for the phone: whoever is signed in gets its pushes, and
+signing out stops them for that person. While the app is open, alerts are not
+shown over it, because the inbox updates by itself. When FCM reports a token
+as unregistered (the app was uninstalled), send-push deletes it.
 
 ## Commands
 

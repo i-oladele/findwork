@@ -6,6 +6,7 @@ import { AuthContext, signUpOutcome } from './authContext'
 import { queryClient } from './queryClient'
 import { destination, forgetDestination, onboardingPath, rememberDestination, storedDestination } from './destination'
 import { useCart } from '../store/cart'
+import { releaseNativePush } from './nativePush'
 import type { AuthContextValue } from './authContext'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -123,6 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
 
       async signOut() {
+        // In the apps, the phone stops getting this person's pushes.
+        await releaseNativePush()
         const { error } = await supabase.auth.signOut()
         if (error) throw error
       },

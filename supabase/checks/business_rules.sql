@@ -2714,6 +2714,68 @@ select pg_temp.eq('an ended stream admits nobody, the seller included',
   coalesce(public.stream_access((select v from t_ids where k = 'lk_stream'), :mama), public.stream_access((select v from t_ids where k = 'lk_stream'), :customer)), null::jsonb);
 reset role;
 
+-- ==== 45. Push to the iPhone and Android apps ================================
+\set fcm_token '''fcmTokenAAAAAAAAAAAAAAAA:APA91bExampleExampleExampleExample'''
+select set_config('request.jwt.claim.sub', :customer, true);
+set local role authenticated;
+select public.save_push_device(:fcm_token, 'android', 'FindWork app on Android');
+select pg_temp.eq('a phone that turns push on is kept for its owner',
+  (select platform from public.push_devices where token = :fcm_token), 'android');
+select pg_temp.fails('a phone must be an iPhone or an Android',
+  format($$ select public.save_push_device(%L, 'windows', '') $$, 'x' || :fcm_token), 'invalid push device');
+select pg_temp.fails('a token too short to be real is refused',
+  $$ select public.save_push_device('abc', 'ios', '') $$, 'invalid push device');
+select pg_temp.fails('a phone cannot be added by writing to the table',
+  format($$ insert into public.push_devices(profile_id, platform, token) values (auth.uid(), 'ios', %L) $$, 'y' || :fcm_token), 'permission denied');
+select pg_temp.fails('users cannot report deliveries',
+  $$ select public.push_devices_delivered('{}', '{}') $$, 'permission denied');
+reset role;
+select set_config('request.jwt.claim.sub', :tunde, true);
+set local role authenticated;
+select pg_temp.eq('other people''s phones are private', (select count(*) from public.push_devices), 0::bigint);
+select public.remove_push_device(:fcm_token);
+reset role;
+select pg_temp.eq('nor can they turn push off on someone else''s phone',
+  (select profile_id from public.push_devices where token = :fcm_token), :customer::uuid);
+select set_config('request.jwt.claim.sub', :tunde, true);
+set local role authenticated;
+select public.save_push_device(:fcm_token, 'android', 'FindWork app on Android');
+select pg_temp.eq('a phone someone else signs in on pushes to them',
+  (select count(*) from public.push_devices where token = :fcm_token), 1::bigint);
+reset role;
+select pg_temp.eq('and no longer to the last person',
+  (select count(*) from public.push_devices where profile_id = :customer::uuid), 0::bigint);
+insert into public.notifications(profile_id, kind, title, body) values (:tunde, 'order', 'Native push fixture', 'Body') returning id \gset native_note_
+set local role service_role;
+select pg_temp.eq('the sender is given the phone''s token and platform',
+  public.push_targets(:'native_note_id')->'devices', jsonb_build_array(jsonb_build_object('token', :fcm_token, 'platform', 'android')));
+select pg_temp.eq('alongside the browsers, of which there are none',
+  public.push_targets(:'native_note_id')->'subscriptions', '[]'::jsonb);
+select public.push_devices_delivered(array[:fcm_token], '{}');
+reset role;
+select pg_temp.eq('a delivery is recorded',
+  (select last_sent_at is not null from public.push_devices where token = :fcm_token), true);
+set local role service_role;
+select public.push_devices_delivered('{}', array[:fcm_token]);
+reset role;
+select pg_temp.eq('a token FCM no longer knows is forgotten',
+  (select count(*) from public.push_devices where token = :fcm_token), 0::bigint);
+select set_config('request.jwt.claim.sub', :tunde, true);
+set local role authenticated;
+select public.save_push_device(:fcm_token, 'ios', '');
+select public.remove_push_device(:fcm_token);
+select pg_temp.eq('turning push off forgets the phone', (select count(*) from public.push_devices), 0::bigint);
+select public.save_push_device(:fcm_token || i, 'ios', '') from generate_series(1, 12) i;
+select pg_temp.eq('a person keeps at most ten phones', (select count(*) from public.push_devices), 10::bigint);
+select pg_temp.eq('the most recently saved',
+  (select count(*) from public.push_devices where token in (:fcm_token || 1, :fcm_token || 2)), 0::bigint);
+select public.save_push_subscription('https://push.example/tunde', 'BPublicKeyPublicKeyPublicKeyPublicKey', 'authsecret123', '');
+reset role;
+update public.profiles set deleted_at = now() where id = :tunde;
+select pg_temp.eq('a deleted account''s phones and browsers are forgotten with it',
+  (select count(*) from public.push_devices where profile_id = :tunde::uuid)
+    + (select count(*) from public.push_subscriptions where profile_id = :tunde::uuid), 0::bigint);
+
 reset role;
 select 'ALL BUSINESS RULE CHECKS PASSED' as result;
 rollback;
