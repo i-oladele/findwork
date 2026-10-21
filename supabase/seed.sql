@@ -127,6 +127,10 @@ insert into public.course_lessons (course_id, title, minutes, position) values
   ('internship-fashion-house', 'Shadowing senior tailors', 0, 2),
   ('internship-logistics', 'Dispatch systems walkthrough', 25, 1);
 
+-- Lesson material and quizzes for the three starter courses
+-- (supabase/migrations/20261018000700_course_content.sql).
+select private.load_course_content();
+
 -- commission_rate is what complete_booking takes from the provider's payout;
 -- listing_limit caps live packages (null = unlimited); priority orders search.
 insert into public.subscription_plans (id, name, price, features, commission_rate, listing_limit, priority) values
