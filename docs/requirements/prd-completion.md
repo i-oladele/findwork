@@ -1,6 +1,6 @@
 # FindWork PRD completion checklist
 
-Reviewed 2026-10-21 against the original 20-page [functionality document](functionality.pdf), its [text extraction](functionality.md), and the [delivery roadmap](roadmap.md). Baseline commit: `7c37b51`, plus the current working-tree implementation. This is a completion ledger, not a claim that the product is finished.
+Reviewed 2026-11-01 against the original 20-page [functionality document](functionality.pdf), its [text extraction](functionality.md), and the [delivery roadmap](roadmap.md). Baseline commit: `c68e89d`, plus the current working-tree implementation. This is a completion ledger, not a claim that the product is finished.
 
 ## Completion standard
 
@@ -16,16 +16,16 @@ Each feature lists source evidence, remaining work and an acceptance scenario. T
 ## Current constraints and decisions
 
 - Keep React/Vite and Supabase, as previously approved; the roadmap's Next.js/DigitalOcean stack is superseded, not its functional requirements.
-- No local Supabase stack. SQL checks run on plain Postgres 17, as CI does, and were last run on 21 October 2026 (558 checks). They have not been run against the hosted project, which holds demo data only.
-- Every requirement now has a source-code path. On 21 October 2026 the new migrations were applied to the hosted project, all fifteen Edge Functions were deployed, and the app was walked in a browser against it as a customer, a provider and an admin; what that walk found was fixed the same day.
+- No local Supabase stack. SQL checks run on plain Postgres 17, as CI does, and were last run on 1 November 2026 (626 checks). They have not been run against the hosted project, which holds demo data only.
+- Every requirement now has a source-code path. On 21 October 2026 the new migrations were applied to the hosted project, all fifteen Edge Functions were deployed, and the app was walked in a browser against it as a customer, a provider and an admin; what that walk found was fixed the same day. The push-to-phones migration from that day and the SOS on-call rota were applied on 1 November 2026.
 - Outside services are built to their test or sandbox APIs and stay switched off until their keys are set, saying so on screen: Paystack (card checkout, saved-card renewals, confirmed bank accounts and automatic payouts), Dojah (BVN, NIN, CAC, face and SIM checks), LiveKit (live video), Google Maps (road routing and traffic), Termii (SMS codes). None has been exercised against its provider yet. Push keys and the assistant's API key are set on the hosted project.
-- Policy numbers chosen while building are first proposals to confirm: the trust score weights, the daily limits per verification tier, the rider's 80% share of the delivery fee, the risk-rule thresholds, the automatic-payout limit, and coupons being funded by whoever issues them.
+- Policy numbers chosen while building are first proposals to confirm: the trust score weights, the daily limits per verification tier, the rider's 80% share of the delivery fee, the risk-rule thresholds, the automatic-payout limit, and coupons being funded by whoever issues them. The SOS escalation steps were agreed on 1 November 2026: 2 and 5 minutes.
 - Preserve the historical September audits. Several of their missing-feature findings were completed by later commits; this checklist is the current status source.
 - Lesson content, the terms of service and the privacy policy are written as drafts for review by practitioners and a lawyer; the app shows the legal pages as drafts. The Yoruba, Igbo, Hausa and Pidgin translations need a native speaker's review.
 
 ## What happens next
 
-1. Set the outside services' test keys (Paystack, Dojah, LiveKit, Google Maps, Termii) and walk each flow end to end.
+1. Set the outside services' test keys (Paystack, Dojah, LiveKit, Google Maps, Termii, Firebase) as in docs/operations/adding-the-keys.md, and walk each flow end to end. Everything else they depend on is in place on the hosted project.
 2. Have the translations, lessons and legal drafts reviewed; decide in-app purchase on iPhone for plans and paid courses.
 3. Walk every journey on real phones, including push, the second sign-in step and a suspended account; run the business-rule checks against a staging copy of the hosted database.
 4. Confirm or change the policy numbers above, then tune the risk rules, matching and payout limit against real activity.
@@ -55,7 +55,7 @@ The PRD introduction and conclusion also describe the following expectations. Ro
 | Phase 13: security/disputes | F28–F30 plus audit history and security review. |
 | Phase 14: admin/reporting | F31–F33 plus role-protected exports, complete revenue definitions and marketplace insights. |
 | Phase 15: hardening and scale | Functional/regression/UX/security/performance QA, penetration testing, cache/database tuning, queues/retries, media processing, load tests, backup automation and disaster recovery remain unverified. |
-| Launch content and policies | Terms of service and privacy policy (NDPA) drafted from how the app works, shown as drafts pending legal review; support procedures in docs/operations/support-procedures.md (the SOS on-call rota is still missing). |
+| Launch content and policies | Terms of service and privacy policy (NDPA) drafted from how the app works, shown as drafts pending legal review; support procedures in docs/operations/support-procedures.md. The SOS on-call rota and its escalation are built; the rota needs people on it before the SOS button is promoted. |
 
 ## F01 · User Registration & Login
 
@@ -214,7 +214,7 @@ PRD feature begins on page 6.
 
 Evidence / relevant current code: [src/lib/api/chat.ts](../../src/lib/api/chat.ts), [src/components/ui/VoiceRecorder.tsx](../../src/components/ui/VoiceRecorder.tsx), [src/components/ui/ChatComposer.tsx](../../src/components/ui/ChatComposer.tsx), [supabase/migrations/20261004001300_push_and_preferences.sql](../../supabase/migrations/20261004001300_push_and_preferences.sql), [supabase/functions/send-push/index.ts](../../supabase/functions/send-push/index.ts), [public/sw.js](../../public/sw.js), [src/lib/push.ts](../../src/lib/push.ts), [supabase/migrations/20261021000100_native_push.sql](../../supabase/migrations/20261021000100_native_push.sql), [supabase/functions/send-push/fcm.ts](../../supabase/functions/send-push/fcm.ts), [src/lib/nativePush.ts](../../src/lib/nativePush.ts), [src/routes/chat/ChatThread.tsx](../../src/routes/chat/ChatThread.tsx).
 
-Remaining: A chat shows the open booking, order, purchase order and dispute between the two people, each linking to its screen. Every in-app notification can be pushed to browsers and to the iPhone and Android apps with push on; sending needs the send-push function deployed with a VAPID key pair (browsers) or a Firebase project and service account (apps), pg_net and two settings rows, none of which is configured, and no push has reached a real device.
+Remaining: A chat shows the open booking, order, purchase order and dispute between the two people, each linking to its screen. Every in-app notification can be pushed to browsers and to the iPhone and Android apps with push on; on the hosted project browser push is configured (VAPID keys, pg_net and the two settings rows), and send-push was redeployed with phone push on 1 November 2026; push to the phone apps waits for a Firebase project and its keys. No push has yet been confirmed on a real device.
 
 Acceptance: Use two accounts to exchange text, voice and media, paginate old messages, verify unread state, deny outsiders and follow transaction-linked push deep links.
 
@@ -390,13 +390,13 @@ PRD feature begins on page 10.
 | F15-I02 | Linked with Admin Monitoring | implemented |
 | F15-I03 | Integrated with Trust Score System | implemented |
 
-Evidence / relevant current code: [src/components/ui/ReportButton.tsx](../../src/components/ui/ReportButton.tsx), [src/routes/classifieds/ClassifiedDetail.tsx](../../src/routes/classifieds/ClassifiedDetail.tsx), [src/components/ui/TrustBadge.tsx](../../src/components/ui/TrustBadge.tsx), [supabase/migrations/20261004001400_classifieds_geo_and_safety.sql](../../supabase/migrations/20261004001400_classifieds_geo_and_safety.sql), [src/routes/safety/MeetupDetail.tsx](../../src/routes/safety/MeetupDetail.tsx), [src/routes/safety/SosButton.tsx](../../src/routes/safety/SosButton.tsx), [src/lib/safety.ts](../../src/lib/safety.ts).
+Evidence / relevant current code: [src/components/ui/ReportButton.tsx](../../src/components/ui/ReportButton.tsx), [src/routes/classifieds/ClassifiedDetail.tsx](../../src/routes/classifieds/ClassifiedDetail.tsx), [src/components/ui/TrustBadge.tsx](../../src/components/ui/TrustBadge.tsx), [supabase/migrations/20261004001400_classifieds_geo_and_safety.sql](../../supabase/migrations/20261004001400_classifieds_geo_and_safety.sql), [src/routes/safety/MeetupDetail.tsx](../../src/routes/safety/MeetupDetail.tsx), [src/routes/safety/SosButton.tsx](../../src/routes/safety/SosButton.tsx), [src/lib/safety.ts](../../src/lib/safety.ts), [supabase/migrations/20261101000100_sos_on_call.sql](../../supabase/migrations/20261101000100_sos_on_call.sql), [src/routes/admin/RiskTab.tsx](../../src/routes/admin/RiskTab.tsx), [src/routes/admin/OnCallRota.tsx](../../src/routes/admin/OnCallRota.tsx), [src/lib/rota.ts](../../src/lib/rota.ts).
 
-Remaining: A buyer proposes a time and public place for a listing and the seller confirms. Either person can share their location with the other for a set time (5 minutes to 3 hours); it stops by itself and when the meet-up ends. SOS alerts FindWork staff with the person's position and who they were meeting, and works even for a suspended account; it does not contact the police, and says so beside the emergency numbers. Up to three trusted contacts can be called or texted in one tap through the phone's own apps; FindWork sends them nothing itself. Location sharing stops when the browser is closed. Staff response to an SOS has no on-call process behind it yet.
+Remaining: A buyer proposes a time and public place for a listing and the seller confirms. Either person can share their location with the other for a set time (5 minutes to 3 hours); it stops by itself and when the meet-up ends. SOS alerts FindWork staff with the person's position and who they were meeting, and works even for a suspended account; it does not contact the police, and says so beside the emergency numbers. Up to three trusted contacts can be called or texted in one tap through the phone's own apps; FindWork sends them nothing itself. Location sharing stops when the browser is closed. An SOS goes first to the primary on an on-call rota that admins keep (a primary and a backup at any moment); whoever takes it presses "I'm on it", which tells the person someone is calling, and staff see the person's phone number, position and who they were meeting. An SOS nobody has taken after 2 minutes goes to the backup and every admin, and after 5 minutes, and every 5 minutes after that, to every admin and moderator (steps agreed on 1 November 2026); SOS pushes ignore muted notifications, and admins are told each morning of gaps in the next two days. Escalation runs on pg_cron on the hosted project. Nobody is on the rota yet: until there is 24-hour cover, every SOS goes to every admin and moderator and the SOS button is not promoted.
 
 Acceptance: Share/revoke a meetup location, expire access, trigger an SOS to authorized recipients and review an abuse report without exposing other users’ locations.
 
-Verification: Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 34). Deployed integration and on-device acceptance are still pending.
+Verification: Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 34), and the on-call rota and escalation on 1 November 2026 (section 46). The rota migration was applied to the hosted project on 1 November 2026, where escalate-sos runs every minute and succeeds; the rota has nobody on it yet. On-device acceptance is still pending.
 
 ## F16 · AI Job Matching
 
@@ -674,9 +674,9 @@ PRD feature begins on page 17.
 | F28-I02 | Linked with Dispute Resolution | implemented |
 | F28-I03 | Integrated with Fraud Monitoring | implemented |
 
-Evidence / relevant current code: [src/routes/chat/Trust.tsx](../../src/routes/chat/Trust.tsx), [src/lib/api/reviews.ts](../../src/lib/api/reviews.ts), [supabase/migrations/20261004000900_risk_and_trust.sql](../../supabase/migrations/20261004000900_risk_and_trust.sql), [src/components/ui/TrustBadge.tsx](../../src/components/ui/TrustBadge.tsx).
+Evidence / relevant current code: [src/routes/chat/Trust.tsx](../../src/routes/chat/Trust.tsx), [src/lib/api/reviews.ts](../../src/lib/api/reviews.ts), [supabase/migrations/20261004000900_risk_and_trust.sql](../../supabase/migrations/20261004000900_risk_and_trust.sql), [src/components/ui/TrustBadge.tsx](../../src/components/ui/TrustBadge.tsx), [src/routes/commerce/ProductDetail.tsx](../../src/routes/commerce/ProductDetail.tsx), [src/routes/chat/ChatThread.tsx](../../src/routes/chat/ChatThread.tsx), [src/routes/hiring/JobQuotes.tsx](../../src/routes/hiring/JobQuotes.tsx), [src/lib/__tests__/trust-badges.test.tsx](../../src/lib/__tests__/trust-badges.test.tsx).
 
-Remaining: A composite score out of 100 (verification 30, reputation 30, history 20, conduct 20) is stored per account, refreshed when its inputs change, shown on provider profiles and classifieds, and broken down for the owner. The weights are a first proposal and need agreeing; the score is not yet shown on products, chat or job quotes.
+Remaining: A composite score out of 100 (verification 30, reputation 30, history 20, conduct 20) is stored per account, refreshed when its inputs change, shown with the verification tier on provider profiles, classifieds, a seller's products, the person at the other end of a chat, and each quote on a job, in the reader's language, and broken down for the owner. The weights are a first proposal and need agreeing.
 
 Acceptance: Explain a reproducible trust score from verified signals, transaction and complaint outcomes; prevent self-written scores and expose appropriate history.
 

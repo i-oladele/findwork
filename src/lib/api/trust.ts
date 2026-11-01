@@ -6,7 +6,7 @@ import { keys } from './keys'
 /** The parts are returned for your own account and to staff; other people get score and tier only. */
 export type Trust = { score: number; tier: number; verification?: number; reputation?: number; history?: number; conduct?: number }
 
-export const TIER_LABEL = ['Unconfirmed', 'Contact confirmed', 'ID verified', 'Business verified'] as const
+export const TIER_LABEL = ['Unconfirmed', 'Contact confirmed', 'ID verified', 'Business verified'] as const // i18n
 
 export function useTrust(profileId: string | undefined | null) {
   return useQuery({

@@ -76,7 +76,9 @@ function targetFor(refType: string | null, refId: string | null): string {
     case 'meetup':
       return refId ? `/meetups/${refId}` : '/meetups'
     case 'admin_sos':
-      return '/admin'
+      return '/admin?tab=Risk'
+    case 'admin_sos_rota':
+      return '/admin/on-call'
     case 'track':
       return refId ? `/track/${refId}` : '/orders'
     case 'admin_rider':

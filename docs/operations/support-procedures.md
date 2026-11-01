@@ -1,9 +1,10 @@
 # FindWork support procedures
 
 How FindWork staff handle each queue in the operations console (`/admin`). Draft
-of 21 October 2026, written from how the app works today; the operations lead
-should adjust the response times and escalation contacts to the team that
-actually runs it, then review this document every quarter.
+of 21 October 2026, updated 1 November 2026, written from how the app works
+today; the operations lead should adjust the response times and escalation
+contacts to the team that actually runs it, then review this document every
+quarter.
 
 Every action in the console is recorded against the member of staff who took
 it (`admin_actions`), and every money movement is a ledger entry naming its
@@ -37,24 +38,63 @@ can change their own.
 | Reports (content) | 1 working day | 1 working day |
 | Data protection requests | 5 working days to acknowledge | 30 days |
 
-**Gap to close before launch:** there is no on-call rota for SOS alerts. Until
-there is one, the SOS screen must not be promoted.
+## SOS on-call rota (Operations → SOS on-call rota)
+
+SOS alerts are answered by whoever is on call. Admins keep the rota; every
+admin and moderator can see it. At any moment there is at most one **primary**,
+who answers first, and one **backup**, who is called in when the primary does
+not answer. A shift can be up to seven days; split longer cover into shifts.
+
+- The person put on call is told in the app. Being on call means having the
+  FindWork app on your phone with push on, the phone charged and with you, and
+  being able to make a call within minutes, day or night.
+- Swap shifts by asking an admin to change the rota; do not just hand your
+  phone over. Ending a shift early leaves it on the record.
+- The rota page shows every time in the next 14 days with nobody on call, and
+  admins are told each morning about gaps in the next two days. Close them the
+  same day.
+- With nobody on call, an SOS goes to every admin and moderator and nobody in
+  particular is expected to answer. Treat that as an incident and fill the gap.
+
+How an SOS travels:
+
+| After | Who is alerted |
+| --- | --- |
+| At once | The primary on call; every other admin and moderator is told who is on call |
+| 2 minutes, not taken | The primary again, the backup and every admin |
+| 5 minutes, not taken, then every 5 minutes | Every admin and moderator |
+
+SOS alerts are pushed even to staff who have muted notifications. The
+escalation runs every minute on the hosted database (`escalate-sos` in
+`cron.job`); confirm it is scheduled after each deployment.
+
+The 2- and 5-minute steps were agreed on 1 November 2026.
+
+**Before launch:** put named people on the rota with 24-hour cover. As of
+1 November 2026 nobody is on it, so every SOS goes to every admin and
+moderator. Until the rota has cover, the SOS button must not be promoted.
 
 ## SOS alerts (Risk tab)
 
-An SOS arrives with the person's position, the meet-up they were on and who they
-were meeting. FindWork does not contact the police on its own.
+An SOS arrives with the person's phone number, their position, the meet-up they
+were on and who they were meeting. FindWork does not contact the police on its
+own.
 
-1. Call the person on the phone number on their account at once.
-2. If they answer and are safe, note it and close the alert.
-3. If they need help, or do not answer within two tries: call the emergency
+1. Press **I'm on it**. This stops the alert escalating and tells the person
+   that someone from FindWork is calling them. Only one person can take an
+   alert; if someone else already has, leave it to them unless they ask for
+   help.
+2. Call the person at once on the number shown.
+3. If they answer and are safe, note it and close the alert.
+4. If they need help, or do not answer within two tries: call the emergency
    number for their location (112 nationally, 767 in Lagos), give the position
    from the alert, and stay on the line if you can.
-4. If they have trusted contacts saved, they will have chosen whether to alert
+5. If they have trusted contacts saved, they will have chosen whether to alert
    them themselves; do not share their location with anyone else.
-5. Suspend the other party's account if there is any sign of threat, and record
+6. Suspend the other party's account if there is any sign of threat, and record
    why.
-6. Write a full note: times, calls made, outcome. Tell the admin on duty.
+7. Write a full note: times, calls made, outcome. If you are not an admin, tell
+   an admin.
 
 ## Disputes (Disputes tab)
 
@@ -191,11 +231,11 @@ writing before you make it.
 
 | When | To |
 | --- | --- |
-| Anyone in danger | Emergency services, then the admin on duty |
+| Anyone in danger | Emergency services, then the person on SOS call (Operations → SOS on-call rota) |
 | Suspected crime or a court order | Admin on duty and legal counsel |
 | Data breach or suspected breach | Admin on duty and the data protection officer, at once |
 | Payment provider problem | Finance lead |
 | App fault affecting money | Developers and finance lead |
 
-Contacts: [admin on duty rota], [finance lead], [data protection officer],
+Contacts: [admin on duty], [finance lead], [data protection officer],
 [legal counsel], [developer on call].

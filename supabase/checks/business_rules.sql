@@ -2777,5 +2777,190 @@ select pg_temp.eq('a deleted account''s phones and browsers are forgotten with i
     + (select count(*) from public.push_subscriptions where profile_id = :tunde::uuid), 0::bigint);
 
 reset role;
+
+-- ==== 46. The SOS on-call rota, taking an SOS, and escalation ================
+-- Ngozi is made a moderator for this section; Mama stays an ordinary user.
+update public.profiles set staff_role = 'moderator' where id = :ngozi;
+select set_config('request.jwt.claim.sub', :ngozi, true);
+set local role authenticated;
+select pg_temp.fails('only admins keep the rota',
+  format($$ select public.admin_save_sos_shift(%L, 'primary', now(), now() + interval '8 hours') $$, :ngozi), 'admins only');
+select pg_temp.eq('SOS staff can read the rota', (select count(*) from public.sos_shifts), 0::bigint);
+reset role;
+select set_config('request.jwt.claim.sub', :admin, true);
+set local role authenticated;
+select pg_temp.fails('only an admin or moderator can be on call',
+  format($$ select public.admin_save_sos_shift(%L, 'primary', now(), now() + interval '8 hours') $$, :mama), 'only an admin or moderator');
+select pg_temp.fails('a shift must end after it starts',
+  format($$ select public.admin_save_sos_shift(%L, 'primary', now() + interval '2 hours', now() + interval '1 hour') $$, :ngozi), 'must end after it starts');
+select pg_temp.fails('a shift is at most a week',
+  format($$ select public.admin_save_sos_shift(%L, 'primary', now(), now() + interval '8 days') $$, :ngozi), 'at most 7 days');
+select pg_temp.fails('a shift that is over cannot be added',
+  format($$ select public.admin_save_sos_shift(%L, 'primary', now() - interval '2 hours', now() - interval '1 hour') $$, :ngozi), 'already over');
+select pg_temp.fails('the rota cannot be written directly',
+  format($$ insert into public.sos_shifts(staff_id, duty, starts_at, ends_at, created_by) values (%L, 'primary', now(), now() + interval '1 hour', %L) $$, :ngozi, :admin), 'permission denied');
+insert into t_ids select 'shift_p', public.admin_save_sos_shift(:ngozi, 'primary', now() - interval '1 hour', now() + interval '8 hours');
+select pg_temp.fails('two primaries cannot overlap',
+  format($$ select public.admin_save_sos_shift(%L, 'primary', now() + interval '1 hour', now() + interval '2 hours') $$, :admin), 'another primary shift overlaps');
+select pg_temp.fails('nobody is primary and backup at once',
+  format($$ select public.admin_save_sos_shift(%L, 'backup', now() + interval '1 hour', now() + interval '2 hours') $$, :ngozi), 'already on call');
+insert into t_ids select 'shift_b', public.admin_save_sos_shift(:admin, 'backup', now() - interval '1 hour', now() + interval '8 hours');
+select pg_temp.eq('the rota has no gap while the shift runs',
+  (select count(*) from public.sos_rota_gaps(now(), now() + interval '7 hours')), 0::bigint);
+select pg_temp.eq('and one after it ends',
+  (select starts_at from public.sos_rota_gaps(now(), now() + interval '1 day')), now() + interval '8 hours');
+reset role;
+select pg_temp.eq('the person put on call is told',
+  (select count(*) from public.notifications where profile_id = :ngozi and ref_type = 'admin_sos_rota'), 1::bigint);
+select pg_temp.eq('an admin who puts themselves on call is not',
+  (select count(*) from public.notifications where profile_id = :admin and ref_type = 'admin_sos_rota'), 0::bigint);
+select pg_temp.eq('rota changes are in the audit trail',
+  (select count(*) from public.admin_actions where action = 'sos_shift_added'), 2::bigint);
+
+select set_config('request.jwt.claim.sub', :customer, true);
+set local role authenticated;
+insert into t_ids select 'sos2', public.raise_sos(null, 6.6, 3.34, 'Second alert');
+reset role;
+select pg_temp.eq('an SOS is assigned to the primary on call',
+  (select assigned_to from public.sos_alerts where id = (select v from t_ids where k = 'sos2')), :ngozi::uuid);
+select pg_temp.eq('who is told it is theirs',
+  (select count(*) from public.notifications where profile_id = :ngozi and ref_id = (select v from t_ids where k = 'sos2')::text
+    and title like 'SOS, you are on call:%'), 1::bigint);
+select pg_temp.eq('the other SOS staff are told who is on call',
+  (select count(*) from public.notifications where profile_id = :admin and ref_id = (select v from t_ids where k = 'sos2')::text
+    and body like 'On call: Ngozi E.%'), 1::bigint);
+select set_config('request.jwt.claim.sub', :mama, true);
+set local role authenticated;
+select pg_temp.fails('other users cannot read the SOS queue', $$ select * from public.admin_sos_queue() $$, 'admins only');
+select pg_temp.fails('or take an SOS',
+  format($$ select public.admin_take_sos(%L) $$, (select v from t_ids where k = 'sos2')), 'admins only');
+reset role;
+select set_config('request.jwt.claim.sub', :ngozi, true);
+set local role authenticated;
+select pg_temp.eq('the queue gives staff the person''s phone and who has it',
+  (select assigned_name from public.admin_sos_queue() where id = (select v from t_ids where k = 'sos2')), 'Ngozi E.');
+reset role;
+select pg_temp.eq('the phone shown is the one on the account',
+  (select q.phone is not distinct from nullif(p.phone, '') from public.profiles p, lateral (
+    select phone from public.admin_sos_queue() where id = (select v from t_ids where k = 'sos2')) q where p.id = :customer::uuid), true);
+
+select pg_temp.eq('nothing escalates at once', private.escalate_sos(), 0);
+update public.sos_alerts set created_at = now() - interval '110 seconds' where id = (select v from t_ids where k = 'sos2');
+select pg_temp.eq('nor in the first two minutes', private.escalate_sos(), 0);
+update public.sos_alerts set created_at = now() - interval '3 minutes' where id = (select v from t_ids where k = 'sos2');
+select pg_temp.eq('an SOS nobody has taken after two minutes escalates', private.escalate_sos(), 1);
+select pg_temp.eq('to the backup and every admin',
+  (select count(*) from public.notifications where profile_id = :admin and ref_id = (select v from t_ids where k = 'sos2')::text
+    and title like 'SOS not taken after 3 minutes:%'), 1::bigint);
+select pg_temp.eq('and again to the person on call',
+  (select count(*) from public.notifications where profile_id = :ngozi and ref_id = (select v from t_ids where k = 'sos2')::text
+    and title like 'SOS not taken%'), 1::bigint);
+select pg_temp.eq('each step happens once', private.escalate_sos(), 0);
+update public.sos_alerts set created_at = now() - interval '6 minutes' where id = (select v from t_ids where k = 'sos2');
+select pg_temp.eq('after five minutes it goes to all SOS staff', private.escalate_sos(), 1);
+update public.sos_alerts set escalated_at = now() - interval '4 minutes' where id = (select v from t_ids where k = 'sos2');
+select pg_temp.eq('not again within five minutes', private.escalate_sos(), 0);
+update public.sos_alerts set escalated_at = now() - interval '6 minutes' where id = (select v from t_ids where k = 'sos2');
+select pg_temp.eq('and again every five minutes until someone takes it', private.escalate_sos(), 1);
+select pg_temp.eq('each time to every SOS staff member',
+  (select count(*) from public.notifications where ref_id = (select v from t_ids where k = 'sos2')::text
+    and title like 'SOS still not taken%'), 4::bigint);
+
+select set_config('request.jwt.claim.sub', :ngozi, true);
+set local role authenticated;
+select public.admin_take_sos((select v from t_ids where k = 'sos2'));
+reset role;
+select pg_temp.eq('taking an SOS records who took it',
+  (select acknowledged_by from public.sos_alerts where id = (select v from t_ids where k = 'sos2')), :ngozi::uuid);
+select pg_temp.eq('and tells the person someone is calling',
+  (select count(*) from public.notifications where profile_id = :customer and title = 'FindWork has seen your SOS'), 1::bigint);
+update public.sos_alerts set escalated_at = now() - interval '6 minutes' where id = (select v from t_ids where k = 'sos2');
+select pg_temp.eq('a taken SOS no longer escalates', private.escalate_sos(), 0);
+select set_config('request.jwt.claim.sub', :admin, true);
+set local role authenticated;
+select pg_temp.fails('only one person takes an SOS',
+  format($$ select public.admin_take_sos(%L) $$, (select v from t_ids where k = 'sos2')), 'already taken');
+select public.admin_handle_sos((select v from t_ids where k = 'sos2'), 'Called the customer; they are safe.');
+select pg_temp.fails('a handled SOS cannot be taken',
+  format($$ select public.admin_take_sos(%L) $$, (select v from t_ids where k = 'sos2')), 'already reviewed');
+
+-- Ending the primary's shift early leaves nobody on call.
+select public.admin_remove_sos_shift((select v from t_ids where k = 'shift_p'));
+reset role;
+select pg_temp.eq('a shift under way ends now rather than disappearing',
+  (select ends_at from public.sos_shifts where id = (select v from t_ids where k = 'shift_p')), now());
+select set_config('request.jwt.claim.sub', :admin, true);
+set local role authenticated;
+select pg_temp.fails('a shift that is over cannot be changed',
+  format($$ select public.admin_remove_sos_shift(%L) $$, (select v from t_ids where k = 'shift_p')), 'already over');
+insert into t_ids select 'shift_f', public.admin_save_sos_shift(:ngozi, 'primary', now() + interval '1 day', now() + interval '2 days');
+select public.admin_remove_sos_shift((select v from t_ids where k = 'shift_f'));
+select pg_temp.eq('a shift that has not started is removed',
+  (select count(*) from public.sos_shifts where id = (select v from t_ids where k = 'shift_f')), 0::bigint);
+reset role;
+select set_config('request.jwt.claim.sub', :mama, true);
+set local role authenticated;
+insert into t_ids select 'sos3', public.raise_sos(null, null, null, null);
+reset role;
+select pg_temp.eq('with nobody on call an SOS is nobody''s in particular',
+  (select assigned_to from public.sos_alerts where id = (select v from t_ids where k = 'sos3')), null::uuid);
+select pg_temp.eq('so every SOS staff member is told to take it',
+  (select count(*) from public.notifications where profile_id in (:admin, :ngozi) and ref_id = (select v from t_ids where k = 'sos3')::text
+    and body like 'Nobody is on call.%'), 2::bigint);
+select pg_temp.eq('and it repeats after five minutes, not two', private.escalate_sos(), 0);
+
+select set_config('request.jwt.claim.sub', :admin, true);
+set local role authenticated;
+insert into t_ids select 'shift_n', public.admin_save_sos_shift(:ngozi, 'primary', now(), now() + interval '1 day');
+reset role;
+update public.profiles set staff_role = null where id = :ngozi;
+select pg_temp.eq('someone who loses their staff role is no longer on call', private.sos_on_call('primary'), null::uuid);
+select private.remind_sos_rota_gaps();
+select pg_temp.eq('admins are told each morning of gaps in the rota',
+  (select count(*) from public.notifications where profile_id = :admin and title = 'The SOS rota has gaps'), 1::bigint);
+
+-- A member of staff on call who presses SOS is not the one to answer it.
+update public.profiles set staff_role = 'moderator' where id = :ngozi;
+select set_config('request.jwt.claim.sub', :ngozi, true);
+set local role authenticated;
+insert into t_ids select 'sos4', public.raise_sos(null, null, null, 'Staff in trouble');
+reset role;
+select pg_temp.eq('staff on call who press SOS hand their own alert to the backup',
+  (select assigned_to from public.sos_alerts where id = (select v from t_ids where k = 'sos4')), :admin::uuid);
+select pg_temp.eq('nor alerted about it',
+  (select count(*) from public.notifications where profile_id = :ngozi and ref_id = (select v from t_ids where k = 'sos4')::text), 0::bigint);
+update public.sos_alerts set escalated_at = now() - interval '6 minutes' where id = (select v from t_ids where k = 'sos4');
+select private.escalate_sos();
+select pg_temp.eq('even when it escalates',
+  (select count(*) from public.notifications where profile_id = :ngozi and ref_id = (select v from t_ids where k = 'sos4')::text), 0::bigint);
+select set_config('request.jwt.claim.sub', :ngozi, true);
+set local role authenticated;
+select pg_temp.fails('and cannot take it',
+  format($$ select public.admin_take_sos(%L) $$, (select v from t_ids where k = 'sos4')), 'someone else must answer');
+select pg_temp.fails('or close it',
+  format($$ select public.admin_handle_sos(%L, 'All fine') $$, (select v from t_ids where k = 'sos4')), 'someone else must answer');
+reset role;
+update public.profiles set staff_role = null where id = :ngozi;
+
+-- An SOS is pushed even to staff who muted system notifications. Plain
+-- Postgres has no pg_net, so a stand-in records the requests.
+select not exists(select 1 from pg_namespace where nspname = 'net') as stub_net \gset
+\if :stub_net
+create schema net;
+create table net.requests (body jsonb);
+create function net.http_post(url text, headers jsonb, body jsonb) returns bigint language sql
+  as $$ insert into net.requests values (body); select 1::bigint $$;
+insert into private.settings values ('push_url', 'https://push.example/send'), ('push_secret', 'fixture') on conflict (key) do nothing;
+insert into public.push_subscriptions(profile_id, endpoint, p256dh, auth_key) values
+  (:admin, 'https://push.example/admin', 'BPublicKeyPublicKeyPublicKeyPublicKey', 'authsecret123');
+insert into public.user_preferences(profile_id, language, muted_kinds) values (:admin, 'en', '{system}')
+  on conflict (profile_id) do update set muted_kinds = '{system}';
+insert into public.notifications(profile_id, kind, title, body) values (:admin, 'system', 'Muted fixture', '');
+select pg_temp.eq('a muted kind is not pushed', (select count(*) from net.requests), 0::bigint);
+insert into public.notifications(profile_id, kind, title, body, ref_type, ref_id) values (:admin, 'system', 'SOS fixture', '', 'admin_sos', null);
+select pg_temp.eq('but an SOS is', (select count(*) from net.requests), 1::bigint);
+\endif
+
+reset role;
 select 'ALL BUSINESS RULE CHECKS PASSED' as result;
 rollback;

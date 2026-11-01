@@ -5,8 +5,9 @@ import { StatusBar } from '../../components/chrome/StatusBar'
 import { BackButton } from '../../components/chrome/PageHeader'
 import { PlaceholderImage } from '../../components/ui/PlaceholderImage'
 import { SectionLabel } from '../../components/ui/SectionLabel'
+import { TrustBadge } from '../../components/ui/TrustBadge'
 import { EmptyState, FullScreenLoader } from '../../components/system/States'
-import { productImage, useProduct, useProductVariants, useRecommendedProducts } from '../../lib/api'
+import { productImage, useProduct, useProductVariants, useRecommendedProducts, useTrust } from '../../lib/api'
 import { useAuth } from '../../lib/authContext'
 import { useCart } from '../../store/cart'
 import { formatNaira } from '../../lib/format'
@@ -20,6 +21,7 @@ export function ProductDetail() {
   const add = useCart((s) => s.add)
   const { data: variants } = useProductVariants(id ? [id] : [])
   const { data: suggestions } = useRecommendedProducts(id ?? null)
+  const { data: sellerTrust } = useTrust(product?.seller_id)
   const [chosen, setChosen] = useState<string | null>(null)
   const option = variants?.find((v) => v.id === chosen) ?? null
   const inCart = useCart((s) => s.lines.find((l) => l.productId === id && (l.variantId ?? null) === (option?.id ?? null))?.qty ?? 0)
@@ -99,6 +101,7 @@ export function ProductDetail() {
             <i className="ph-fill ph-storefront text-2xl text-brand" />
             <div className="flex-1">
               <div className="text-[15px] font-semibold text-ink">{product.vendor}</div>
+              {sellerTrust && <div className="mt-1"><TrustBadge tier={sellerTrust.tier} score={sellerTrust.score} /></div>}
               <div className="text-[12.5px] text-muted-2 mt-0.5">
                 {t('Visit the store · your money is held until you confirm it arrived')}
               </div>

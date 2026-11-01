@@ -9,6 +9,7 @@ import { PlaceholderImage } from '../../components/ui/PlaceholderImage'
 import { ReportButton } from '../../components/ui/ReportButton'
 import { ChatAttachment } from '../../components/ui/PrivateAttachment'
 import { ChatComposer } from '../../components/ui/ChatComposer'
+import { TrustBadge } from '../../components/ui/TrustBadge'
 import { ErrorState, ListSkeleton } from '../../components/system/States'
 import { useAuth } from '../../lib/authContext'
 import {
@@ -16,6 +17,7 @@ import {
   useMessages,
   useProvider,
   useThreadPartner,
+  useTrust,
   useThreadRealtime,
 } from '../../lib/api'
 import { useThreadContext } from '../../lib/api/matching'
@@ -41,6 +43,7 @@ export function ChatThread() {
   const { user } = useAuth()
   const { data: partner } = useThreadPartner(threadId)
   const { data: partnerAsProvider } = useProvider(partner?.id)
+  const { data: partnerTrust } = useTrust(partner?.id)
   const messages = useMessages(threadId)
   const { data: context } = useThreadContext(threadId)
   const { mutate: markRead } = useMarkThreadRead()
@@ -76,6 +79,7 @@ export function ChatThread() {
               {partnerAsProvider?.verified && <i className="ph-fill ph-shield-check text-sm text-success" />}
             </div>
             {partnerAsProvider && <div className="text-xs text-muted-3 mt-0.5">{partnerAsProvider.category}</div>}
+            {partnerTrust && <div className="mt-1"><TrustBadge tier={partnerTrust.tier} score={partnerTrust.score} /></div>}
           </div>
           {partnerAsProvider && (
             <Link

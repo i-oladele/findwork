@@ -158,6 +158,8 @@ export const keys = {
     locations: (id: string) => ['safety', 'meetups', id, 'locations'] as const,
     contacts: () => ['safety', 'contacts'] as const,
     sos: () => ['safety', 'sos'] as const,
+    rota: (from: string, to: string) => ['safety', 'rota', from, to] as const,
+    sosStaff: () => ['safety', 'sos-staff'] as const,
   },
   procurement: {
     all: ['procurement'] as const,

@@ -7,11 +7,14 @@ you hand a phone to.
 
 1. A Supabase project, set up as in the [README](README.md#setting-up-the-backend).
 2. Seeded (`supabase db push --include-seed`), which creates the demo catalog
-   and the accounts below.
+   and the seed accounts below; then `npm run demo:accounts` for the staff,
+   rider, business-buyer and seller accounts and some test money.
 3. The auth settings from the README, above all a real email sender: testers
    signing up with their own address get no code without one.
-4. Paystack **test** keys set (`sk_test_…`), with the webhook URL pointing at
-   your deployed `paystack-webhook` function.
+4. Outside services are optional. Without their keys, card payments, ID
+   checks, live video, road routing, text-message codes and push to the phone
+   apps are off, and the app says so; everything else can be tested. To add
+   them, follow [Adding the keys](docs/operations/adding-the-keys.md).
 5. The app running: `npm run dev`, or deployed somewhere your testers can open.
 
 Use a **staging project**, not one holding real data: the check suite and the
@@ -26,8 +29,23 @@ All seeded accounts share the password `findwork-demo-2026`.
 | `ada@findwork.africa` | Customer, starts with ₦48,200 |
 | `hello@adastailoring.ng` | Provider — tailoring, verified, two services |
 | `hello@chidiplumbing.ng` | Provider — plumbing, verified |
-| `hello@mamankechi.ng` | Provider — not verified, no services yet |
-| `admin@findwork.africa` | Operations console at `/admin` |
+| `hello@mamankechi.ng` | Provider — not verified, no services yet; sells three goods (fabric, a headtie, a made-to-measure kaftan) |
+| `admin@findwork.africa` | Operations console at `/admin`, everything |
+| `tunde.a@example.ng` | Customer; a buyer in Okoro Foods who needs approval above ₦50,000 |
+
+From `npm run demo:accounts`, same password:
+
+| Email | Who they are |
+| --- | --- |
+| `moderator@findwork.africa` | Staff: disputes, reports, verification, users, risk, SOS, courses |
+| `finance@findwork.africa` | Staff: payouts, wallets, reports |
+| `support@findwork.africa` | Staff: help requests, orders, deliveries |
+| `rider@findwork.africa` | Rider, approved, motorcycle, Yaba |
+| `buyer@findwork.africa` | Business buyer, owner of Okoro Foods Ltd (test) |
+
+It also credits test money as staff adjustments: ₦200,000 to Adaeze,
+₦500,000 to the business buyer and ₦100,000 to Tunde. Delete all of these
+accounts before launch.
 
 Sign up as yourself too: a brand-new account is the most honest test, and it
 starts with an empty wallet, which is the state most testers will be in.
@@ -204,13 +222,31 @@ Paystack test card: `4084 0840 8408 4081`, any future expiry, CVV `408`,
 PIN `0000`, OTP `123456`. Dojah sandbox values:
 https://docs.dojah.io/api-reference/get-started/sandbox-test-data
 
+### 16. Built 1 November
+
+- **SOS on-call rota.** As the admin, `/admin` → SOS on-call rota: add a
+  primary shift for the moderator starting now. As Adaeze, press SOS on a
+  meet-up. The moderator is told it is theirs; the Risk tab shows Adaeze's
+  phone number, her position, who she was meeting, and "I'm on it". Leave it
+  untaken: after 2 minutes the admin is alerted, after 5 every admin and
+  moderator, then every 5 minutes. Press "I'm on it": Adaeze is told someone
+  is calling. End the shift afterwards. With nobody on the rota, an SOS goes
+  to every admin and moderator at once.
+- **Trust badges.** The verification level and trust score show on a seller's
+  product (one of Mama Nkechi's), in the chat header with anyone, and on each
+  quote when comparing quotes for a job. Switch to Yoruba: the badge is
+  translated.
+
 ## Things that are meant to look unfinished
 
 Not bugs; they are listed in the README under "Before real money":
 
 - Without each provider's keys: IDs are checked by an admin, withdrawals are
   sent by hand, cards are not offered, live video comes from a pasted link,
-  and arrival times are estimates.
+  arrival times are estimates, phone sign-up moves to the email form, and the
+  phone apps get no push.
+- Nobody is on the SOS rota yet, so every SOS goes to every admin and
+  moderator.
 - The staff console is in English whatever language is chosen.
 - Terms and privacy pages are marked as drafts for legal review.
 - The iPhone app does not sell plans or paid courses.

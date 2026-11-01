@@ -3,7 +3,7 @@ import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { useStaff } from './admin'
 import { keys } from './keys'
-import type { Meetup, SosAlert, TrustedContact } from '../database.types'
+import type { Database, Meetup, SosDuty, SosShift, StaffRole, TrustedContact } from '../database.types'
 
 type Person = { full_name: string; verification_tier: number; trust_score: number } | null
 export type MeetupWithPeople = Meetup & { buyer: Person; seller: Person }
@@ -158,8 +158,9 @@ export function useRaiseSos() {
   })
 }
 
-export type AdminSos = SosAlert & { profile: { full_name: string } | null }
+export type AdminSos = Database['public']['Functions']['admin_sos_queue']['Returns'][number]
 
+/** The open SOS alerts, with the person's phone, who they were meeting and who has it. */
 export function useAdminSos() {
   const allowed = useStaff().can('users')
   return useQuery({
@@ -167,11 +168,22 @@ export function useAdminSos() {
     enabled: allowed,
     refetchInterval: 15_000,
     queryFn: async (): Promise<AdminSos[]> => {
-      const { data, error } = await supabase.from('sos_alerts').select('*, profile:profiles!sos_alerts_profile_id_fkey(full_name)')
-        .eq('status', 'open').order('created_at')
+      const { data, error } = await supabase.rpc('admin_sos_queue')
       if (error) throw error
-      return data as unknown as AdminSos[]
+      return (data ?? []).map((a) => ({ ...a, lat: a.lat == null ? null : Number(a.lat), lng: a.lng == null ? null : Number(a.lng) }))
     },
+  })
+}
+
+/** "I'm on it": one member of staff takes the alert, and the person is told someone is calling. */
+export function useAdminTakeSos() {
+  const invalidate = useInvalidateSafety()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('admin_take_sos', { p_alert_id: id })
+      if (error) throw error
+    },
+    onSuccess: invalidate,
   })
 }
 
@@ -180,6 +192,73 @@ export function useAdminHandleSos() {
   return useMutation({
     mutationFn: async (input: { id: string; note: string }) => {
       const { error } = await supabase.rpc('admin_handle_sos', { p_alert_id: input.id, p_note: input.note })
+      if (error) throw error
+    },
+    onSuccess: invalidate,
+  })
+}
+
+export type RotaShift = SosShift & { staff: { full_name: string } | null }
+
+/**
+ * The rota from the start of this hour for the given number of days: the
+ * shifts in that window and the times nobody is on call. The window moves
+ * on the hour, so it stays the same between renders.
+ */
+export function useSosRota(days: number) {
+  const allowed = useStaff().can('users')
+  const hour = Math.floor(Date.now() / 3_600_000) * 3_600_000
+  const window = { from: new Date(hour).toISOString(), to: new Date(hour + days * 86_400_000).toISOString() }
+  return useQuery({
+    queryKey: keys.safety.rota(window.from, window.to),
+    enabled: allowed,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const [shifts, gaps] = await Promise.all([
+        supabase.from('sos_shifts').select('*, staff:profiles!sos_shifts_staff_id_fkey(full_name)')
+          .gt('ends_at', window.from).lt('starts_at', window.to).order('starts_at'),
+        supabase.rpc('sos_rota_gaps', { p_from: window.from, p_to: window.to }),
+      ])
+      if (shifts.error) throw shifts.error
+      if (gaps.error) throw gaps.error
+      return { shifts: shifts.data as unknown as RotaShift[], gaps: gaps.data ?? [] }
+    },
+  })
+}
+
+/** The admins and moderators who can be put on call. */
+export function useSosStaff() {
+  const allowed = useStaff().can('users')
+  return useQuery({
+    queryKey: keys.safety.sosStaff(),
+    enabled: allowed,
+    queryFn: async (): Promise<{ id: string; full_name: string; staff_role: StaffRole }[]> => {
+      const { data, error } = await supabase.rpc('admin_sos_staff')
+      if (error) throw error
+      return data ?? []
+    },
+  })
+}
+
+export function useSaveSosShift() {
+  const invalidate = useInvalidateSafety()
+  return useMutation({
+    mutationFn: async (input: { staffId: string; duty: SosDuty; startsAt: Date; endsAt: Date }) => {
+      const { error } = await supabase.rpc('admin_save_sos_shift', {
+        p_staff_id: input.staffId, p_duty: input.duty, p_starts_at: input.startsAt.toISOString(), p_ends_at: input.endsAt.toISOString(),
+      })
+      if (error) throw error
+    },
+    onSuccess: invalidate,
+  })
+}
+
+/** Removes a shift that has not started; ends one that is under way. */
+export function useRemoveSosShift() {
+  const invalidate = useInvalidateSafety()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('admin_remove_sos_shift', { p_shift_id: id })
       if (error) throw error
     },
     onSuccess: invalidate,

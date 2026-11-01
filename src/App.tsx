@@ -100,6 +100,7 @@ const NewStream = lazyNamed(() => import('./routes/social/Live'), 'NewStream')
 const StreamRoom = lazyNamed(() => import('./routes/social/Live'), 'StreamRoom')
 const CertificatePage = lazyNamed(() => import('./routes/learning/CertificatePage'), 'CertificatePage')
 const CourseEditor = lazyNamed(() => import('./routes/admin/CourseEditor'), 'CourseEditor')
+const OnCallRota = lazyNamed(() => import('./routes/admin/OnCallRota'), 'OnCallRota')
 const Internships = lazyNamed(() => import('./routes/internships/Internships'), 'Internships')
 const NewInternship = lazyNamed(() => import('./routes/internships/Internships'), 'NewInternship')
 const InternshipDetail = lazyNamed(() => import('./routes/internships/Internships'), 'InternshipDetail')
@@ -289,6 +290,7 @@ export default function App() {
             <Route path="/admin/analytics" element={<Analytics />} />
             <Route path="/admin/coupons" element={<PlatformCoupons />} />
             <Route path="/admin/courses" element={<CourseEditor />} />
+            <Route path="/admin/on-call" element={<OnCallRota />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

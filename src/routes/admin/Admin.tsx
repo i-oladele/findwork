@@ -5,7 +5,7 @@ import { UsersTab } from './UsersTab'
 import { RiskTab } from './RiskTab'
 import { LogisticsTab } from './LogisticsTab'
 import type { StaffArea } from '../../lib/staff'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { PageHeader } from '../../components/chrome/PageHeader'
 import { Badge } from '../../components/ui/Badge'
@@ -70,7 +70,10 @@ export function Admin() {
   const { data: profile, isLoading } = useProfile()
   const staff = useStaff()
   const tabs = TABS.filter((t) => staff.can(TAB_AREA[t]))
-  const [chosen, setTab] = useState<Tab | null>(null)
+  // A notification can open a tab directly, e.g. an SOS opens Risk.
+  const [params] = useSearchParams()
+  const asked = TABS.find((t) => t === params.get('tab')) ?? null
+  const [chosen, setTab] = useState<Tab | null>(asked)
   const tab = chosen && tabs.includes(chosen) ? chosen : tabs[0]
   const [error, setError] = useState<string | null>(null)
 
@@ -111,6 +114,7 @@ export function Admin() {
         {staff.can('analytics') && <Link to="/admin/analytics" className="block min-h-11 py-3 text-sm font-semibold text-brand underline">Platform reports & analytics</Link>}
         {staff.can('content') && <Link to="/admin/courses" className="block min-h-11 py-2 text-sm font-semibold text-brand underline">Courses and quizzes</Link>}
         {staff.can('finance') && <Link to="/admin/coupons" className="block min-h-11 py-2 text-sm font-semibold text-brand underline">FindWork coupons</Link>}
+        {staff.can('users') && <Link to="/admin/on-call" className="block min-h-11 py-2 text-sm font-semibold text-brand underline">SOS on-call rota</Link>}
         <div className="flex gap-2 overflow-x-auto mt-3 -mx-[22px] px-[22px] pb-1">
           {tabs.map((t) => (
             <button

@@ -11,6 +11,7 @@ import { StarRating } from '../../components/ui/StarRating'
 import { SlotPicker } from '../../components/ui/SlotPicker'
 import { QuoteHistory } from '../../components/ui/QuoteHistory'
 import { PlaceholderImage } from '../../components/ui/PlaceholderImage'
+import { TrustBadge } from '../../components/ui/TrustBadge'
 import { QueryState } from '../../components/system/QueryState'
 import { EmptyState, FullScreenLoader } from '../../components/system/States'
 import { useAuth } from '../../lib/authContext'
@@ -102,6 +103,7 @@ export function JobQuotes() {
                         {q.start_day ? ` · can start ${q.start_day}` : ''}
                       </span>
                     </div>
+                    {q.trust && <div className="mt-1.5"><TrustBadge tier={q.trust.tier} score={q.trust.score} /></div>}
                   </div>
                 </div>
                 {q.message && <p className="mt-3 text-[14.5px] leading-[1.5] text-text-soft">“{q.message}”</p>}

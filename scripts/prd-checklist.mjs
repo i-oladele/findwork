@@ -57,16 +57,16 @@ Each feature lists source evidence, remaining work and an acceptance scenario. T
 ## Current constraints and decisions
 
 - Keep React/Vite and Supabase, as previously approved; the roadmap's Next.js/DigitalOcean stack is superseded, not its functional requirements.
-- No local Supabase stack. SQL checks run on plain Postgres 17, as CI does, and were last run on 21 October 2026 (558 checks). They have not been run against the hosted project, which holds demo data only.
-- Every requirement now has a source-code path. On 21 October 2026 the new migrations were applied to the hosted project, all fifteen Edge Functions were deployed, and the app was walked in a browser against it as a customer, a provider and an admin; what that walk found was fixed the same day.
+- No local Supabase stack. SQL checks run on plain Postgres 17, as CI does, and were last run on 1 November 2026 (626 checks). They have not been run against the hosted project, which holds demo data only.
+- Every requirement now has a source-code path. On 21 October 2026 the new migrations were applied to the hosted project, all fifteen Edge Functions were deployed, and the app was walked in a browser against it as a customer, a provider and an admin; what that walk found was fixed the same day. The push-to-phones migration from that day and the SOS on-call rota were applied on 1 November 2026.
 - Outside services are built to their test or sandbox APIs and stay switched off until their keys are set, saying so on screen: Paystack (card checkout, saved-card renewals, confirmed bank accounts and automatic payouts), Dojah (BVN, NIN, CAC, face and SIM checks), LiveKit (live video), Google Maps (road routing and traffic), Termii (SMS codes). None has been exercised against its provider yet. Push keys and the assistant's API key are set on the hosted project.
-- Policy numbers chosen while building are first proposals to confirm: the trust score weights, the daily limits per verification tier, the rider's 80% share of the delivery fee, the risk-rule thresholds, the automatic-payout limit, and coupons being funded by whoever issues them.
+- Policy numbers chosen while building are first proposals to confirm: the trust score weights, the daily limits per verification tier, the rider's 80% share of the delivery fee, the risk-rule thresholds, the automatic-payout limit, and coupons being funded by whoever issues them. The SOS escalation steps were agreed on 1 November 2026: 2 and 5 minutes.
 - Preserve the historical September audits. Several of their missing-feature findings were completed by later commits; this checklist is the current status source.
 - Lesson content, the terms of service and the privacy policy are written as drafts for review by practitioners and a lawyer; the app shows the legal pages as drafts. The Yoruba, Igbo, Hausa and Pidgin translations need a native speaker's review.
 
 ## What happens next
 
-1. Set the outside services' test keys (Paystack, Dojah, LiveKit, Google Maps, Termii) and walk each flow end to end.
+1. Set the outside services' test keys (Paystack, Dojah, LiveKit, Google Maps, Termii, Firebase) as in docs/operations/adding-the-keys.md, and walk each flow end to end. Everything else they depend on is in place on the hosted project.
 2. Have the translations, lessons and legal drafts reviewed; decide in-app purchase on iPhone for plans and paid courses.
 3. Walk every journey on real phones, including push, the second sign-in step and a suspended account; run the business-rule checks against a staging copy of the hosted database.
 4. Confirm or change the policy numbers above, then tune the risk rules, matching and payout limit against real activity.
@@ -96,7 +96,7 @@ The PRD introduction and conclusion also describe the following expectations. Ro
 | Phase 13: security/disputes | F28–F30 plus audit history and security review. |
 | Phase 14: admin/reporting | F31–F33 plus role-protected exports, complete revenue definitions and marketplace insights. |
 | Phase 15: hardening and scale | Functional/regression/UX/security/performance QA, penetration testing, cache/database tuning, queues/retries, media processing, load tests, backup automation and disaster recovery remain unverified. |
-| Launch content and policies | Terms of service and privacy policy (NDPA) drafted from how the app works, shown as drafts pending legal review; support procedures in docs/operations/support-procedures.md (the SOS on-call rota is still missing). |
+| Launch content and policies | Terms of service and privacy policy (NDPA) drafted from how the app works, shown as drafts pending legal review; support procedures in docs/operations/support-procedures.md. The SOS on-call rota and its escalation are built; the rota needs people on it before the SOS button is promoted. |
 
 ${rows.join('\n\n')}
 `

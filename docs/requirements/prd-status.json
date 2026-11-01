@@ -1,6 +1,6 @@
 {
-  "reviewed_at": "2026-10-21",
-  "baseline_commit": "7c37b51",
+  "reviewed_at": "2026-11-01",
+  "baseline_commit": "c68e89d",
   "source": "docs/requirements/functionality.md",
   "features": [
     {
@@ -381,7 +381,7 @@
         "src/lib/nativePush.ts",
         "src/routes/chat/ChatThread.tsx"
       ],
-      "remaining": "A chat shows the open booking, order, purchase order and dispute between the two people, each linking to its screen. Every in-app notification can be pushed to browsers and to the iPhone and Android apps with push on; sending needs the send-push function deployed with a VAPID key pair (browsers) or a Firebase project and service account (apps), pg_net and two settings rows, none of which is configured, and no push has reached a real device.",
+      "remaining": "A chat shows the open booking, order, purchase order and dispute between the two people, each linking to its screen. Every in-app notification can be pushed to browsers and to the iPhone and Android apps with push on; on the hosted project browser push is configured (VAPID keys, pg_net and the two settings rows), and send-push was redeployed with phone push on 1 November 2026; push to the phone apps waits for a Firebase project and its keys. No push has yet been confirmed on a real device.",
       "acceptance": "Use two accounts to exchange text, voice and media, paginate old messages, verify unread state, deny outsiders and follow transaction-linked push deep links.",
       "verification": "Subscription rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 33), and the apps' device rules on 21 October 2026 (section 45); the sender's logic, including FCM sign-in and its answers, is unit tested. No push has been delivered to a device."
     },
@@ -769,11 +769,15 @@
         "supabase/migrations/20261004001400_classifieds_geo_and_safety.sql",
         "src/routes/safety/MeetupDetail.tsx",
         "src/routes/safety/SosButton.tsx",
-        "src/lib/safety.ts"
+        "src/lib/safety.ts",
+        "supabase/migrations/20261101000100_sos_on_call.sql",
+        "src/routes/admin/RiskTab.tsx",
+        "src/routes/admin/OnCallRota.tsx",
+        "src/lib/rota.ts"
       ],
-      "remaining": "A buyer proposes a time and public place for a listing and the seller confirms. Either person can share their location with the other for a set time (5 minutes to 3 hours); it stops by itself and when the meet-up ends. SOS alerts FindWork staff with the person's position and who they were meeting, and works even for a suspended account; it does not contact the police, and says so beside the emergency numbers. Up to three trusted contacts can be called or texted in one tap through the phone's own apps; FindWork sends them nothing itself. Location sharing stops when the browser is closed. Staff response to an SOS has no on-call process behind it yet.",
+      "remaining": "A buyer proposes a time and public place for a listing and the seller confirms. Either person can share their location with the other for a set time (5 minutes to 3 hours); it stops by itself and when the meet-up ends. SOS alerts FindWork staff with the person's position and who they were meeting, and works even for a suspended account; it does not contact the police, and says so beside the emergency numbers. Up to three trusted contacts can be called or texted in one tap through the phone's own apps; FindWork sends them nothing itself. Location sharing stops when the browser is closed. An SOS goes first to the primary on an on-call rota that admins keep (a primary and a backup at any moment); whoever takes it presses \"I'm on it\", which tells the person someone is calling, and staff see the person's phone number, position and who they were meeting. An SOS nobody has taken after 2 minutes goes to the backup and every admin, and after 5 minutes, and every 5 minutes after that, to every admin and moderator (steps agreed on 1 November 2026); SOS pushes ignore muted notifications, and admins are told each morning of gaps in the next two days. Escalation runs on pg_cron on the hosted project. Nobody is on the rota yet: until there is 24-hour cover, every SOS goes to every admin and moderator and the SOS button is not promoted.",
       "acceptance": "Share/revoke a meetup location, expire access, trigger an SOS to authorized recipients and review an abuse report without exposing other users’ locations.",
-      "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 34). Deployed integration and on-device acceptance are still pending."
+      "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 34), and the on-call rota and escalation on 1 November 2026 (section 46). The rota migration was applied to the hosted project on 1 November 2026, where escalate-sos runs every minute and succeeds; the rota has nobody on it yet. On-device acceptance is still pending."
     },
     {
       "id": "F16",
@@ -1387,9 +1391,13 @@
         "src/routes/chat/Trust.tsx",
         "src/lib/api/reviews.ts",
         "supabase/migrations/20261004000900_risk_and_trust.sql",
-        "src/components/ui/TrustBadge.tsx"
+        "src/components/ui/TrustBadge.tsx",
+        "src/routes/commerce/ProductDetail.tsx",
+        "src/routes/chat/ChatThread.tsx",
+        "src/routes/hiring/JobQuotes.tsx",
+        "src/lib/__tests__/trust-badges.test.tsx"
       ],
-      "remaining": "A composite score out of 100 (verification 30, reputation 30, history 20, conduct 20) is stored per account, refreshed when its inputs change, shown on provider profiles and classifieds, and broken down for the owner. The weights are a first proposal and need agreeing; the score is not yet shown on products, chat or job quotes.",
+      "remaining": "A composite score out of 100 (verification 30, reputation 30, history 20, conduct 20) is stored per account, refreshed when its inputs change, shown with the verification tier on provider profiles, classifieds, a seller's products, the person at the other end of a chat, and each quote on a job, in the reader's language, and broken down for the owner. The weights are a first proposal and need agreeing.",
       "acceptance": "Explain a reproducible trust score from verified signals, transaction and complaint outcomes; prevent self-written scores and expose appropriate history.",
       "verification": "Database rules executed on plain Postgres 17 on 4 October 2026 (supabase/checks/business_rules.sql section 29). Deployed integration and user-journey acceptance are still pending."
     },

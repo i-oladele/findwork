@@ -27,7 +27,8 @@ goods, move money through escrow, and settle disputes — in one app.
 
 ```bash
 npm install
-cp .env.example .env.local     # fill in from your Supabase project
+# create .env.local with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+# from your Supabase project (Settings -> API)
 npm run dev
 ```
 
@@ -46,7 +47,10 @@ supabase functions deploy paystack-webhook paystack-charge paystack-payout send-
 ```
 
 Every outside service is optional. Without its keys the app says so on screen
-and carries on without it; with them, the feature switches on:
+and carries on without it; with them, the feature switches on. Server keys
+live in the server section of `.env.local` and go up with
+`npm run secrets:push`; [Adding the keys](docs/operations/adding-the-keys.md)
+has the steps for each service:
 
 | What | Without it | To switch it on |
 | --- | --- | --- |
@@ -114,7 +118,8 @@ plain Postgres cannot prove either:
   then `notify pgrst, 'reload config';`.
 - **Scheduled jobs.** With `pg_cron` enabled (Database → Extensions),
   `select jobname from cron.job` should list renewals, renewal reminders,
-  order and purchase-order auto-release, and the activity purge. Push needs
+  order and purchase-order auto-release, the activity purge, SOS escalation
+  (every minute) and the SOS rota-gap reminder. Push needs
   `pg_net` enabled the same way.
 
 Then regenerate types whenever the schema changes:
@@ -352,6 +357,8 @@ npm run prd:report  # rebuild the PRD checklist from prd-status.json
 npm run prd:check   # fail if the checklist is out of date (CI runs this)
 npm run i18n:check  # fail if a translation is missing (CI runs this)
 npm run cap:sync    # build and copy into the iPhone and Android projects
+npm run secrets:push    # upload the filled server keys in .env.local (--dry-run to preview)
+npm run demo:accounts   # staff, rider, buyer and seller test accounts on the hosted demo project
 
 # Business rules, against any seeded database (never production):
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/checks/business_rules.sql
@@ -403,8 +410,10 @@ backtest, and rider rounds are optimised exactly. The assistant, translation,
 lesson help, dispute summaries and the staff analyst call Claude.
 
 **Operations.** Staff procedures for every console queue are in
-`docs/operations/support-procedures.md`. There is no on-call rota for SOS
-alerts yet; do not promote the SOS button until there is.
+`docs/operations/support-procedures.md`. SOS alerts go to whoever is on the
+on-call rota (Operations → SOS on-call rota) and escalate when nobody takes
+them; put people on the rota, and confirm `escalate-sos` is in `cron.job`,
+before promoting the SOS button.
 
 **Content.** The three starter courses have lessons and quizzes written by
 the developers; have someone who practises each trade check them. Every plan

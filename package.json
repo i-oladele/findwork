@@ -7,6 +7,8 @@
     "prd:report": "node scripts/prd-checklist.mjs",
     "prd:check": "node scripts/prd-checklist.mjs --check",
     "i18n:check": "node scripts/i18n-check.mjs --check",
+    "secrets:push": "node scripts/push-secrets.ts",
+    "demo:accounts": "supabase db query --linked --file supabase/test-accounts.sql",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",

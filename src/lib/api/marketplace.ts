@@ -98,7 +98,7 @@ export function useCloseJob() {
   })
 }
 
-export type QuoteWithProvider = SentQuote & { provider: ProviderProfile | null }
+export type QuoteWithProvider = SentQuote & { provider: ProviderProfile | null; trust: { tier: number; score: number } | null }
 
 /**
  * Quotes on one job, with the quoting provider's public profile. RLS limits
@@ -118,14 +118,24 @@ export function useQuotesForJob(jobId: string | undefined) {
       if (!quotes.length) return []
 
       // sent_quotes points at profiles, not provider_profiles, so the
-      // business name and rating come from a second lookup.
-      const { data: providers, error: pErr } = await supabase
-        .from('provider_profiles')
-        .select('*')
-        .in('id', quotes.map((q) => q.provider_id))
-      if (pErr) throw pErr
+      // business name and rating come from a second lookup, and the
+      // verification tier and trust score from the profiles themselves.
+      const ids = quotes.map((q) => q.provider_id)
+      const [providers, people] = await Promise.all([
+        supabase.from('provider_profiles').select('*').in('id', ids),
+        supabase.from('profiles').select('id, verification_tier, trust_score').in('id', ids),
+      ])
+      if (providers.error) throw providers.error
+      if (people.error) throw people.error
 
-      return quotes.map((q) => ({ ...q, provider: providers.find((p) => p.id === q.provider_id) ?? null }))
+      return quotes.map((q) => {
+        const person = people.data.find((p) => p.id === q.provider_id)
+        return {
+          ...q,
+          provider: providers.data.find((p) => p.id === q.provider_id) ?? null,
+          trust: person ? { tier: person.verification_tier, score: person.trust_score } : null,
+        }
+      })
     },
   })
 }

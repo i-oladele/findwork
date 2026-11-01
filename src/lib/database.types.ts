@@ -74,6 +74,8 @@ export type PurchaseOrderStatus = 'pending_approval' | 'rejected' | 'funded' | '
 export type InternshipApplicationStatus = 'submitted' | 'shortlisted' | 'accepted' | 'rejected' | 'withdrawn'
 export type StreamStatus = 'scheduled' | 'live' | 'ended'
 export type StaffRole = 'admin' | 'moderator' | 'finance' | 'support'
+/** Who answers an SOS first, and who is called in when they do not. */
+export type SosDuty = 'primary' | 'backup'
 export type SecurityEventKind = 'sign_in' | 'new_device' | 'mfa_enrolled' | 'mfa_removed' | 'mfa_recovered' | 'suspended' | 'reinstated' | 'role_changed' | 'sos'
 export type RiskSeverity = 'low' | 'medium' | 'high'
 export type RiskAlertStatus = 'open' | 'reviewed' | 'dismissed'
@@ -212,10 +214,17 @@ export type Database = {
         Relationships: []
       }
       sos_alerts: {
-        Row: { id: string; profile_id: string; meetup_id: string | null; lat: number | null; lng: number | null; note: string | null; status: 'open' | 'handled'; handled_by: string | null; handled_at: string | null; handled_note: string | null; created_at: string }
+        Row: { id: string; profile_id: string; meetup_id: string | null; lat: number | null; lng: number | null; note: string | null; status: 'open' | 'handled'; handled_by: string | null; handled_at: string | null; handled_note: string | null; created_at: string; assigned_to: string | null; acknowledged_by: string | null; acknowledged_at: string | null; escalation_level: number; escalated_at: string | null }
         Insert: never
         Update: never
         Relationships: [Rel<'sos_alerts_profile_id_fkey', 'profile_id', 'profiles'>]
+      }
+      sos_shifts: {
+        /** The SOS on-call rota; readable by SOS staff, written through admin_save_sos_shift. */
+        Row: { id: string; staff_id: string; duty: SosDuty; starts_at: string; ends_at: string; created_by: string; created_at: string }
+        Insert: never
+        Update: never
+        Relationships: [Rel<'sos_shifts_staff_id_fkey', 'staff_id', 'profiles'>]
       }
       user_preferences: {
         Row: { profile_id: string; language: Language; muted_kinds: string[]; interests: string[]; skills: string[]; analytics: boolean; updated_at: string }
@@ -1246,6 +1255,20 @@ export type Database = {
       remove_trusted_contact: { Args: { p_contact_id: string }; Returns: undefined }
       raise_sos: { Args: { p_meetup_id: string | null; p_lat: number | null; p_lng: number | null; p_note: string | null }; Returns: string }
       admin_handle_sos: { Args: { p_alert_id: string; p_note: string }; Returns: undefined }
+      admin_take_sos: { Args: { p_alert_id: string }; Returns: undefined }
+      admin_sos_queue: {
+        Args: Record<string, never>
+        Returns: {
+          id: string; profile_id: string; full_name: string; phone: string | null; lat: number | null; lng: number | null; note: string | null; created_at: string
+          meetup_id: string | null; meetup_title: string | null; meetup_place: string | null; meet_at: string | null; other_id: string | null; other_name: string | null
+          assigned_to: string | null; assigned_name: string | null; acknowledged_by: string | null; acknowledged_name: string | null; acknowledged_at: string | null
+          escalation_level: number
+        }[]
+      }
+      admin_sos_staff: { Args: Record<string, never>; Returns: { id: string; full_name: string; staff_role: StaffRole }[] }
+      admin_save_sos_shift: { Args: { p_staff_id: string; p_duty: SosDuty; p_starts_at: string; p_ends_at: string }; Returns: string }
+      admin_remove_sos_shift: { Args: { p_shift_id: string }; Returns: undefined }
+      sos_rota_gaps: { Args: { p_from: string; p_to: string }; Returns: { starts_at: string; ends_at: string }[] }
       save_preferences: { Args: { p_language: Language; p_muted_kinds: string[]; p_interests: string[] }; Returns: undefined }
       save_push_subscription: { Args: { p_endpoint: string; p_p256dh: string; p_auth: string; p_label: string }; Returns: undefined }
       remove_push_subscription: { Args: { p_endpoint: string }; Returns: undefined }
@@ -1550,6 +1573,7 @@ export type UserPreferences = Tables<'user_preferences'>
 export type Meetup = Tables<'meetups'>
 export type TrustedContact = Tables<'trusted_contacts'>
 export type SosAlert = Tables<'sos_alerts'>
+export type SosShift = Tables<'sos_shifts'>
 export type Organization = Tables<'organizations'>
 export type PurchaseOrder = Tables<'purchase_orders'>
 export type StockItem = Tables<'stock_items'>

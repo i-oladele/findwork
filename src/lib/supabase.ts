@@ -15,7 +15,7 @@ export const isSupabaseConfigured = Boolean(url && anonKey)
 if (!isSupabaseConfigured && import.meta.env.DEV) {
   console.warn(
     '[findwork] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set. ' +
-      'Copy .env.example to .env.local and fill them in — every query will fail until you do.',
+      'Add them to .env.local — every query will fail until you do.',
   )
 }
 
