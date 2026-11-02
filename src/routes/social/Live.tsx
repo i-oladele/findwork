@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Screen } from '../../components/chrome/Screen'
 import { PageHeader } from '../../components/chrome/PageHeader'
@@ -23,6 +23,7 @@ import {
   useStreamMessages,
   useStreamProducts,
   useStreams,
+  useLiveVideoAllowance,
   useLiveVideoAvailable,
   useStreamViewers,
   useUpdateStream,
@@ -30,7 +31,7 @@ import {
 } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
 import { formatDateTime, formatNaira } from '../../lib/format'
-import { playbackFor } from '../../lib/stream'
+import { allowanceSummary, cameraAvailability, ENDED_REASON, minutesLeft, playbackFor, type LiveVideoAllowance } from '../../lib/stream'
 import { useCart } from '../../store/cart'
 
 // The video client is large; it loads only on a stream that FindWork carries.
@@ -74,6 +75,8 @@ function StreamForm() {
   const schedule = useScheduleStream()
   const { data: products } = useMyProducts()
   const { data: liveVideo } = useLiveVideoAvailable()
+  const { data: allowance } = useLiveVideoAllowance(Boolean(liveVideo))
+  const camera = allowance ? cameraAvailability(allowance) : { ok: true as const }
   const [video, setVideo] = useState<'livekit' | 'link' | null>(null)
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
@@ -81,8 +84,9 @@ function StreamForm() {
   const [chosen, setChosen] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const live = (products ?? []).filter((p) => p.status === 'live')
-  // FindWork carries the video when it can; a pasted link is the other choice.
-  const source = video ?? (liveVideo ? 'livekit' : 'link')
+  // FindWork carries the video when it can; a pasted link is the other choice,
+  // and the only one once this month's live video is used up.
+  const source = camera.ok ? (video ?? (liveVideo ? 'livekit' : 'link')) : 'link'
   const valid = title.trim().length >= 3 && (source === 'livekit' || /^https:\/\/\S+$/.test(url.trim()))
 
   return (
@@ -94,15 +98,19 @@ function StreamForm() {
           <fieldset>
             <legend className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-muted-2 mb-2">Video</legend>
             <div className="flex flex-wrap gap-2">
-              <button type="button" aria-pressed={source === 'livekit'} onClick={() => setVideo('livekit')}
-                className={`rounded-full px-[15px] py-2 text-[13.5px] ${source === 'livekit' ? 'bg-ink text-white font-semibold' : 'bg-white border border-line text-ink font-medium'}`}>From this phone&apos;s camera</button>
+              <button type="button" aria-pressed={source === 'livekit'} disabled={!camera.ok} onClick={() => setVideo('livekit')}
+                className={`rounded-full px-[15px] py-2 text-[13.5px] disabled:opacity-50 ${source === 'livekit' ? 'bg-ink text-white font-semibold' : 'bg-white border border-line text-ink font-medium'}`}>From this phone&apos;s camera</button>
               <button type="button" aria-pressed={source === 'link'} onClick={() => setVideo('link')}
                 className={`rounded-full px-[15px] py-2 text-[13.5px] ${source === 'link' ? 'bg-ink text-white font-semibold' : 'bg-white border border-line text-ink font-medium'}`}>A link from another app</button>
             </div>
+            {!camera.ok && <p className="mt-2 text-[13px] leading-[1.45] text-text-soft">{camera.reason}</p>}
           </fieldset>
         )}
         {source === 'livekit' ? (
-          <Alert tone="info">You broadcast from your camera inside FindWork, and viewers watch beside the chat and your products. You can check your camera before going live.</Alert>
+          <>
+            <Alert tone="info">You broadcast from your camera inside FindWork, and viewers watch beside the chat and your products. You can check your camera before going live.</Alert>
+            {allowance && <AllowanceNote a={allowance} />}
+          </>
         ) : (
           <>
             <Alert tone="info">FindWork runs the selling room: the chat, your pinned products and checkout. The video comes from the app you broadcast with (YouTube Live, or any service that gives you a watch link). Paste that link below.</Alert>
@@ -174,7 +182,8 @@ function Room({ s }: { s: StreamWithSeller }) {
         <Link to={`/store/${s.seller_id}`} className="inline-flex items-center min-h-11 text-[14px] font-semibold text-brand-hover">{s.seller?.business_name ?? 'Seller'} · visit the store</Link>
 
         {s.status === 'scheduled' && <Alert tone="info">This stream has not started{s.scheduled_for ? `. It is planned for ${formatDateTime(s.scheduled_for)}` : ''}.</Alert>}
-        {s.status === 'ended' && <Alert tone="info">This stream has ended. The products are still on sale in the store.</Alert>}
+        {s.status === 'ended' && <Alert tone="info">{s.ended_reason ? ENDED_REASON[s.ended_reason] : 'This stream has ended. The products are still on sale in the store.'}</Alert>}
+        {carried && mine && s.status !== 'ended' && <SellerVideoTime startedAt={s.started_at} />}
         {carried && mine && <Suspense fallback={videoLoading}><LiveBroadcast streamId={s.id} ended={s.status === 'ended'} /></Suspense>}
         {carried && !mine && isLive && <Suspense fallback={videoLoading}><LiveWatch streamId={s.id} /></Suspense>}
         {!carried && isLive && playback && (
@@ -260,3 +269,33 @@ function Room({ s }: { s: StreamWithSeller }) {
     </Screen>
   )
 }
+
+/** What a FindWork video stream may use, in plain terms. */
+function AllowanceNote({ a }: { a: LiveVideoAllowance }) {
+  return (
+    <p className="text-[13px] leading-[1.5] text-text-soft">
+      {allowanceSummary(a)} (resets {formatDateTime(a.resets_at)}). Everyone in the stream counts, you included: 10 viewers for
+      30 minutes is about 330 minutes. A stream runs for up to {a.stream_minutes} minutes once live, after a camera check of up
+      to {a.preview_minutes}, with up to {a.max_viewers} people watching at once. A YouTube link has no limits.
+    </p>
+  )
+}
+
+/** For the seller during a FindWork video stream: time left on it, and this month's minutes. */
+function SellerVideoTime({ startedAt }: { startedAt: string | null }) {
+  const { data: a } = useLiveVideoAllowance(true)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [])
+  if (!a) return null
+  const left = minutesLeft(startedAt, a.stream_minutes, now)
+  return (
+    <p className={`mt-2 text-[13px] ${left !== null && left <= 5 ? 'font-semibold text-danger' : 'text-text-soft'}`}>
+      {left === null ? `Up to ${a.stream_minutes} minutes once you go live. ` : `${left} minute${left === 1 ? '' : 's'} left on this stream. `}
+      {allowanceSummary(a)}.
+    </p>
+  )
+}
+

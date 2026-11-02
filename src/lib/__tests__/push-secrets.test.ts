@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { paystackSettingsSql, SERVER_KEYS, serverSecrets, valueOf } from '../../../scripts/push-secrets.ts'
+import { livekitSettingsSql, paystackSettingsSql, SERVER_KEYS, serverSecrets, valueOf } from '../../../scripts/push-secrets.ts'
 
 const ENV = `
 # app
@@ -77,5 +77,11 @@ describe('uploading server keys from .env.local', () => {
     expect(sql).toContain("('paystack_hook_secret', 'abc''123')")
     expect(sql).toContain('on conflict (key) do update')
     expect(() => paystackSettingsSql("x'; drop table", 's')).toThrow()
+  })
+
+  it('points the database at the live video meter, with the same secret', () => {
+    const sql = livekitSettingsSql('yletjxnmsytdmhtsyezd', 'meter-secret')
+    expect(sql).toContain("('livekit_tick_url', 'https://yletjxnmsytdmhtsyezd.supabase.co/functions/v1/livekit-meter')")
+    expect(sql).toContain("('livekit_hook_secret', 'meter-secret')")
   })
 })

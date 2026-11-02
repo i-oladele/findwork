@@ -13,7 +13,7 @@
 // Secrets: LIVEKIT_URL (wss://<project>.livekit.cloud), LIVEKIT_API_KEY, LIVEKIT_API_SECRET
 // Deploy:  supabase functions deploy livekit-token
 import { adminClient, callerFrom, cors, json } from '../_shared/http.ts'
-import { joinGrant, serverUrl, signToken } from './livekitToken.ts'
+import { joinGrant, serverGrant, serverUrl, signToken } from './livekitToken.ts'
 
 type Access = { room: string; publish: boolean; status: string; name: string | null }
 
@@ -36,8 +36,10 @@ Deno.serve(async (req: Request) => {
   if (body.action === 'join') {
     const { data, error } = await admin.rpc('stream_access', { p_stream_id: body.stream_id, p_profile_id: user.id })
     if (error) return json({ error: error.message }, 500)
-    const access = data as Access | null
+    const access = data as (Access & { denied?: string }) | null
     if (!access) return json({ error: 'stream_not_open' }, 403)
+    // A fair-use limit (live_video_tick): the app says which, and offers the link option.
+    if (access.denied) return json({ error: 'video_limit', reason: access.denied }, 403)
     const token = await signToken(apiKey!, apiSecret!, {
       identity: user.id,
       name: access.name ?? undefined,
@@ -53,7 +55,8 @@ Deno.serve(async (req: Request) => {
     if (!stream || stream.seller_id !== user.id || stream.video !== 'livekit') return json({ error: 'stream not found' }, 404)
     if (stream.status !== 'ended') return json({ error: 'stream is still open' }, 400)
     const room = `stream-${stream.id}`
-    const token = await signToken(apiKey!, apiSecret!, { identity: 'findwork-server', ttlSeconds: 60, video: { room, roomAdmin: true } })
+    // Deleting a room needs roomCreate; roomAdmin alone is refused.
+    const token = await signToken(apiKey!, apiSecret!, { identity: 'findwork-server', ttlSeconds: 60, video: serverGrant('delete', room) })
     const res = await fetch(`${serverUrl(url!)}/twirp/livekit.RoomService/DeleteRoom`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

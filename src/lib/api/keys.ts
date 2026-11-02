@@ -180,6 +180,8 @@ export const keys = {
     streamProducts: (id: string) => ['social', 'streams', id, 'products'] as const,
     streamMessages: (id: string) => ['social', 'streams', id, 'messages'] as const,
     liveVideo: () => ['social', 'live-video'] as const,
+    liveVideoAllowance: () => ['social', 'live-video', 'allowance'] as const,
+    adminLiveVideo: () => ['social', 'live-video', 'admin'] as const,
   },
   security: {
     all: ['security'] as const,

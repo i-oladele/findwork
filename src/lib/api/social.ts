@@ -3,6 +3,7 @@ import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
 import { keys } from './keys'
 import type { LiveStream, Product } from '../database.types'
+import { videoLimitMessage, type LiveVideoAllowance, type LiveVideoState } from '../stream'
 
 export type FeedPost = {
   id: string; author_id: string; kind: 'story' | 'reel'; media_path: string; mime: string; caption: string
@@ -230,10 +231,68 @@ export type StreamRoomAccess = { url: string; token: string; publish: boolean }
 export async function joinStreamRoom(streamId: string): Promise<StreamRoomAccess> {
   const { data, error } = await supabase.functions.invoke('livekit-token', { body: { action: 'join', stream_id: streamId } })
   if (error) {
-    const status = (error as { context?: Response }).context?.status
-    throw new Error(status === 403 ? 'This stream is not open to watch.' : 'We could not connect to the video. Try again.')
+    const context = (error as { context?: Response }).context
+    if (context?.status !== 403) throw new Error('We could not connect to the video. Try again.')
+    // A fair-use limit says which one; anything else is a stream not open to this person.
+    const answer = (await context.json().catch(() => null)) as { error?: string; reason?: string } | null
+    throw new Error(videoLimitMessage(answer?.error === 'video_limit' ? answer.reason : undefined))
   }
   return data as StreamRoomAccess
+}
+
+/** The signed-in seller's live video this month, while FindWork video is set up. */
+export function useLiveVideoAllowance(enabled: boolean) {
+  return useQuery({
+    queryKey: keys.social.liveVideoAllowance(),
+    enabled,
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<LiveVideoAllowance> => {
+      const { data, error } = await supabase.rpc('live_video_allowance')
+      if (error) throw error
+      return data as unknown as LiveVideoAllowance
+    },
+  })
+}
+
+export type LiveVideoPolicy = {
+  plan_minutes: number; seller_minutes: number; stream_minutes: number
+  preview_minutes: number; max_viewers: number; cycle_day: number
+}
+export type AdminLiveVideo = {
+  policy: LiveVideoPolicy
+  used: number
+  state: LiveVideoState
+  cycle_start: string
+  resets_at: string
+  sellers: { seller_id: string; name: string | null; minutes: number }[]
+}
+
+/** Staff: live video used this cycle, by whom, and the limits in force. */
+export function useAdminLiveVideo(enabled: boolean) {
+  return useQuery({
+    queryKey: keys.social.adminLiveVideo(),
+    enabled,
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<AdminLiveVideo> => {
+      const { data, error } = await supabase.rpc('admin_live_video')
+      if (error) throw error
+      return data as unknown as AdminLiveVideo
+    },
+  })
+}
+
+export function useSetLiveVideoPolicy() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: LiveVideoPolicy) => {
+      const { error } = await supabase.rpc('admin_set_live_video_policy', {
+        p_plan_minutes: p.plan_minutes, p_seller_minutes: p.seller_minutes, p_stream_minutes: p.stream_minutes,
+        p_preview_minutes: p.preview_minutes, p_max_viewers: p.max_viewers, p_cycle_day: p.cycle_day,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.social.all }),
+  })
 }
 
 /** After ending a stream, the seller closes its room so nobody is left watching an empty one. */

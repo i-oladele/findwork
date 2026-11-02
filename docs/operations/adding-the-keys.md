@@ -49,11 +49,25 @@ the database is told where the Paystack functions are.
 
 ## LiveKit (video inside live selling)
 
-- [cloud.livekit.io](https://cloud.livekit.io): create a project; under
-  Settings → Keys, copy the WebSocket URL (`wss://…livekit.cloud`), API key
-  and secret into the three `LIVEKIT_` lines.
+- [cloud.livekit.io](https://cloud.livekit.io): sign up (no card needed) and
+  create a project; it starts on the free Build plan. Under Settings → API
+  Keys, copy the WebSocket URL (`wss://…livekit.cloud`), API key and secret
+  into the three `LIVEKIT_` lines. `LIVEKIT_HOOK_SECRET` is already filled in;
+  leave it.
+- Note the day LiveKit's monthly usage resets (Billing or Usage in its
+  dashboard). After `npm run secrets:push`, sign in as the admin and set it
+  under `/admin/analytics` → Live video this cycle → Change the limits →
+  "Cycle starts on day". FindWork counts by the same month as LiveKit.
+- The free plan's minutes are shared by every seller, so FindWork keeps a
+  fair share: each seller gets 750 minutes a month (everyone in a stream
+  counts, the seller too), a stream runs up to 60 minutes after a 15-minute
+  camera check, with up to 50 watching. New camera streams pause at 90% of
+  the plan and everything stops at 98%, so LiveKit never cuts video off.
+  Admins change these numbers on the same card. Streams with a YouTube link
+  are never limited.
 - **Check:** as the test seller, go live (`/live/new`) from the phone camera;
-  watch it from another account.
+  watch it from another account. A minute or two later the card on
+  `/admin/analytics` shows the minutes used.
 
 ## Google Maps (road routing and traffic for riders)
 

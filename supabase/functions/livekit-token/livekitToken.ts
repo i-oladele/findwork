@@ -6,9 +6,14 @@
  */
 
 export type VideoGrant = {
-  room: string
+  /** The room the grant is for; server grants such as roomList need none. */
+  room?: string
   roomJoin?: boolean
   roomAdmin?: boolean
+  /** LiveKit requires this to create or delete a room (RoomService.DeleteRoom). */
+  roomCreate?: boolean
+  /** And this to list the open rooms (RoomService.ListRooms). */
+  roomList?: boolean
   canPublish?: boolean
   canSubscribe?: boolean
   canPublishData?: boolean
@@ -55,4 +60,9 @@ export function joinGrant(room: string, publish: boolean): VideoGrant {
 /** wss://project.livekit.cloud → https://project.livekit.cloud, for the server API. */
 export function serverUrl(wsUrl: string): string {
   return wsUrl.replace(/^ws(s?):\/\//, 'http$1://').replace(/\/$/, '')
+}
+
+/** A short-lived server token for the room API: delete one room, or list them all. */
+export function serverGrant(action: 'delete' | 'list', room?: string): VideoGrant {
+  return action === 'delete' ? { room, roomCreate: true } : { roomList: true }
 }

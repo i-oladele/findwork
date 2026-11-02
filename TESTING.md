@@ -237,6 +237,15 @@ https://docs.dojah.io/api-reference/get-started/sandbox-test-data
   quote when comparing quotes for a job. Switch to Yoruba: the badge is
   translated.
 
+- **Live video fair use** (LiveKit keys). As the admin, on `/admin/analytics`
+  → Live video this cycle → Change the limits, set the longest stream to 10
+  minutes and viewers at once to 1. As the seller, go live on camera: the
+  stream shows the minutes left and the month's minutes used; a second viewer
+  is told the stream is full; at 5 minutes left the seller is warned, and at
+  10 the stream ends with the reason shown. Set the seller's share below what
+  they have used: the camera option is turned off and the form offers a link.
+  Put the limits back afterwards.
+
 ## Things that are meant to look unfinished
 
 Not bugs; they are listed in the README under "Before real money":

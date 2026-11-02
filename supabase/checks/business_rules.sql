@@ -2173,6 +2173,12 @@ select pg_temp.eq('going live tells the people who saved the seller',
 select set_config('request.jwt.claim.sub', :customer, true);
 set local role authenticated;
 insert into t_ids select 'stream_message', public.send_stream_message((select v from t_ids where k = 'stream'), 'How much for two yards?');
+-- The checks run as one transaction, so a message is stamped with its start
+-- (now()) while pacing reads the clock; stamp it with the clock, as a
+-- request of its own would be, so the check does not depend on timing.
+reset role;
+update public.stream_messages set created_at = clock_timestamp() where id = (select v from t_ids where k = 'stream_message');
+set local role authenticated;
 select pg_temp.fails('chat is paced', format($$ select public.send_stream_message(%L, 'And three?') $$, (select v from t_ids where k = 'stream')), 'slow down');
 select pg_temp.eq('a viewer is counted as watching', public.stream_heartbeat((select v from t_ids where k = 'stream')), 1);
 select pg_temp.fails('a viewer cannot delete chat',
@@ -2959,6 +2965,225 @@ insert into public.notifications(profile_id, kind, title, body) values (:admin, 
 select pg_temp.eq('a muted kind is not pushed', (select count(*) from net.requests), 0::bigint);
 insert into public.notifications(profile_id, kind, title, body, ref_type, ref_id) values (:admin, 'system', 'SOS fixture', '', 'admin_sos', null);
 select pg_temp.eq('but an SOS is', (select count(*) from net.requests), 1::bigint);
+\endif
+
+reset role;
+
+-- ==== 47. Live video fair use: allowances, limits and the meter ============
+-- Mama, Bisi and Chidi sell; the customer, Ngozi and Femi watch. Earlier
+-- sections' streams are ended so these start clean.
+\set bisi_seller '''00000000-0000-0000-0000-000000000004'''
+update public.live_streams set status = 'ended', ended_at = now() where status <> 'ended';
+select pg_temp.eq('the cycle starts on the cycle day at midnight UTC',
+  private.live_video_cycle_start(1, '2026-11-15 10:00Z'), '2026-11-01 00:00Z'::timestamptz);
+select pg_temp.eq('or on that day last month, before it comes round',
+  private.live_video_cycle_start(15, '2026-11-10 10:00Z'), '2026-10-15 00:00Z'::timestamptz);
+select pg_temp.eq('and from midnight on the day itself',
+  private.live_video_cycle_start(15, '2026-11-15 00:00Z'), '2026-11-15 00:00Z'::timestamptz);
+
+select set_config('request.jwt.claim.sub', :mama, true);
+set local role authenticated;
+insert into t_ids select 'lv1', public.schedule_stream('Fabric sale on camera', null, null, '{}', 'livekit');
+select pg_temp.eq('a seller sees their own live video allowance',
+  (public.live_video_allowance()->>'allowance')::integer, 750);
+select pg_temp.fails('the meter is not for users', $$ select public.live_video_tick('[]') $$, 'permission denied');
+select pg_temp.fails('nor is deciding who joins the video', format($$ select public.stream_access(%L, auth.uid()) $$, (select v from t_ids where k = 'lv1')), 'permission denied');
+select pg_temp.fails('nor are the staff figures', $$ select public.admin_live_video() $$, 'admins only');
+select pg_temp.fails('nor the limits', $$ select public.admin_set_live_video_policy(5000, 750, 60, 15, 50, 1) $$, 'admins only');
+select pg_temp.fails('nor is the usage table readable', $$ select count(*) from public.live_video_minutes $$, 'permission denied');
+reset role;
+select set_config('request.jwt.claim.sub', :customer, true);
+set local role authenticated;
+select pg_temp.fails('only sellers have an allowance', $$ select public.live_video_allowance() $$, 'provider not found');
+reset role;
+
+set local role service_role;
+select pg_temp.eq('the seller may broadcast during the camera check',
+  (public.stream_access((select v from t_ids where k = 'lv1'), :mama)->>'publish')::boolean, true);
+reset role;
+select pg_temp.eq('letting someone in is noted, so the meter runs',
+  (select video_joined_at is not null from public.live_streams where id = (select v from t_ids where k = 'lv1')), true);
+set local role service_role;
+select public.live_video_tick(jsonb_build_array(jsonb_build_object('room', 'stream-' || (select v from t_ids where k = 'lv1'), 'participants', 1))) ->> 'state';
+select public.live_video_tick(jsonb_build_array(jsonb_build_object('room', 'stream-' || (select v from t_ids where k = 'lv1'), 'participants', 1))) ->> 'state';
+reset role;
+select pg_temp.eq('a minute is counted once, however often the meter runs',
+  (select count(*) from public.live_video_minutes where stream_id = (select v from t_ids where k = 'lv1')), 1::bigint);
+select pg_temp.eq('and marked as the camera check',
+  (select live from public.live_video_minutes where stream_id = (select v from t_ids where k = 'lv1')), false);
+-- Fourteen more minutes of camera check, recorded last cycle so that they
+-- count towards the check's 15 minutes but not this month's allowance.
+insert into public.live_video_minutes(stream_id, seller_id, minute, participants, live)
+select (select v from t_ids where k = 'lv1'), :mama, private.live_video_cycle_start(1) - make_interval(days => 1, mins => n), 1, false
+from generate_series(1, 14) n;
+set local role service_role;
+select pg_temp.eq('the camera check lasts 15 minutes',
+  public.stream_access((select v from t_ids where k = 'lv1'), :mama)->>'denied', 'preview');
+select pg_temp.eq('then the meter closes its room',
+  public.live_video_tick(jsonb_build_array(jsonb_build_object('room', 'stream-' || (select v from t_ids where k = 'lv1'), 'participants', 1)))->'close',
+  jsonb_build_array('stream-' || (select v from t_ids where k = 'lv1')));
+reset role;
+select pg_temp.eq('without ending the stream', (select status from public.live_streams where id = (select v from t_ids where k = 'lv1')), 'scheduled');
+
+select set_config('request.jwt.claim.sub', :mama, true);
+set local role authenticated;
+select public.update_stream((select v from t_ids where k = 'lv1'), 'start', null);
+reset role;
+set local role service_role;
+select pg_temp.eq('once live, the seller is back on camera',
+  (public.stream_access((select v from t_ids where k = 'lv1'), :mama)->>'publish')::boolean, true);
+select pg_temp.eq('and viewers may watch',
+  (public.stream_access((select v from t_ids where k = 'lv1'), :customer)->>'publish')::boolean, false);
+reset role;
+select set_config('request.jwt.claim.sub', :admin, true);
+set local role authenticated;
+select pg_temp.fails('limits must make sense',
+  $$ select public.admin_set_live_video_policy(5000, 9000, 60, 15, 50, 1) $$, 'invalid live video policy');
+select public.admin_set_live_video_policy(5000, 750, 60, 15, 1, 1);
+reset role;
+insert into public.stream_viewers(stream_id, profile_id) values ((select v from t_ids where k = 'lv1'), :ngozi);
+set local role service_role;
+select pg_temp.eq('a stream takes only so many viewers at once',
+  public.stream_access((select v from t_ids where k = 'lv1'), :customer)->>'denied', 'full');
+select pg_temp.eq('though someone already watching can rejoin',
+  (public.stream_access((select v from t_ids where k = 'lv1'), :ngozi)->>'publish')::boolean, false);
+reset role;
+select set_config('request.jwt.claim.sub', :admin, true);
+set local role authenticated;
+select public.admin_set_live_video_policy(5000, 750, 60, 15, 50, 1);
+reset role;
+select pg_temp.eq('changing the limits is in the audit trail',
+  (select count(*) from public.admin_actions where action = 'set_live_video_policy'), 2::bigint);
+
+update public.live_streams set started_at = now() - interval '56 minutes' where id = (select v from t_ids where k = 'lv1');
+set local role service_role;
+select public.live_video_tick('[]');
+select public.live_video_tick('[]');
+reset role;
+select pg_temp.eq('the seller is warned once, five minutes before the time is up',
+  (select count(*) from public.notifications where profile_id = :mama and title = '5 minutes left on your live stream'), 1::bigint);
+update public.live_streams set started_at = now() - interval '61 minutes' where id = (select v from t_ids where k = 'lv1');
+set local role service_role;
+select pg_temp.eq('at the time limit the meter closes the room',
+  public.live_video_tick('[]')->'close', jsonb_build_array('stream-' || (select v from t_ids where k = 'lv1')));
+reset role;
+select pg_temp.eq('and ends the stream, saying why',
+  (select status || ' ' || ended_reason from public.live_streams where id = (select v from t_ids where k = 'lv1')), 'ended time_limit');
+select pg_temp.eq('and the seller is told',
+  (select count(*) from public.notifications where profile_id = :mama and title = 'Your live stream reached its time limit'), 1::bigint);
+select pg_temp.eq('the viewers are let go', (select count(*) from public.stream_viewers where stream_id = (select v from t_ids where k = 'lv1')), 0::bigint);
+set local role service_role;
+select pg_temp.eq('a room left open for an ended stream is closed',
+  public.live_video_tick(jsonb_build_array(jsonb_build_object('room', 'stream-' || (select v from t_ids where k = 'lv1'), 'participants', 0)))->'close',
+  jsonb_build_array('stream-' || (select v from t_ids where k = 'lv1')));
+select pg_temp.eq('so is one for a stream that does not exist',
+  public.live_video_tick('[{"room": "stream-00000000-0000-0000-0000-00000000dead", "participants": 2}]')->'close',
+  '["stream-00000000-0000-0000-0000-00000000dead"]'::jsonb);
+select pg_temp.eq('rooms that are not a stream''s are left alone',
+  public.live_video_tick('[{"room": "someone-elses-room", "participants": 2}]')->'close', '[]'::jsonb);
+reset role;
+
+-- A seller's monthly allowance.
+select set_config('request.jwt.claim.sub', :mama, true);
+set local role authenticated;
+insert into t_ids select 'lv2', public.schedule_stream('Second sale', null, null, '{}', 'livekit');
+select public.update_stream((select v from t_ids where k = 'lv2'), 'start', null);
+insert into t_ids select 'lv3', public.schedule_stream('Third sale', null, null, '{}', 'livekit');
+reset role;
+insert into public.live_video_minutes(stream_id, seller_id, minute, participants, live)
+values ((select v from t_ids where k = 'lv2'), :mama, private.live_video_cycle_start(1) - interval '1 minute', 5000, true);
+select pg_temp.eq('minutes from the last cycle do not count',
+  private.live_video_used(:mama::uuid), 1);
+insert into public.live_video_minutes(stream_id, seller_id, minute, participants, live)
+values ((select v from t_ids where k = 'lv2'), :mama, private.live_video_cycle_start(1) + interval '3 minutes', 690, true);
+set local role service_role;
+select public.live_video_tick('[]');
+reset role;
+select pg_temp.eq('at 90% of the allowance the seller is warned',
+  (select count(*) from public.notifications where profile_id = :mama and title = 'Your live video for this month is nearly used up'), 1::bigint);
+insert into public.live_video_minutes(stream_id, seller_id, minute, participants, live)
+values ((select v from t_ids where k = 'lv2'), :mama, private.live_video_cycle_start(1) + interval '4 minutes', 60, true);
+select set_config('request.jwt.claim.sub', :mama, true);
+set local role authenticated;
+select pg_temp.eq('the seller sees what they have used', (public.live_video_allowance()->>'used')::integer, 751);
+select pg_temp.fails('a seller who has used their allowance cannot go live on camera',
+  format($$ select public.update_stream(%L, 'start', null) $$, (select v from t_ids where k = 'lv3')), 'live video allowance used');
+reset role;
+set local role service_role;
+select pg_temp.eq('nor rejoin the camera',
+  public.stream_access((select v from t_ids where k = 'lv2'), :mama)->>'denied', 'allowance');
+select public.live_video_tick('[]');
+reset role;
+select pg_temp.eq('and the meter ends their stream',
+  (select status || ' ' || ended_reason from public.live_streams where id = (select v from t_ids where k = 'lv2')), 'ended allowance');
+select set_config('request.jwt.claim.sub', :mama, true);
+set local role authenticated;
+insert into t_ids select 'lvlink', public.schedule_stream('Link sale', 'https://youtube.com/live/abcdefgh', null, '{}', 'link');
+select public.update_stream((select v from t_ids where k = 'lvlink'), 'start', null);
+reset role;
+select pg_temp.eq('a stream with a link is never limited',
+  (select status from public.live_streams where id = (select v from t_ids where k = 'lvlink')), 'live');
+
+-- The platform's pool.
+select set_config('request.jwt.claim.sub', :bisi_seller, true);
+set local role authenticated;
+insert into t_ids select 'lva', public.schedule_stream('Bisi live', null, null, '{}', 'livekit');
+select public.update_stream((select v from t_ids where k = 'lva'), 'start', null);
+insert into t_ids select 'lva2', public.schedule_stream('Bisi later', null, null, '{}', 'livekit');
+reset role;
+select set_config('request.jwt.claim.sub', :chidi, true);
+set local role authenticated;
+insert into t_ids select 'lvc', public.schedule_stream('Chidi demo', null, null, '{}', 'livekit');
+reset role;
+-- Another seller's heavy use takes the platform to 90% (4,500 of 5,000).
+insert into public.live_video_minutes(stream_id, seller_id, minute, participants, live)
+values ((select v from t_ids where k = 'lvc'), :chidi, private.live_video_cycle_start(1) + interval '5 minutes', 4500 - private.live_video_used(), false);
+set local role service_role;
+select pg_temp.eq('at 90% new camera streams are paused', public.live_video_tick('[]')->>'state', 'paused');
+select public.live_video_tick('[]');
+reset role;
+select pg_temp.eq('and the admins are told, once',
+  (select count(*) from public.notifications where profile_id = :admin and title = 'Live video is 90% used this month'), 1::bigint);
+select set_config('request.jwt.claim.sub', :bisi_seller, true);
+set local role authenticated;
+select pg_temp.fails('so no one can go live on camera',
+  format($$ select public.update_stream(%L, 'start', null) $$, (select v from t_ids where k = 'lva2')), 'live video used up');
+select pg_temp.eq('and sellers are shown why', public.live_video_allowance()->>'state', 'paused');
+reset role;
+set local role service_role;
+select pg_temp.eq('or start a camera check',
+  public.stream_access((select v from t_ids where k = 'lva2'), :bisi_seller)->>'denied', 'budget');
+select pg_temp.eq('but a stream already live carries on',
+  (public.stream_access((select v from t_ids where k = 'lva'), :customer)->>'publish')::boolean, false);
+reset role;
+select pg_temp.eq('without being ended', (select status from public.live_streams where id = (select v from t_ids where k = 'lva')), 'live');
+insert into public.live_video_minutes(stream_id, seller_id, minute, participants, live)
+values ((select v from t_ids where k = 'lvc'), :chidi, private.live_video_cycle_start(1) + interval '6 minutes', 400, false);
+set local role service_role;
+select pg_temp.eq('at 98% everything stops',
+  public.live_video_tick('[]')->'close', jsonb_build_array('stream-' || (select v from t_ids where k = 'lva')));
+select pg_temp.eq('and nobody new may watch',
+  public.stream_access((select v from t_ids where k = 'lva'), :femi), null::jsonb);
+reset role;
+select pg_temp.eq('the live stream ends, saying why',
+  (select status || ' ' || ended_reason from public.live_streams where id = (select v from t_ids where k = 'lva')), 'ended budget');
+select set_config('request.jwt.claim.sub', :admin, true);
+set local role authenticated;
+select pg_temp.eq('staff see the cycle so far', (public.admin_live_video()->>'used')::integer, 4900);
+select pg_temp.eq('and who used it, most first', public.admin_live_video()->'sellers'->0->>'name', (select business_name from public.provider_profiles where id = :chidi));
+reset role;
+
+-- The meter is asked to run only while a FindWork video room could be open.
+\if :stub_net
+insert into private.settings values ('livekit_tick_url', 'https://meter.example/livekit-meter'), ('livekit_hook_secret', 'fixture')
+  on conflict (key) do nothing;
+delete from net.requests;
+select private.request_live_video_tick();
+select pg_temp.eq('while a FindWork video room could be open, the meter is called', (select count(*) from net.requests), 1::bigint);
+update public.live_streams set status = 'ended', ended_at = now() - interval '1 hour', video_joined_at = now() - interval '2 hours' where video = 'livekit';
+delete from net.requests;
+select private.request_live_video_tick();
+select pg_temp.eq('with no video room possible, it is not', (select count(*) from net.requests), 0::bigint);
 \endif
 
 reset role;

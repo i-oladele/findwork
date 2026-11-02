@@ -8,9 +8,10 @@
  *   npm run secrets:push -- PAYSTACK_SECRET_KEY APP_URL    only these
  *
  * Values are never printed. The server functions read a new key on their next
- * request; there is nothing to redeploy. When PAYSTACK_HOOK_SECRET is among
- * them, the database is also told where the Paystack charge and payout
- * functions are and given the same secret, so the two match.
+ * request; there is nothing to redeploy. When PAYSTACK_HOOK_SECRET or
+ * LIVEKIT_HOOK_SECRET is among them, the database is also told where the
+ * functions it calls are (Paystack charge and payout; the live video meter)
+ * and given the same secret, so the two match.
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -23,7 +24,7 @@ export const SERVER_KEYS = new Set([
   'ANTHROPIC_API_KEY', 'ANTHROPIC_WORKSPACE_ID', 'ASSISTANT_MODEL',
   'APP_URL', 'PAYSTACK_SECRET_KEY', 'PAYSTACK_HOOK_SECRET',
   'DOJAH_APP_ID', 'DOJAH_SECRET_KEY', 'DOJAH_BASE_URL',
-  'LIVEKIT_URL', 'LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET',
+  'LIVEKIT_URL', 'LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET', 'LIVEKIT_HOOK_SECRET',
   'GOOGLE_MAPS_API_KEY',
   'TERMII_API_KEY', 'TERMII_BASE_URL', 'TERMII_SENDER_ID', 'SEND_SMS_HOOK_SECRET', 'SMS_COUNTRIES',
   'FCM_PROJECT_ID', 'FCM_SERVICE_ACCOUNT_JSON',
@@ -102,13 +103,24 @@ export function valueOf(line: string): string {
  * must be the same as the PAYSTACK_HOOK_SECRET the functions check.
  */
 export function paystackSettingsSql(projectRef: string, hookSecret: string): string {
+  return settingsSql(projectRef, [
+    ['paystack_charge_url', 'paystack-charge'],
+    ['paystack_payout_url', 'paystack-payout'],
+  ], ['paystack_hook_secret', hookSecret])
+}
+
+/** Where the database sends the live video meter its once-a-minute call, and the secret it signs it with. */
+export function livekitSettingsSql(projectRef: string, hookSecret: string): string {
+  return settingsSql(projectRef, [['livekit_tick_url', 'livekit-meter']], ['livekit_hook_secret', hookSecret])
+}
+
+function settingsSql(projectRef: string, functions: [string, string][], secret: [string, string]): string {
   if (!/^[a-z0-9]{20}$/.test(projectRef)) throw new Error('not a Supabase project ref')
   const q = (v: string) => `'${v.replaceAll("'", "''")}'`
   const base = `https://${projectRef}.supabase.co/functions/v1`
+  const rows = [...functions.map(([key, fn]) => `(${q(key)}, ${q(`${base}/${fn}`)})`), `(${q(secret[0])}, ${q(secret[1])})`]
   return `insert into private.settings(key, value) values
-  ('paystack_charge_url', ${q(`${base}/paystack-charge`)}),
-  ('paystack_payout_url', ${q(`${base}/paystack-payout`)}),
-  ('paystack_hook_secret', ${q(hookSecret)})
+  ${rows.join(',\n  ')}
 on conflict (key) do update set value = excluded.value;
 `
 }
@@ -150,22 +162,30 @@ function main(argv: string[]): number {
     if (run.status !== 0) return run.status ?? 1
     console.log('Uploaded. The server functions use them from their next request.')
 
-    const hook = found.lines.find((l) => l.startsWith('PAYSTACK_HOOK_SECRET='))
-    if (hook) {
+    const hooks = [
+      { name: 'PAYSTACK_HOOK_SECRET', label: 'Paystack', sql: paystackSettingsSql },
+      { name: 'LIVEKIT_HOOK_SECRET', label: 'live video meter', sql: livekitSettingsSql },
+    ].flatMap((h) => {
+      const line = found.lines.find((l) => l.startsWith(`${h.name}=`))
+      return line ? [{ ...h, secret: valueOf(line) }] : []
+    })
+    if (hooks.length > 0) {
       let ref = ''
       try { ref = readFileSync(join(root, 'supabase/.temp/project-ref'), 'utf8').trim() } catch { /* not linked */ }
       if (!ref) {
-        console.error('The project is not linked (supabase link), so the Paystack settings were not saved in the database.')
+        console.error('The project is not linked (supabase link), so the database settings were not saved.')
         return 1
       }
-      const sql = join(dir, 'paystack-settings.sql')
-      writeFileSync(sql, paystackSettingsSql(ref, valueOf(hook)), { mode: 0o600 })
-      const saved = spawnSync('supabase', ['db', 'query', '--linked', '--file', sql], { cwd: root, stdio: ['ignore', 'ignore', 'inherit'] })
-      if (saved.error || saved.status !== 0) {
-        console.error('The keys are uploaded, but saving the Paystack settings in the database failed; run this again.')
-        return saved.status ?? 1
+      for (const hook of hooks) {
+        const sql = join(dir, `${hook.name.toLowerCase()}.sql`)
+        writeFileSync(sql, hook.sql(ref, hook.secret), { mode: 0o600 })
+        const saved = spawnSync('supabase', ['db', 'query', '--linked', '--file', sql], { cwd: root, stdio: ['ignore', 'ignore', 'inherit'] })
+        if (saved.error || saved.status !== 0) {
+          console.error(`The keys are uploaded, but saving the ${hook.label} settings in the database failed; run this again.`)
+          return saved.status ?? 1
+        }
+        console.log(`Saved the ${hook.label} settings in the database (where to call, and the shared secret).`)
       }
-      console.log('Saved the Paystack settings in the database (charge and payout addresses, and the shared secret).')
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })

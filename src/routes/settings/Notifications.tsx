@@ -79,6 +79,8 @@ function targetFor(refType: string | null, refId: string | null): string {
       return '/admin?tab=Risk'
     case 'admin_sos_rota':
       return '/admin/on-call'
+    case 'admin_live_video':
+      return '/admin/analytics'
     case 'track':
       return refId ? `/track/${refId}` : '/orders'
     case 'admin_rider':

@@ -105,7 +105,7 @@ export type Database = {
       }
       live_streams: {
         /** video 'livekit': FindWork carries the video and playback_url is null; 'link': it plays from playback_url. */
-        Row: { id: string; seller_id: string; title: string; video: 'link' | 'livekit'; playback_url: string | null; status: StreamStatus; scheduled_for: string | null; started_at: string | null; ended_at: string | null; pinned_product_id: string | null; peak_viewers: number; created_at: string }
+        Row: { id: string; seller_id: string; title: string; video: 'link' | 'livekit'; playback_url: string | null; status: StreamStatus; scheduled_for: string | null; started_at: string | null; ended_at: string | null; pinned_product_id: string | null; peak_viewers: number; created_at: string; ended_reason: 'time_limit' | 'allowance' | 'budget' | null; video_warned: string[]; video_joined_at: string | null }
         Insert: never
         Update: never
         Relationships: [Rel<'live_streams_seller_id_fkey', 'seller_id', 'provider_profiles'>]
@@ -1202,6 +1202,13 @@ export type Database = {
       social_feed: { Args: { p_kind: 'story' | 'reel' | null; p_author_id: string | null }; Returns: Json }
       schedule_stream: { Args: { p_title: string; p_playback_url: string | null; p_scheduled_for: string | null; p_product_ids: string[]; p_video?: 'link' | 'livekit' }; Returns: string }
       update_stream: { Args: { p_stream_id: string; p_action: 'start' | 'end' | 'pin'; p_product_id: string | null }; Returns: undefined }
+      /** The signed-in seller's live video this cycle (fair use of FindWork video). */
+      live_video_allowance: { Args: Record<string, never>; Returns: Json }
+      admin_live_video: { Args: Record<string, never>; Returns: Json }
+      admin_set_live_video_policy: {
+        Args: { p_plan_minutes: number; p_seller_minutes: number; p_stream_minutes: number; p_preview_minutes: number; p_max_viewers: number; p_cycle_day: number }
+        Returns: undefined
+      }
       send_stream_message: { Args: { p_stream_id: string; p_body: string }; Returns: string }
       remove_stream_message: { Args: { p_message_id: string }; Returns: undefined }
       stream_heartbeat: { Args: { p_stream_id: string }; Returns: number }

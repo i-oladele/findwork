@@ -43,7 +43,7 @@ supabase link --project-ref <your-project-ref>
 supabase db push --include-seed         # migrations + demo catalog and accounts
 supabase functions deploy delete-account paystack-initialize paystack-verify payout-account
 supabase functions deploy mfa-recover route-estimate route-plan assistant identity-check livekit-token
-supabase functions deploy paystack-webhook paystack-charge paystack-payout send-sms send-push --no-verify-jwt
+supabase functions deploy paystack-webhook paystack-charge paystack-payout send-sms send-push livekit-meter --no-verify-jwt
 ```
 
 Every outside service is optional. Without its keys the app says so on screen
@@ -57,7 +57,7 @@ has the steps for each service:
 | Card payments: top-ups, paying for an order or a plan by card, saved cards for renewals | The card option is hidden; people pay from the wallet, topped up by staff | Paystack, below |
 | Confirmed bank accounts and automatic payouts | People type their bank details; staff send every withdrawal | Paystack, below |
 | Identity checks: NIN or BVN with face match, phone (SIM), CAC | Staff review every ID and business by hand | `supabase secrets set DOJAH_APP_ID=... DOJAH_SECRET_KEY=... DOJAH_BASE_URL=https://sandbox.dojah.io` (drop the base URL for live) |
-| Live video for selling, from the phone camera | Sellers paste a link from another streaming app | `supabase secrets set LIVEKIT_URL=wss://<project>.livekit.cloud LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=...` |
+| Live video for selling, from the phone camera, within a fair share of LiveKit's minutes per seller | Sellers paste a link from another streaming app | The three `LIVEKIT_` keys in `.env.local`, then `npm run secrets:push` (it also switches on the minute meter) |
 | Road routing in traffic: rider rounds and arrival times | Rounds are planned on distance; arrival times are estimates, labelled as such | `supabase secrets set GOOGLE_MAPS_API_KEY=...` with the Routes API enabled |
 | Assistant: voice commands beyond the built-in phrases, support answers, chat translation, lesson help, dispute summaries, the staff analyst | Common English and Pidgin commands still work on the device; everything else shows a hint | `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...` (`ASSISTANT_MODEL` optionally picks the model; a key that is not scoped to a workspace also needs `ANTHROPIC_WORKSPACE_ID=wrkspc_...`) |
 | Push notifications | The in-app inbox only; in a browser the push switch is hidden | Browsers: see below. The iPhone and Android apps: Phone apps → Push in the apps |
@@ -119,7 +119,8 @@ plain Postgres cannot prove either:
 - **Scheduled jobs.** With `pg_cron` enabled (Database → Extensions),
   `select jobname from cron.job` should list renewals, renewal reminders,
   order and purchase-order auto-release, the activity purge, SOS escalation
-  (every minute) and the SOS rota-gap reminder. Push needs
+  (every minute), the SOS rota-gap reminder and the live video meter (every
+  minute). Push needs
   `pg_net` enabled the same way.
 
 Then regenerate types whenever the schema changes:

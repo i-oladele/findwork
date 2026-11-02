@@ -11,6 +11,7 @@ import { askAssistant, AssistantUnavailable } from '../../lib/api/assistant'
 import { analyticsCsv, reportDate, reportRange, type AnalyticsReport } from '../../lib/analytics'
 import { formatDateTime, formatNaira } from '../../lib/format'
 import { staffCan } from '../../lib/staff'
+import { LiveVideoUsage } from './LiveVideoUsage'
 
 export function Analytics() {
   const profile = useProfile()
@@ -92,6 +93,7 @@ function AnalyticsDashboard() {
           </div>
         </>}
       </QueryState>}
+      <LiveVideoUsage />
     </div>
   </Screen>
 }
