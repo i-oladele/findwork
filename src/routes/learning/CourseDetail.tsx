@@ -160,6 +160,9 @@ export function CourseDetail() {
         {error && <Alert className="mt-4">{error}</Alert>}
       </div>
 
+      {!isEnrolled && course.price > 0 && !digitalPurchasesAllowed && (
+        <p className="px-[22px] py-4 text-[14px] text-muted">New purchases are unavailable in this app. Courses you already own remain accessible.</p>
+      )}
       {!isEnrolled && (course.price === 0 || digitalPurchasesAllowed) && (
         <div className="sticky bottom-0 left-0 right-0 bg-cream border-t border-line px-[22px] pt-3.5 pb-[max(22px,env(safe-area-inset-bottom))] mt-5">
           {shortfall > 0 ? (

@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
-import { appPathFor, digitalPurchasesAllowed, isNativeApp, pushTapPath } from '../native'
+import { allowsDigitalPurchases, appPathFor, digitalPurchasesAllowed, isNativeApp, pushTapPath } from '../native'
 import { releaseNativePush, syncNativePush } from '../nativePush'
 import { pushSupported } from '../push'
 import { supabase } from '../supabase'
 
 describe('the phone apps', () => {
+  it('disables new digital purchases on both stores until store billing exists', () => {
+    expect(allowsDigitalPurchases('ios')).toBe(false)
+    expect(allowsDigitalPurchases('android')).toBe(false)
+    expect(allowsDigitalPurchases('web')).toBe(true)
+    expect(allowsDigitalPurchases('unknown')).toBe(false)
+  })
+
   it('opens its own links in the app, keeping the path and query', () => {
     expect(appPathFor('https://findwork.africa/wallet/topup?reference=fw_1')).toBe('/wallet/topup?reference=fw_1')
     expect(appPathFor('https://www.findwork.africa/reset-password#access_token=x')).toBe('/reset-password#access_token=x')

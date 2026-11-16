@@ -6,6 +6,7 @@ import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { Chip } from '../../components/ui/Chip'
 import { PlaceholderImage } from '../../components/ui/PlaceholderImage'
+import { BlockUserButton } from '../../components/ui/BlockUserButton'
 import { ReportButton } from '../../components/ui/ReportButton'
 import { SectionLabel } from '../../components/ui/SectionLabel'
 import { QueryState } from '../../components/system/QueryState'
@@ -108,7 +109,7 @@ export function Post({ post }: { post: FeedPost }) {
           <span className="inline-flex items-center gap-1.5"><i className="ph ph-eye text-[19px]" /> {post.views}</span>
           {mine
             ? <button disabled={remove.isPending} className="min-h-11 ml-auto font-semibold" onClick={() => { if (window.confirm('Remove this post?')) remove.mutate(post.id) }}>Remove</button>
-            : <ReportButton targetType="post" targetId={post.id} label="Report" className="ml-auto" />}
+            : <><ReportButton targetType="post" targetId={post.id} label="Report" className="ml-auto" /><BlockUserButton profileId={post.author_id} /></>}
         </div>
       </div>
     </article>

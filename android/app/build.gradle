@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// Supply these in the build environment, never in source control.
+def uploadStoreFile = System.getenv('FINDWORK_UPLOAD_STORE_FILE')
+def uploadStorePassword = System.getenv('FINDWORK_UPLOAD_STORE_PASSWORD')
+def uploadKeyAlias = System.getenv('FINDWORK_UPLOAD_KEY_ALIAS')
+def uploadKeyPassword = System.getenv('FINDWORK_UPLOAD_KEY_PASSWORD')
+def hasUploadSigning = [uploadStoreFile, uploadStorePassword, uploadKeyAlias, uploadKeyPassword].every { it }
+
+
 android {
     namespace = "africa.findwork.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +24,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasUploadSigning) {
+            release {
+                storeFile file(uploadStoreFile)
+                storePassword uploadStorePassword
+                keyAlias uploadKeyAlias
+                keyPassword uploadKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasUploadSigning) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -51,4 +70,11 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+// Never silently produce an unsigned store release.
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.project == project && (it.name == 'bundleRelease' || it.name == 'assembleRelease') } && !hasUploadSigning) {
+        throw new GradleException('Release signing is missing. Set all four FINDWORK_UPLOAD_* environment variables; see docs/release/launch-checklist.md.')
+    }
 }

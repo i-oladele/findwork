@@ -9,13 +9,12 @@ import { Capacitor } from '@capacitor/core'
 export const isNativeApp = Capacitor.isNativePlatform()
 export const nativePlatform = Capacitor.getPlatform() as 'ios' | 'android' | 'web'
 
-/**
- * Whether digital purchases (plans, paid courses) may be bought here. Apple
- * requires its own in-app purchase for digital goods sold in an iPhone app,
- * so until FindWork decides to offer it, they are bought on the web or on
- * Android. Goods and services (bookings, orders, top-ups) are not affected.
- */
-export const digitalPurchasesAllowed = nativePlatform !== 'ios'
+/** New digital purchases stay on the web until store billing is implemented.
+ * Existing entitlements remain readable in both phone apps. */
+export function allowsDigitalPurchases(platform: string): boolean {
+  return platform === 'web'
+}
+export const digitalPurchasesAllowed = allowsDigitalPurchases(nativePlatform)
 
 /** Hosts whose links open the app instead of a browser (see public/.well-known). */
 const APP_HOSTS = ['findwork.africa', 'www.findwork.africa']
@@ -80,6 +79,10 @@ export async function startNativeShell(navigate: (path: string) => void): Promis
     void Browser.close().catch(() => {})
     navigate(path)
   })
+  // A link that starts a stopped app can arrive before the listener exists.
+  const launch = await App.getLaunchUrl().catch(() => undefined)
+  const launchPath = launch && appPathFor(launch.url)
+  if (launchPath) navigate(launchPath)
   await App.addListener('backButton', ({ canGoBack }) => {
     if (canGoBack) window.history.back()
     else void App.exitApp()

@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { PlaceholderImage } from '../../components/ui/PlaceholderImage'
+import { BlockUserButton } from '../../components/ui/BlockUserButton'
 import { ReportButton } from '../../components/ui/ReportButton'
 import { SectionLabel } from '../../components/ui/SectionLabel'
 import { QueryState } from '../../components/system/QueryState'
@@ -264,7 +265,7 @@ function Room({ s }: { s: StreamWithSeller }) {
             <button type="submit" disabled={!text.trim() || send.isPending} className="px-4 h-12 bg-ink text-cream rounded-lg text-[14.5px] font-semibold disabled:opacity-50">Send</button>
           </form>
         )}
-        {!mine && <ReportButton targetType="stream" targetId={s.id} label="Report this stream" className="mt-5" />}
+        {!mine && <><ReportButton targetType="stream" targetId={s.id} label="Report this stream" className="mt-5" /><BlockUserButton profileId={s.seller_id} /></>}
       </div>
     </Screen>
   )

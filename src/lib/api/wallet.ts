@@ -1,3 +1,4 @@
+import { digitalPurchasesAllowed } from '../native'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
@@ -76,6 +77,9 @@ export type StartPayment =
 export function useStartPayment() {
   return useMutation({
     mutationFn: async (body: StartPayment) => {
+      if (body.purpose === 'plan' && !digitalPurchasesAllowed) {
+        throw new Error('Plan purchases are unavailable in this app.')
+      }
       const { data, error } = await supabase.functions.invoke('paystack-initialize', { body })
       if (error) throw await functionError(error)
       return data as { reference: string; amount: number; authorization_url: string }

@@ -36,6 +36,7 @@ export const supabase = createClient<Database>(url ?? 'http://localhost:54321', 
  * a generic message rather than leaking SQL to the screen.
  */
 const FRIENDLY_ERRORS: Record<string, string> = {
+  'messaging blocked': 'Messaging is unavailable because a user block is in place.',
   'minimum transfer': msg('The minimum you can send is ₦100.'),
   'cannot send to yourself': msg('That is your own account.'),
   'recipient not found': msg('We could not find that account.'),

@@ -6,6 +6,8 @@ import { Screen } from '../../components/chrome/Screen'
 import { StatusBar } from '../../components/chrome/StatusBar'
 import { BackButton } from '../../components/chrome/PageHeader'
 import { PlaceholderImage } from '../../components/ui/PlaceholderImage'
+import { BlockUserButton } from '../../components/ui/BlockUserButton'
+import { useBlockStatus } from '../../lib/api/blocks'
 import { ReportButton } from '../../components/ui/ReportButton'
 import { ChatAttachment } from '../../components/ui/PrivateAttachment'
 import { ChatComposer } from '../../components/ui/ChatComposer'
@@ -44,6 +46,7 @@ export function ChatThread() {
   const { data: partner } = useThreadPartner(threadId)
   const { data: partnerAsProvider } = useProvider(partner?.id)
   const { data: partnerTrust } = useTrust(partner?.id)
+  const blockStatus = useBlockStatus(partner?.id)
   const messages = useMessages(threadId)
   const { data: context } = useThreadContext(threadId)
   const { mutate: markRead } = useMarkThreadRead()
@@ -125,6 +128,8 @@ export function ChatThread() {
           </p>
         </div>
 
+        {partner && <BlockUserButton profileId={partner.id} />}
+
         {messages.isLoading && <ListSkeleton rows={3} />}
         {messages.isError && <ErrorState message="We could not load this conversation." onRetry={() => messages.refetch()} />}
         {messages.data?.length === 0 && (
@@ -180,7 +185,15 @@ export function ChatThread() {
         <div ref={bottom} />
       </div>
 
-      <ChatComposer key={threadId} threadId={threadId} />
+      {blockStatus.data && !blockStatus.data.blocked ? (
+        <ChatComposer key={threadId} threadId={threadId} />
+      ) : (
+        <p role="status" className="px-5 py-4 text-[14px] text-muted">
+          {blockStatus.isError ? 'Could not check messaging availability. Reopen this conversation to try again.'
+            : blockStatus.data?.blocked ? 'Messaging is unavailable because a user block is in place. You can still manage existing transactions and contact support.'
+              : 'Checking messaging availability…'}
+        </p>
+      )}
     </Screen>
   )
 }

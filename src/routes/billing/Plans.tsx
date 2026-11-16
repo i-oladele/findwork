@@ -96,7 +96,7 @@ export function Plans() {
                   </div>
                   {!digitalPurchasesAllowed && !isCurrent ? (
                     <div className="flex items-center justify-center w-full h-12 mt-4 rounded-lg bg-cream text-[14px] text-muted">
-                      Plans cannot be changed in the iPhone app
+                      Plans cannot be changed in this app
                     </div>
                   ) : isCurrent ? (
                     <div className="flex items-center justify-center w-full h-12 mt-4 rounded-lg bg-cream text-[15px] font-semibold text-muted">

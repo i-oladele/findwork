@@ -1,3 +1,4 @@
+import { digitalPurchasesAllowed } from '../native'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
@@ -37,16 +38,14 @@ export function useSubscription() {
  * Charges the first month from the wallet; private.renew_subscriptions
  * charges each month after, or drops the account to Free if it cannot.
  *
- * TODO(store-review): on iOS, selling a digital subscription outside Apple's
- * in-app purchase is the single most common cause of marketplace-app
- * rejection. This wallet-charge path is fine on web and Android; the iOS
- * build needs either IAP or these plans hidden.
+ * New plan purchases are unavailable in store builds until store billing is added.
  */
 export function useSubscribe() {
   const qc = useQueryClient()
 
   return useMutation({
     mutationFn: async (planId: string) => {
+      if (!digitalPurchasesAllowed) throw new Error('Plan purchases are unavailable in this app.')
       const { error } = await supabase.rpc('subscribe_plan', { p_plan: planId })
       if (error) throw error
     },

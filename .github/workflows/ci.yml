@@ -86,6 +86,9 @@ jobs:
       - name: Business rules
         run: psql -v ON_ERROR_STOP=1 -f supabase/checks/business_rules.sql
 
+      - name: User blocking permissions
+        run: psql -v ON_ERROR_STOP=1 -f supabase/checks/user_blocking.sql
+
   # Fails the build if a service-role key or a real .env is ever committed.
   # The anon key is safe in the client; the service-role key bypasses RLS.
   secrets:

@@ -91,6 +91,12 @@ type Rel<Name extends string, Col extends string, Ref extends string, One extend
 export type Database = {
   public: {
     Tables: {
+      user_blocks: {
+        Row: { blocker_id: string; blocked_id: string; created_at: string }
+        Insert: { blocker_id: string; blocked_id: string; created_at?: string }
+        Update: never
+        Relationships: []
+      }
       social_posts: {
         Row: { id: string; author_id: string; kind: 'story' | 'reel'; media_path: string; mime: string; caption: string; product_id: string | null; expires_at: string | null; views: number; likes: number; status: 'live' | 'removed'; created_at: string }
         Insert: never
@@ -1185,6 +1191,7 @@ export type Database = {
     }
     Views: Record<never, never>
     Functions: {
+      users_blocked: { Args: { p_first: string; p_second: string }; Returns: boolean }
       match_providers_for_job: { Args: { p_job_id: string }; Returns: Json }
       invite_provider_to_job: { Args: { p_job_id: string; p_provider_id: string }; Returns: undefined }
       recommended_jobs: { Args: Record<never, never>; Returns: Json }

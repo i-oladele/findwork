@@ -1,3 +1,4 @@
+import { BlockUserButton } from './BlockUserButton'
 import { useState } from 'react'
 import { useReport } from '../../lib/api'
 import { friendlyError } from '../../lib/supabase'
@@ -6,7 +7,7 @@ import type { ReportTargetType } from '../../lib/database.types'
 const REASONS = ['Scam or fraud', 'Offensive or abusive', 'Prohibited item', 'Misleading', 'Something else']
 
 /** "Report" link that expands into a reason picker and files it for a moderator. */
-export function ReportButton({
+function ReportControl({
   targetType,
   targetId,
   label = 'Report',
@@ -70,4 +71,11 @@ export function ReportButton({
       </button>
     </div>
   )
+}
+
+export function ReportButton(props: Parameters<typeof ReportControl>[0]) {
+  return <div>
+    <ReportControl {...props} />
+    {props.targetType === 'profile' && <BlockUserButton profileId={props.targetId} />}
+  </div>
 }

@@ -49,6 +49,7 @@ export function Legal() {
           </section>
         ))}
 
+        <Link to="/delete-account" className="flex items-center min-h-11 mt-8 text-[15px] font-semibold text-brand-hover">Delete your FindWork account</Link>
         <Link to={other.to} className="inline-flex items-center min-h-11 mt-8 text-[15px] font-semibold text-brand-hover">{other.label}</Link>
       </article>
     </Screen>

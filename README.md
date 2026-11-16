@@ -257,6 +257,13 @@ in English. `npm run i18n:check` (run by CI) fails if a wrapped sentence is
 missing from a catalog or its placeholders differ. The translations were
 written by the developers and need a native speaker's review.
 
+## Release preparation
+
+See [the build and launch checklist](docs/release/launch-checklist.md),
+[owner handoff](docs/release/owner-handoff.md) and
+[store listing draft](docs/release/store-listing.md). Run `npm run release:verify`
+for local checks and `npm run release:check` for outstanding configuration.
+
 ## Phone apps
 
 The iPhone and Android apps are the same web app in a Capacitor shell
@@ -282,10 +289,11 @@ Before a store build:
 - **Android:** install Android Studio; put the Play app-signing key's SHA-256
   in `public/.well-known/assetlinks.json`. The app-link host is in
   `android/app/src/main/AndroidManifest.xml`.
-- **Digital purchases on iPhone:** Apple requires its in-app purchase for
-  digital goods, so the iPhone app does not sell plans or paid courses
-  (`digitalPurchasesAllowed` in `src/lib/native.ts`). Bookings, goods and
-  top-ups are not affected. Decide whether to add in-app purchase.
+- **Digital purchases in the phone apps:** new plans and paid courses are
+  unavailable on iOS and Android until store billing is implemented
+  (`digitalPurchasesAllowed` in `src/lib/native.ts`). Courses remain visible;
+  free enrollment and access to existing purchases remain available. Bookings,
+  physical goods and their payment flows continue to work.
 - **Passkeys in the apps** need the `webcredentials` association above.
 
 ### Push in the apps

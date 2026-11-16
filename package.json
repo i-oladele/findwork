@@ -16,7 +16,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b --noEmit",
-    "cap:sync": "npm run build && cap sync"
+    "cap:sync": "npm run build && cap sync",
+    "release:check": "node scripts/release-check.mjs",
+    "release:verify": "npm run lint && npm test && npm run prd:check && npm run i18n:check && npm run build",
+    "android:bundle": "npm run cap:sync && cd android && ./gradlew bundleRelease",
+    "release:web": "node scripts/web-release-check.mjs && npm run release:verify",
+    "release:hosted": "node scripts/hosted-release-check.mjs"
   },
   "dependencies": {
     "@capacitor/android": "8.5.2",

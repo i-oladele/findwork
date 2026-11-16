@@ -115,6 +115,7 @@ const Rider = lazyNamed(() => import('./routes/rider/Rider'), 'Rider')
 const Notifications = lazyNamed(() => import('./routes/settings/Notifications'), 'Notifications')
 const Location = lazyNamed(() => import('./routes/settings/Location'), 'Location')
 const Help = lazyNamed(() => import('./routes/settings/Help'), 'Help')
+const AccountDeletion = lazyNamed(() => import('./routes/settings/AccountDeletion'), 'AccountDeletion')
 const Legal = lazyNamed(() => import('./routes/settings/Legal'), 'Legal')
 const Admin = lazyNamed(() => import('./routes/admin/Admin'), 'Admin')
 const Analytics = lazyNamed(() => import('./routes/admin/Analytics'), 'Analytics')
@@ -170,6 +171,7 @@ export default function App() {
 
           {/* Reachable signed in or out — required for store review */}
           <Route path="/legal/:doc" element={<Legal />} />
+          <Route path="/delete-account" element={<AccountDeletion />} />
           {/* A certificate can be checked by anyone it is shown to. */}
           <Route path="/certificate/:code" element={<CertificatePage />} />
 

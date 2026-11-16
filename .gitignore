@@ -30,3 +30,11 @@ dist-ssr
 # Supabase local artifacts
 supabase/.temp
 supabase/.branches
+
+# Mobile release credentials
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+android/key.properties

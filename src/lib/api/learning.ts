@@ -1,3 +1,4 @@
+import { digitalPurchasesAllowed } from '../native'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../supabase'
 import { useAuth } from '../authContext'
@@ -80,6 +81,11 @@ export function useEnroll() {
 
   return useMutation({
     mutationFn: async (courseId: string) => {
+      if (!digitalPurchasesAllowed) {
+        const course = await supabase.from('courses').select('price').eq('id', courseId).single()
+        if (course.error) throw course.error
+        if (course.data.price > 0) throw new Error('New paid course purchases are unavailable in this app.')
+      }
       const { error } = await supabase.rpc('enroll_in_course', { p_course_id: courseId })
       if (error) throw error
     },
